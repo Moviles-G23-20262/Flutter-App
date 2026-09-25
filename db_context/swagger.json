@@ -1,0 +1,1249 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/": {
+            "get": {
+                "operationId": "AppController_getHello",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "App"
+                ]
+            }
+        },
+        "/auth": {
+            "post": {
+                "operationId": "AuthController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateAuthDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Auth"
+                ]
+            },
+            "get": {
+                "operationId": "AuthController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Auth"
+                ]
+            }
+        },
+        "/auth/{id}": {
+            "get": {
+                "operationId": "AuthController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Auth"
+                ]
+            },
+            "patch": {
+                "operationId": "AuthController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateAuthDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Auth"
+                ]
+            },
+            "delete": {
+                "operationId": "AuthController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Auth"
+                ]
+            }
+        },
+        "/users": {
+            "post": {
+                "operationId": "UsersController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUserDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "get": {
+                "operationId": "UsersController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "operationId": "UsersController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "patch": {
+                "operationId": "UsersController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "delete": {
+                "operationId": "UsersController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/materials": {
+            "post": {
+                "operationId": "MaterialsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateMaterialDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Materials"
+                ]
+            },
+            "get": {
+                "operationId": "MaterialsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Materials"
+                ]
+            }
+        },
+        "/materials/{id}": {
+            "get": {
+                "operationId": "MaterialsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Materials"
+                ]
+            },
+            "patch": {
+                "operationId": "MaterialsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMaterialDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Materials"
+                ]
+            },
+            "delete": {
+                "operationId": "MaterialsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Materials"
+                ]
+            }
+        },
+        "/chatrooms": {
+            "post": {
+                "operationId": "ChatroomsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateChatroomDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chatrooms"
+                ]
+            },
+            "get": {
+                "operationId": "ChatroomsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chatrooms"
+                ]
+            }
+        },
+        "/chatrooms/{id}": {
+            "get": {
+                "operationId": "ChatroomsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chatrooms"
+                ]
+            },
+            "patch": {
+                "operationId": "ChatroomsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateChatroomDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chatrooms"
+                ]
+            },
+            "delete": {
+                "operationId": "ChatroomsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Chatrooms"
+                ]
+            }
+        },
+        "/messages": {
+            "post": {
+                "operationId": "MessagesController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateMessageDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Messages"
+                ]
+            },
+            "get": {
+                "operationId": "MessagesController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Messages"
+                ]
+            }
+        },
+        "/messages/{id}": {
+            "get": {
+                "operationId": "MessagesController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Messages"
+                ]
+            },
+            "patch": {
+                "operationId": "MessagesController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMessageDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Messages"
+                ]
+            },
+            "delete": {
+                "operationId": "MessagesController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Messages"
+                ]
+            }
+        },
+        "/sql/query": {
+            "post": {
+                "operationId": "SqlController_query",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/QuerySqlDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Sql"
+                ]
+            }
+        },
+        "/exchanges": {
+            "post": {
+                "operationId": "ExchangesController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateExchangeDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Exchanges"
+                ]
+            },
+            "get": {
+                "operationId": "ExchangesController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Exchanges"
+                ]
+            }
+        },
+        "/exchanges/{id}": {
+            "get": {
+                "operationId": "ExchangesController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Exchanges"
+                ]
+            },
+            "patch": {
+                "operationId": "ExchangesController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateExchangeDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Exchanges"
+                ]
+            },
+            "delete": {
+                "operationId": "ExchangesController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Exchanges"
+                ]
+            }
+        },
+        "/wishlist-items": {
+            "post": {
+                "operationId": "WishlistItemsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateWishlistItemDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "WishlistItems"
+                ]
+            },
+            "get": {
+                "operationId": "WishlistItemsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "WishlistItems"
+                ]
+            }
+        },
+        "/wishlist-items/{id}": {
+            "get": {
+                "operationId": "WishlistItemsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "WishlistItems"
+                ]
+            },
+            "patch": {
+                "operationId": "WishlistItemsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateWishlistItemDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "WishlistItems"
+                ]
+            },
+            "delete": {
+                "operationId": "WishlistItemsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "WishlistItems"
+                ]
+            }
+        },
+        "/notifications": {
+            "post": {
+                "operationId": "NotificationsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateNotificationDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            },
+            "get": {
+                "operationId": "NotificationsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            }
+        },
+        "/notifications/{id}": {
+            "get": {
+                "operationId": "NotificationsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            },
+            "patch": {
+                "operationId": "NotificationsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateNotificationDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            },
+            "delete": {
+                "operationId": "NotificationsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Notifications"
+                ]
+            }
+        },
+        "/analytics-events": {
+            "post": {
+                "operationId": "AnalyticsEventsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateAnalyticsEventDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "AnalyticsEvents"
+                ]
+            },
+            "get": {
+                "operationId": "AnalyticsEventsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "AnalyticsEvents"
+                ]
+            }
+        },
+        "/analytics-events/{id}": {
+            "get": {
+                "operationId": "AnalyticsEventsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "AnalyticsEvents"
+                ]
+            },
+            "patch": {
+                "operationId": "AnalyticsEventsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateAnalyticsEventDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "AnalyticsEvents"
+                ]
+            },
+            "delete": {
+                "operationId": "AnalyticsEventsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "AnalyticsEvents"
+                ]
+            }
+        },
+        "/meeting-points": {
+            "post": {
+                "operationId": "MeetingPointsController_create",
+                "parameters": [],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateMeetingPointDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "MeetingPoints"
+                ]
+            },
+            "get": {
+                "operationId": "MeetingPointsController_findAll",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "MeetingPoints"
+                ]
+            }
+        },
+        "/meeting-points/{id}": {
+            "get": {
+                "operationId": "MeetingPointsController_findOne",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "MeetingPoints"
+                ]
+            },
+            "patch": {
+                "operationId": "MeetingPointsController_update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateMeetingPointDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "MeetingPoints"
+                ]
+            },
+            "delete": {
+                "operationId": "MeetingPointsController_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "MeetingPoints"
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "Campus Swap API",
+        "description": "API documentation for Campus Swap",
+        "version": "1.0",
+        "contact": {}
+    },
+    "tags": [],
+    "servers": [],
+    "components": {
+        "schemas": {
+            "CreateAuthDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateAuthDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateUserDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateUserDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateMaterialDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateMaterialDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateChatroomDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateChatroomDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateMessageDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateMessageDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "QuerySqlDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateExchangeDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateExchangeDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateWishlistItemDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateWishlistItemDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateNotificationDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateNotificationDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateAnalyticsEventDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateAnalyticsEventDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "CreateMeetingPointDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UpdateMeetingPointDto": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    }
+}
