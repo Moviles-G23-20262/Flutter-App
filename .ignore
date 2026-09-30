@@ -1,0 +1,16 @@
+# Flutter
+.dart_tool/
+build/
+.idea/
+ios/Pods/
+android/.gradle/
+pubspec.lock
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Node / NestJS
+node_modules/
+dist/

@@ -45,3 +45,57 @@ app.*.map.json
 /android/app/release
 
 AGENTS.md
+
+
+# Flutter SDK / tooling installed locally
+.flutter/
+.fvm/
+.fvmrc
+flutter/
+.packages
+.flutter-plugins
+.pub-cache/
+pubspec_overrides.yaml
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+
+# Android (local, machine-specific)
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/gradle-wrapper.jar
+**/android/key.properties
+*.jks
+*.keystore
+.cxx/
+.externalNativeBuild/
+
+# iOS / macOS (generated)
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/macos/Pods/
+**/macos/Flutter/ephemeral/
+**/Pods/
+xcuserdata/
+
+# Desktop / web generated
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# IDE / local tool settings
+.vscode/settings.json
+.claude/settings.local.json
