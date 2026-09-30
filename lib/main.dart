@@ -9,6 +9,7 @@ import 'Presentation/Screens/messages_screen.dart';
 import 'Presentation/Screens/profile_screen.dart';
 import 'Presentation/Screens/seller_hub_screen.dart';
 import 'Presentation/Screens/new_listing_screen.dart';
+import 'Presentation/Screens/new_listing_smart_screen.dart';
 import 'Presentation/Screens/confirmation_screen.dart';
 
 void main() {
@@ -61,6 +62,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
         return SellerHubScreen(appState: _appState);
       case AppScreen.newListing:
         return NewListingScreen(appState: _appState);
+      case AppScreen.newListingSmart:
+        return NewListingSmartScreen(appState: _appState);
       case AppScreen.confirmation:
         return ConfirmationScreen(appState: _appState);
       case AppScreen.home:
