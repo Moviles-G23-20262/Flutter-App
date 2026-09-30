@@ -14,6 +14,7 @@ enum AppScreen {
   profile,
   sellerHub,
   newListing,
+  newListingSmart,
   confirmation,
 }
 

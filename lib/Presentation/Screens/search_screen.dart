@@ -3,6 +3,7 @@ import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
+import '../../Domain/Strategies/sort_strategy.dart';
 import 'home_screen.dart' show kMockMaterials;
 
 // ─── Search Screen ────────────────────────────────────────────────────────────
@@ -19,25 +20,13 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _queryCtrl = TextEditingController();
   String _query       = '';
-  String _category    = 'All';
-  String _condition   = 'All';
-  String _sortBy      = 'default';
-  double _maxPrice    = 100;
-  bool   _showFilters = false;
-
-  static const _conditions = ['All', 'New', 'Like New', 'Good', 'Fair'];
-  static const _categories = ['All', 'Books', 'Calculators', 'Lab Equipment', 'Other'];
-  static const _sortOptions = [
-    ['default', 'Relevance'],
-    ['price-asc', 'Price low'],
-    ['price-desc', 'Price high'],
-  ];
+  _SearchFilters _filters = const _SearchFilters();
 
   List<MaterialEntity> get _results {
     var list = kMockMaterials.where((m) {
-      if (_category != 'All' && m.category.displayName != _category) return false;
-      if (_condition != 'All' && m.conditionDisplayName != _condition) return false;
-      if (m.price > _maxPrice) return false;
+      if (_filters.category != null && m.category != _filters.category) return false;
+      if (_filters.condition != null && m.condition != _filters.condition) return false;
+      if (m.price > _filters.maxPrice) return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         return m.title.toLowerCase().contains(q) ||
@@ -47,10 +36,17 @@ class _SearchScreenState extends State<SearchScreen> {
       return true;
     }).toList();
 
-    if (_sortBy == 'price-asc')  list.sort((a, b) => a.price.compareTo(b.price));
-    if (_sortBy == 'price-desc') list.sort((a, b) => b.price.compareTo(a.price));
+    return _filters.sort.sort(list);
+  }
 
-    return list;
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<_SearchFilters>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSheet(initial: _filters),
+    );
+    if (result != null && mounted) setState(() => _filters = result);
   }
 
   @override
@@ -66,8 +62,6 @@ class _SearchScreenState extends State<SearchScreen> {
     final border      = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
     final txMuted     = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-    final elevated    = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
-    final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
 
     final results = _results;
 
@@ -97,66 +91,18 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(width: 8),
                   AppIconButton(
-                    icon: Icon(Icons.tune_rounded, color: _showFilters ? Colors.white : txSecondary, size: 18),
-                    active: _showFilters,
-                    onTap: () => setState(() => _showFilters = !_showFilters),
+                    icon: Icon(Icons.photo_camera_outlined, color: txSecondary, size: 18),
+                    onTap: () => widget.appState.navigateTo(AppScreen.newListingSmart),
+                  ),
+                  const SizedBox(width: 8),
+                  AppIconButton(
+                    icon: Icon(Icons.filter_alt_rounded,
+                        color: _filters.isActive ? Colors.white : txSecondary, size: 18),
+                    active: _filters.isActive,
+                    onTap: _openFilters,
                   ),
                 ],
               ),
-
-              // Filters panel
-              if (_showFilters) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: elevated,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderSubtle),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _FilterGroup(
-                        label: 'Category',
-                        options: _categories,
-                        selected: _category,
-                        onSelect: (v) => setState(() => _category = v),
-                      ),
-                      const SizedBox(height: 10),
-                      _FilterGroup(
-                        label: 'Condition',
-                        options: _conditions,
-                        selected: _condition,
-                        onSelect: (v) => setState(() => _condition = v),
-                      ),
-                      const SizedBox(height: 10),
-                      Text('Max Price: ₱${_maxPrice.toInt()}',
-                          style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          activeTrackColor: brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent,
-                          thumbColor: brightness == Brightness.dark ? AppColors.darkAccentHi : AppColors.lightAccentHi,
-                          inactiveTrackColor: borderSubtle,
-                          overlayColor: (brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent).withOpacity(0.2),
-                        ),
-                        child: Slider(
-                          min: 5, max: 200, value: _maxPrice,
-                          onChanged: (v) => setState(() => _maxPrice = v),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      _FilterGroup(
-                        label: 'Sort by',
-                        options: _sortOptions.map((e) => e[0]).toList(),
-                        labels: _sortOptions.map((e) => e[1]).toList(),
-                        selected: _sortBy,
-                        onSelect: (v) => setState(() => _sortBy = v),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 8),
               Text('${results.length} item${results.length != 1 ? 's' : ''} found',
                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
@@ -194,47 +140,176 @@ class _SearchScreenState extends State<SearchScreen> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _FilterGroup extends StatelessWidget {
-  final String label;
-  final List<String> options;
-  final List<String>? labels;
-  final String selected;
-  final ValueChanged<String> onSelect;
+/// Applied search filters (null category/condition means "All").
+class _SearchFilters {
+  static const double defaultMaxPrice = 200;
 
-  const _FilterGroup({
-    required this.label,
-    required this.options,
-    this.labels,
-    required this.selected,
-    required this.onSelect,
+  final MaterialCategoryEnum? category;
+  final MaterialConditionEnum? condition;
+  final double maxPrice;
+  final SortStrategy sort;
+
+  const _SearchFilters({
+    this.category,
+    this.condition,
+    this.maxPrice = defaultMaxPrice,
+    this.sort = const RelevanceSortStrategy(),
   });
+
+  bool get isActive =>
+      category != null ||
+      condition != null ||
+      maxPrice < defaultMaxPrice ||
+      sort.id != const RelevanceSortStrategy().id;
+}
+
+// ─── Filter bottom sheet (View 06) ───────────────────────────────────────────
+
+class _FilterSheet extends StatefulWidget {
+  final _SearchFilters initial;
+
+  const _FilterSheet({required this.initial});
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late MaterialCategoryEnum? _category = widget.initial.category;
+  late MaterialConditionEnum? _condition = widget.initial.condition;
+  late double _maxPrice = widget.initial.maxPrice;
+  late SortStrategy _sort = widget.initial.sort;
+
+  void _reset() => setState(() {
+        _category = null;
+        _condition = null;
+        _maxPrice = _SearchFilters.defaultMaxPrice;
+        _sort = kSortStrategies.first;
+      });
+
+  void _apply() => Navigator.of(context).pop(_SearchFilters(
+        category: _category,
+        condition: _condition,
+        maxPrice: _maxPrice,
+        sort: _sort,
+      ));
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final isDark      = Theme.of(context).brightness == Brightness.dark;
+    final surface     = isDark ? AppColors.darkSurface       : AppColors.lightSurface;
+    final borderSub   = isDark ? AppColors.darkBorderSubtle  : AppColors.lightBorderSubtle;
+    final txPrimary   = isDark ? AppColors.darkTextPrimary   : AppColors.lightTextPrimary;
+    final txSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final accent      = isDark ? AppColors.darkAccent        : AppColors.lightAccent;
+    final accentHi    = isDark ? AppColors.darkAccentHi      : AppColors.lightAccentHi;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: List.generate(options.length, (i) {
-            final val = options[i];
-            final lbl = labels != null ? labels![i] : val;
-            return PillChip(
-              label: lbl,
-              active: selected == val,
-              onTap: () => onSelect(val),
-            );
-          }),
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(color: borderSub),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: borderSub, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Filters & Sort',
+                        style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
+                  ),
+                  TextButton(onPressed: _reset, child: const Text('Reset')),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              _SheetLabel('Category', color: txSecondary),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  PillChip(label: 'All', active: _category == null, onTap: () => setState(() => _category = null)),
+                  for (final c in MaterialCategoryEnum.values)
+                    PillChip(label: c.displayName, active: _category == c, onTap: () => setState(() => _category = c)),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              _SheetLabel('Condition', color: txSecondary),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  PillChip(label: 'All', active: _condition == null, onTap: () => setState(() => _condition = null)),
+                  for (final c in MaterialConditionEnum.values)
+                    PillChip(label: c.displayName, active: _condition == c, onTap: () => setState(() => _condition = c)),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              _SheetLabel('Max Price: ₱${_maxPrice.toInt()}', color: txSecondary),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: accent,
+                  thumbColor: accentHi,
+                  inactiveTrackColor: borderSub,
+                  overlayColor: accent.withValues(alpha: 0.2),
+                ),
+                child: Slider(
+                  min: 5,
+                  max: _SearchFilters.defaultMaxPrice,
+                  value: _maxPrice,
+                  onChanged: (v) => setState(() => _maxPrice = v),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              _SheetLabel('Sort by', color: txSecondary),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final s in kSortStrategies)
+                    PillChip(label: s.label, active: _sort.id == s.id, onTap: () => setState(() => _sort = s)),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              PrimaryButton(label: 'Apply Filters', fullWidth: true, onPressed: _apply),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+  final Color color;
+
+  const _SheetLabel(this.text, {required this.color});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text,
+            style: AppTextStyles.body(color, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -249,7 +324,6 @@ class _SearchProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final txMuted   = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final accentHi  = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
     final elevated  = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
