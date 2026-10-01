@@ -85,7 +85,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
     final borderSubtle= brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
     final successColor= brightness == Brightness.dark ? AppColors.darkSuccess    : AppColors.lightSuccess;
 
-    return Column(
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
       children: [
         // Header
         Container(
@@ -172,7 +174,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
                         decoration: BoxDecoration(
                           color: elevated,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: accentHi.withOpacity(0.5), style: BorderStyle.solid, width: 1.5),
+                          border: Border.all(color: accentHi.withValues(alpha: 0.5), style: BorderStyle.solid, width: 1.5),
                         ),
                         child: Column(
                           children: [
@@ -316,7 +318,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
                                     children: [
                                       Expanded(child: _AiResultTile(label: 'Detected condition', value: 'Like New', brightness: brightness)),
                                       const SizedBox(width: 10),
-                                      Expanded(child: _AiResultTile(label: 'Suggested price', value: '₱${_aiSuggestion.$2}', brightness: brightness)),
+                                      Expanded(child: _AiResultTile(label: 'Suggested price', value: '\$${_aiSuggestion.$2}', brightness: brightness)),
                                     ],
                                   ),
                                 ],
@@ -368,7 +370,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _FieldLabel('Price (₱)', txMuted: txMuted),
+                                _FieldLabel('Price (\$)', txMuted: txMuted),
                                 AppTextField(
                                   placeholder: '0.00',
                                   controller: _priceCtrl,
@@ -448,6 +450,8 @@ class _NewListingScreenState extends State<NewListingScreen> {
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 }

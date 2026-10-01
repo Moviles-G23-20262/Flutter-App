@@ -28,7 +28,9 @@ class SellerHubScreen extends StatelessWidget {
     // seller's listings (mock: use first seller)
     final myListings = kMockMaterials.take(2).toList();
 
-    return Column(
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
       children: [
         // Header
         Container(
@@ -79,7 +81,7 @@ class SellerHubScreen extends StatelessWidget {
                   children: [
                     _StatCard(icon: Icons.inventory_2_outlined, value: '8',    label: 'Active Listings', brightness: brightness),
                     const SizedBox(width: 10),
-                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: '₱240', label: 'Earned This Month', brightness: brightness),
+                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: '\$240', label: 'Earned This Month', brightness: brightness),
                     const SizedBox(width: 10),
                     _StatCard(icon: Icons.trending_up_rounded, value: '4.9',   label: 'Your Rating', brightness: brightness),
                   ],
@@ -136,7 +138,7 @@ class SellerHubScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Text('₱${s.price.toStringAsFixed(2)}',
+                        Text('\$${s.price.toStringAsFixed(2)}',
                             style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
                       ],
                     ),
@@ -182,6 +184,8 @@ class SellerHubScreen extends StatelessWidget {
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 }
@@ -247,7 +251,7 @@ class _ListingRow extends StatelessWidget {
               width: 58, height: 58,
               child: material.primaryImageUrl.isNotEmpty
                   ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: elevated))
+                      errorBuilder: (_, _, _) => Container(color: elevated))
                   : Container(color: elevated),
             ),
           ),
@@ -272,7 +276,7 @@ class _ListingRow extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('₱${material.price.toStringAsFixed(2)}',
+                      child: Text('\$${material.price.toStringAsFixed(2)}',
                           style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                     ),
                     Container(

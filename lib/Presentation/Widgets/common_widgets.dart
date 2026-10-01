@@ -277,6 +277,8 @@ class AppTextField extends StatelessWidget {
   final int maxLines;
   final String? errorText;
   final TextInputAction textInputAction;
+  final bool enabled;
+  final TextCapitalization textCapitalization;
 
   const AppTextField({
     super.key,
@@ -292,6 +294,8 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.errorText,
     this.textInputAction = TextInputAction.next,
+    this.enabled = true,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -313,6 +317,8 @@ class AppTextField extends StatelessWidget {
       readOnly: readOnly,
       maxLines: maxLines,
       textInputAction: textInputAction,
+      enabled: enabled,
+      textCapitalization: textCapitalization,
       style: AppTextStyles.body(textColor, fontSize: AppTextStyles.sizeSm),
       decoration: InputDecoration(
         hintText: placeholder,
@@ -401,9 +407,7 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final deco = AppDecorations.card(brightness).copyWith(
-      borderRadius: borderRadius != null
-          ? borderRadius
-          : BorderRadius.circular(16),
+      borderRadius: borderRadius ?? BorderRadius.circular(16),
     );
 
     final container = Container(
