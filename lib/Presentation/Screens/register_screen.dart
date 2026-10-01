@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../Domain/errors/auth_exceptions.dart';
+import '../../Domain/exceptions/auth_exceptions.dart';
 import '../../Domain/rules/registration_rules.dart';
 import '../../Domain/use_cases/check_email_availability_use_case.dart';
 import '../../Domain/use_cases/register_student_use_case.dart';
