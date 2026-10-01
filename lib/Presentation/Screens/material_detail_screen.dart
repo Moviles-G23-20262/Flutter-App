@@ -22,7 +22,7 @@ class MaterialDetailScreen extends StatefulWidget {
 
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   bool _isFav = false;
-  int  _imageIndex = 0;
+  final int  _imageIndex = 0;
 
   // Related materials (same category, mock)
   List<MaterialEntity> _related(List<MaterialEntity> all) =>
@@ -58,7 +58,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                         width: double.infinity,
                         child: m.primaryImageUrl.isNotEmpty
                             ? Image.network(m.primaryImageUrl, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(color: elevated))
+                                errorBuilder: (_, _, _) => Container(color: elevated))
                             : Container(color: elevated, child: const Icon(Icons.image_outlined, size: 48)),
                       ),
                       // Gradient overlay
@@ -70,7 +70,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Colors.black.withOpacity(0.45), Colors.transparent],
+                              colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent],
                             ),
                           ),
                         ),
@@ -110,7 +110,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                               height: 6,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(3),
-                                color: i == _imageIndex ? accentHi : Colors.white.withOpacity(0.4),
+                                color: i == _imageIndex ? accentHi : Colors.white.withValues(alpha: 0.4),
                               ),
                             )),
                           ),
@@ -121,12 +121,13 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
 
                 // Content
                 SliverToBoxAdapter(
-                  child: Container(
+                  child: Transform.translate(
+                    offset: const Offset(0, -16),
+                    child: Container(
                     decoration: BoxDecoration(
                       color: surface,
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                     ),
-                    margin: const EdgeInsets.only(top: -16),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
                       child: Column(
@@ -150,7 +151,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           // Price + rating
                           Row(
                             children: [
-                              Text('₱${m.price.toStringAsFixed(2)}',
+                              Text('\$${m.price.toStringAsFixed(2)}',
                                   style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeLg)),
                               const SizedBox(width: 14),
                               const StarRating(rating: 4.8, reviewCount: 12),
@@ -246,6 +247,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           ),
                         ],
                       ),
+                    ),
                     ),
                   ),
                 ),

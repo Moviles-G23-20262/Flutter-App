@@ -241,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: SizedBox(
                             width: 56, height: 56,
                             child: Image.network(p.imageUrl, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
+                                errorBuilder: (_, _, _) => Container(
                                     color: elevated, child: const Icon(Icons.image_outlined))),
                           ),
                         ),
@@ -272,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text('₱${p.price.toStringAsFixed(2)}',
+                        Text('\$${p.price.toStringAsFixed(2)}',
                             style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
                       ],
                     ),

@@ -261,7 +261,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
               const SizedBox(height: 16),
 
-              _SheetLabel('Max Price: ₱${_maxPrice.toInt()}', color: txSecondary),
+              _SheetLabel('Max Price: \$${_maxPrice.toInt()}', color: txSecondary),
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   activeTrackColor: accent,
@@ -340,7 +340,7 @@ class _SearchProductCard extends StatelessWidget {
               width: double.infinity,
               child: material.primaryImageUrl.isNotEmpty
                   ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: elevated, child: const Icon(Icons.image_outlined)))
+                      errorBuilder: (_, _, _) => Container(color: elevated, child: const Icon(Icons.image_outlined)))
                   : Container(color: elevated, child: const Icon(Icons.image_outlined)),
             ),
             Padding(
@@ -356,7 +356,7 @@ class _SearchProductCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   AppBadge(material.conditionDisplayName),
                   const SizedBox(height: 6),
-                  Text('₱${material.price.toStringAsFixed(2)}',
+                  Text('\$${material.price.toStringAsFixed(2)}',
                       style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                 ],
               ),

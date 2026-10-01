@@ -1,6 +1,6 @@
 import '../Entities/registration_data.dart';
 import '../Entities/user_entity.dart';
-import '../errors/auth_exceptions.dart';
+import '../exceptions/auth_exceptions.dart';
 import '../repositories/auth_repository.dart';
 import '../rules/registration_rules.dart';
 

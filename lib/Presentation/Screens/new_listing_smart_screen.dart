@@ -213,11 +213,11 @@ class _EstimateCard extends StatelessWidget {
           Text('Recommended price',
               style: AppTextStyles.body(onHero.withValues(alpha: 0.8), fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text('₱${estimate.suggestedPrice.toStringAsFixed(2)}',
+          Text('\$${estimate.suggestedPrice.toStringAsFixed(2)}',
               style: AppTextStyles.mono(onHero, fontSize: AppTextStyles.sizeXl, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           Text(
-            'Historical range (p25–p75): ₱${estimate.p25.toStringAsFixed(2)} – ₱${estimate.p75.toStringAsFixed(2)}',
+            'Historical range (p25–p75): \$${estimate.p25.toStringAsFixed(2)} – \$${estimate.p75.toStringAsFixed(2)}',
             style: AppTextStyles.mono(onHero.withValues(alpha: 0.85), fontSize: AppTextStyles.sizeXs),
           ),
           const SizedBox(height: 8),

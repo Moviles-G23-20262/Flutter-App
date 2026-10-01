@@ -188,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: kCategories.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (_, i) => PillChip(
                       label: kCategories[i],
                       active: _activeCategory == kCategories[i],
@@ -220,12 +220,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                  height: 200,
+                  height: 240,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _filtered.take(4).length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
                     itemBuilder: (_, i) {
                       final m = _filtered[i];
                       return _ProductCard(
@@ -283,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
-                  height: 120,
+                  height: 140,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -327,16 +327,16 @@ class _HeroBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.auto_awesome_rounded, color: Colors.white70, size: 13),
                 const SizedBox(width: 4),
-                Text('Weekly Deal', style: AppTextStyles.body(Colors.white.withOpacity(0.9), fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
+                Text('Weekly Deal', style: AppTextStyles.body(Colors.white.withValues(alpha: 0.9), fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -345,7 +345,7 @@ class _HeroBanner extends StatelessWidget {
               style: AppTextStyles.heading(Colors.white, fontSize: AppTextStyles.sizeMd)),
           const SizedBox(height: 6),
           Text('Buy from fellow students and save up to 70% on textbooks, calculators and more.',
-              style: AppTextStyles.body(Colors.white.withOpacity(0.8), fontSize: AppTextStyles.sizeXs),
+              style: AppTextStyles.body(Colors.white.withValues(alpha: 0.8), fontSize: AppTextStyles.sizeXs),
               maxLines: 3),
           const SizedBox(height: 16),
           GestureDetector(
@@ -353,9 +353,9 @@ class _HeroBanner extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white.withOpacity(0.3)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -411,7 +411,7 @@ class _ProductCard extends StatelessWidget {
               height: 110,
               child: material.primaryImageUrl.isNotEmpty
                   ? Image.network(material.primaryImageUrl, fit: BoxFit.cover, width: double.infinity,
-                      errorBuilder: (_, __, ___) => Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)))
+                      errorBuilder: (_, _, _) => Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)))
                   : Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)),
             ),
             // Content
@@ -433,7 +433,7 @@ class _ProductCard extends StatelessWidget {
                         onTap: onFavToggle,
                         child: Icon(
                           isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                          color: isFav ? accentHi : accentHi.withOpacity(0.6),
+                          color: isFav ? accentHi : accentHi.withValues(alpha: 0.6),
                           size: 18,
                         ),
                       ),
@@ -442,7 +442,7 @@ class _ProductCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   AppBadge(material.conditionDisplayName),
                   const SizedBox(height: 6),
-                  Text('₱${material.price.toStringAsFixed(2)}',
+                  Text('\$${material.price.toStringAsFixed(2)}',
                       style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                 ],
               ),
@@ -486,7 +486,7 @@ class _RecommendedRow extends StatelessWidget {
               width: 68, height: 68,
               child: material.primaryImageUrl.isNotEmpty
                   ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: elevated))
+                      errorBuilder: (_, _, _) => Container(color: elevated))
                   : Container(color: elevated),
             ),
           ),
@@ -511,7 +511,7 @@ class _RecommendedRow extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('₱${material.price.toStringAsFixed(2)}',
+                      child: Text('\$${material.price.toStringAsFixed(2)}',
                           style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                     ),
                     GestureDetector(

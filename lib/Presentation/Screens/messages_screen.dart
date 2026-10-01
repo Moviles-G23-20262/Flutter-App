@@ -53,10 +53,10 @@ const _kConversations = [
   ),
   _MockConversation(
     name: 'Sofia Lim', initials: 'SL', itemTitle: 'TI-84 Plus Calculator',
-    lastMessage: 'Could you do ₱32 if I pick it up today?', time: '18m ago', unread: 0, online: true,
+    lastMessage: 'Could you do \$32 if I pick it up today?', time: '18m ago', unread: 0, online: true,
     meetupPlace: 'Engineering lobby', meetupTime: 'Today, 5:15 PM',
     messages: [
-      _MockMessage(isMe: false, text: 'Could you do ₱32 if I pick it up today?', time: '1:58 PM'),
+      _MockMessage(isMe: false, text: 'Could you do \$32 if I pick it up today?', time: '1:58 PM'),
       _MockMessage(isMe: true,  text: 'I can meet you at the Engineering lobby after class.', time: '2:02 PM'),
       _MockMessage(isMe: false, text: 'Perfect, I can be there around 5:15.', time: '2:04 PM'),
     ],
@@ -536,7 +536,7 @@ class _ChatViewState extends State<_ChatView> {
                           const SizedBox(height: 4),
                           Text(msg.time,
                               style: AppTextStyles.mono(
-                                msg.isMe ? Colors.white.withOpacity(0.7) : txMuted,
+                                msg.isMe ? Colors.white.withValues(alpha: 0.7) : txMuted,
                                 fontSize: AppTextStyles.size2xs,
                               )),
                         ],
