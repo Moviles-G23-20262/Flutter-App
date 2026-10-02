@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../theme/app_theme.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
 import '../../Domain/Entities/meetup_entities.dart';
@@ -26,7 +25,8 @@ class MeetingPointScreen extends StatefulWidget {
 
 class _MeetingPointScreenState extends State<MeetingPointScreen> {
   late final MeetingPlannerState _planner = widget.appState.createMeetingPlanner(widget.room);
-  GoogleMapController? _map;
+  final _map = MapController();
+  bool _mapReady = false;
   String? _focusedZoneId;
 
   String get _otherFirstName {
@@ -45,16 +45,16 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
   void dispose() {
     _planner.removeListener(_followSelectedZone);
     _planner.dispose();
-    _map?.dispose();
+    _map.dispose();
     super.dispose();
   }
 
   /// Moves the map to the chosen zone whenever the choice changes.
   void _followSelectedZone() {
     final zone = _planner.selectedZone?.zone;
-    if (zone == null || zone.id == _focusedZoneId) return;
+    if (zone == null || zone.id == _focusedZoneId || !_mapReady) return;
     _focusedZoneId = zone.id;
-    _map?.animateCamera(CameraUpdate.newLatLng(_latLng(zone.location)));
+    _map.move(_latLng(zone.location), _map.camera.zoom);
   }
 
   Future<void> _propose() async {
@@ -251,6 +251,7 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
   Widget _buildMap(Brightness brightness) {
     final zones = _planner.zones;
     final selected = _planner.selectedZone?.zone;
+    final here = _planner.location;
     final center = selected?.location ?? _centerOf(zones.map((r) => r.zone.location).toList());
     final accent = brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent;
     final surface = brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface;
@@ -260,50 +261,72 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
       height: 300,
       child: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(target: _latLng(center), zoom: 17),
-            onMapCreated: (controller) {
-              _map = controller;
-              _focusedZoneId = selected?.id;
-            },
-            myLocationEnabled: _planner.location != null,
-            myLocationButtonEnabled: _planner.location != null,
-            mapToolbarEnabled: false,
-            zoomControlsEnabled: false,
-            // The map sits inside a scrolling page; let it keep its own drags.
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
-            },
-            markers: {
-              for (final r in zones)
-                Marker(
-                  markerId: MarkerId(r.zone.id),
-                  position: _latLng(r.zone.location),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    r.zone.id == selected?.id
-                        ? BitmapDescriptor.hueAzure
-                        : r.zone.isMonitored
-                            ? BitmapDescriptor.hueGreen
-                            : BitmapDescriptor.hueOrange,
-                  ),
-                  infoWindow: InfoWindow(
-                    title: r.zone.name,
-                    snippet: r.zone.isMonitored ? 'Monitored safe zone' : 'Public spot',
-                  ),
-                  onTap: () => _planner.selectZone(r.zone.id),
-                ),
-            },
-            circles: {
+          FlutterMap(
+            mapController: _map,
+            options: MapOptions(
+              initialCenter: _latLng(center),
+              initialZoom: 17,
+              minZoom: 14,
+              maxZoom: 19,
+              onMapReady: () {
+                _mapReady = true;
+                _focusedZoneId = selected?.id;
+              },
+            ),
+            children: [
+              TileLayer(
+                // OpenStreetMap: free, no key. Their usage policy asks every app to identify itself.
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.flutter_front_end',
+                tileBuilder: brightness == Brightness.dark ? darkModeTileBuilder : null,
+              ),
               if (selected != null)
-                Circle(
-                  circleId: const CircleId('selected'),
-                  center: _latLng(selected.location),
-                  radius: 35,
-                  fillColor: accent.withValues(alpha: 0.18),
-                  strokeColor: accent.withValues(alpha: 0.5),
-                  strokeWidth: 1,
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: _latLng(selected.location),
+                      radius: 40,
+                      useRadiusInMeter: true,
+                      color: accent.withValues(alpha: 0.18),
+                      borderColor: accent.withValues(alpha: 0.5),
+                      borderStrokeWidth: 1,
+                    ),
+                  ],
                 ),
-            },
+              MarkerLayer(
+                markers: [
+                  for (final r in zones)
+                    if (r.zone.id != selected?.id)
+                      Marker(
+                        point: _latLng(r.zone.location),
+                        width: 40,
+                        height: 40,
+                        child: GestureDetector(
+                          onTap: () => _planner.selectZone(r.zone.id),
+                          child: _ZoneMarker(zone: r.zone),
+                        ),
+                      ),
+                  if (here != null)
+                    Marker(
+                      point: _latLng(here),
+                      width: 56,
+                      height: 64,
+                      alignment: Alignment.topCenter,
+                      child: const _YouMarker(),
+                    ),
+                  if (selected != null)
+                    Marker(
+                      point: _latLng(selected.location),
+                      width: 220,
+                      height: 84,
+                      alignment: Alignment.topCenter,
+                      // The label is wide; let taps reach the zones underneath it.
+                      child: IgnorePointer(child: _SelectedMarker(name: selected.name)),
+                    ),
+                ],
+              ),
+              const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+            ],
           ),
           Positioned(
             top: 12,
@@ -337,6 +360,92 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
     final lat = points.map((p) => p.lat).reduce((a, b) => a + b) / points.length;
     final lng = points.map((p) => p.lng).reduce((a, b) => a + b) / points.length;
     return GeoPoint(lat, lng);
+  }
+}
+
+// ─── Map markers ──────────────────────────────────────────────────────────────
+
+/// A safe zone on the map: its kind of place, ringed green when monitored.
+class _ZoneMarker extends StatelessWidget {
+  final MeetingPointEntity zone;
+
+  const _ZoneMarker({required this.zone});
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final surface = brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface;
+    final ring = zone.isMonitored ? successColor(brightness) : warningColor(brightness);
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: ring, width: 2.5),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 1))],
+      ),
+      child: Icon(zoneIcon(zone.zoneType), size: 20, color: ring),
+    );
+  }
+}
+
+/// The chosen zone: a labelled pin.
+class _SelectedMarker extends StatelessWidget {
+  final String name;
+
+  const _SelectedMarker({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final accent = brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(color: AppColors.primary900, borderRadius: BorderRadius.circular(8)),
+          child: Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body(Colors.white, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
+        ),
+        Icon(Icons.location_on, size: 40, color: accent),
+      ],
+    );
+  }
+}
+
+/// Where the current user is.
+class _YouMarker extends StatelessWidget {
+  const _YouMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final accent = brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent;
+    final surface = brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface;
+    final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: accent,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: const Icon(Icons.person_outline_rounded, color: Colors.white, size: 20),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(6)),
+          child: Text('You', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    );
   }
 }
 
