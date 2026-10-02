@@ -53,6 +53,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       sendMessage: _deps.sendMessage,
       markRead: _deps.markChatRead,
       answerProposal: _deps.meetups.answer,
+      getConversationInsight: _deps.getConversationInsight,
     ),
     account: AccountState(
       getExchanges: _deps.getExchanges,

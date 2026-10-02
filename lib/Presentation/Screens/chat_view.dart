@@ -8,6 +8,7 @@ import '../../Domain/use_cases/meetup_use_cases.dart';
 import '../State Management/app_state.dart';
 import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/conversation_insight_card.dart';
 import '../Widgets/formatters.dart';
 import '../Widgets/meetup_widgets.dart';
 
@@ -39,6 +40,7 @@ class _ChatViewState extends State<ChatView> {
     });
     // The other side may have placed or completed an order since the list was loaded.
     widget.appState.account.refreshExchanges();
+    widget.appState.chats.loadInsight();
   }
 
   @override
@@ -101,7 +103,7 @@ class _ChatViewState extends State<ChatView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.appState.account,
+      listenable: Listenable.merge([widget.appState.account, widget.appState.chats]),
       builder: (context, _) => _buildChat(context),
     );
   }
@@ -183,6 +185,13 @@ class _ChatViewState extends State<ChatView> {
             isBuyer: order.buyerId == me,
             otherFirstName: otherFirst,
             onOpen: () => appState.openCompleteExchange(order),
+          ),
+
+        // ── BQ4 insight: hidden once a meeting point has been agreed ──
+        if (chats.insight != null && agreed == null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: ConversationInsightCard(insight: chats.insight!, messagesSoFar: messages.length),
           ),
 
         // ── Messages ──
