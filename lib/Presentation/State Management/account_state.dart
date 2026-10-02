@@ -39,6 +39,14 @@ class AccountState extends ChangeNotifier {
   String? get error => _error;
   int get unreadNotifications => _notifications.where((n) => n.isUnread).length;
 
+  Future<void> markAllNotificationsOpened() async {
+  final unread = _notifications.where((n) => n.isUnread).toList();
+
+  for (final notification in unread) {
+    await openNotification(notification.id);
+  }
+}
+
   /// Orders [userId] placed, newest first (cancelled ones left out).
   List<ExchangeEntity> purchasesOf(String userId) => _sortedBy((e) => e.buyerId == userId);
 

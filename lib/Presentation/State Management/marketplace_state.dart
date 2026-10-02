@@ -4,6 +4,7 @@ import '../../Domain/Entities/new_listing_data.dart';
 import '../../Domain/Entities/wishlist_item_entity.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
 import '../../Domain/use_cases/marketplace_use_cases.dart';
+import '../../Domain/Strategies/sort_strategy.dart';
 
 /// Listings and favorites, shared by Home, Search, Detail and the Seller Hub.
 class MarketplaceState extends ChangeNotifier {
@@ -111,6 +112,106 @@ class MarketplaceState extends ChangeNotifier {
       _togglingFavorites.remove(materialId);
     }
   }
+
+
+  String _searchQuery = '';
+  MaterialCategoryEnum? _searchCategory;
+  MaterialConditionEnum? _searchCondition;
+  double _maxSearchPrice = 200;
+  SortStrategy _searchSort = const RelevanceSortStrategy();
+
+  String get searchQuery => _searchQuery;
+  MaterialCategoryEnum? get searchCategory => _searchCategory;
+  MaterialConditionEnum? get searchCondition => _searchCondition;
+  double get maxSearchPrice => _maxSearchPrice;
+  SortStrategy get searchSort => _searchSort;
+
+  bool get hasSearchFilters =>
+      _searchQuery.trim().isNotEmpty ||
+      _searchCategory != null ||
+      _searchCondition != null ||
+      _maxSearchPrice < 200 ||
+      _searchSort.id != 'relevance';
+
+  List<MaterialEntity> get filteredMaterials {
+    final query = _searchQuery.trim().toLowerCase();
+
+    final filtered = availableMaterials.where((material) {
+      if (_searchCategory != null &&
+          material.category != _searchCategory) {
+        return false;
+      }
+
+      if (_searchCondition != null &&
+          material.condition != _searchCondition) {
+        return false;
+      }
+
+      if (material.price > _maxSearchPrice) {
+        return false;
+      }
+
+      if (query.isNotEmpty) {
+        final matchesTitle =
+            material.title.toLowerCase().contains(query);
+
+        final matchesDescription =
+            material.description.toLowerCase().contains(query);
+
+        final matchesCourse =
+            material.courseCode?.toLowerCase().contains(query) ?? false;
+
+        final matchesCategory =
+            material.category.displayName.toLowerCase().contains(query);
+
+        if (!matchesTitle &&
+            !matchesDescription &&
+            !matchesCourse &&
+            !matchesCategory) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    return _searchSort.sort(filtered);
+  }
+
+  void setSearchQuery(String value) {
+    _searchQuery = value;
+    notifyListeners();
+  }
+
+  void setSearchCategory(MaterialCategoryEnum? value) {
+    _searchCategory = value;
+    notifyListeners();
+  }
+
+  void setSearchCondition(MaterialConditionEnum? value) {
+    _searchCondition = value;
+    notifyListeners();
+  }
+
+  void setMaxSearchPrice(double value) {
+    _maxSearchPrice = value;
+    notifyListeners();
+  }
+
+  void setSearchSort(SortStrategy strategy) {
+    _searchSort = strategy;
+    notifyListeners();
+  }
+
+  void resetSearchFilters() {
+    _searchQuery = '';
+    _searchCategory = null;
+    _searchCondition = null;
+    _maxSearchPrice = 200;
+    _searchSort = const RelevanceSortStrategy();
+    notifyListeners();
+  }
+
 
   /// Uploads the photos and creates the listing. Throws [DataException] with a message to show.
   Future<MaterialEntity> publish(NewListingData data) async {

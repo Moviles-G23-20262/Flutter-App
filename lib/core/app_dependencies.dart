@@ -9,6 +9,7 @@ import '../Data/Repositories/auth_repository_impl.dart';
 import '../Data/Repositories/marketplace_repositories_impl.dart';
 import '../Data/Repositories/meetup_repositories_impl.dart';
 import '../Domain/use_cases/login_use_case.dart';
+import '../Domain/use_cases/get_user_ratings.dart';
 import '../Domain/use_cases/marketplace_use_cases.dart';
 import '../Domain/use_cases/meetup_use_cases.dart';
 import '../Domain/use_cases/logout_use_case.dart';
@@ -41,6 +42,7 @@ class AppDependencies {
   final CompleteExchangeUseCase completeExchange;
   final CancelExchangeUseCase cancelExchange;
   final RateUserUseCase rateUser;
+  final GetUserRatings getUserRatings;
   final GetNotificationsUseCase getNotifications;
   final MarkNotificationOpenedUseCase markNotificationOpened;
   final MeetupUseCases meetups;
@@ -69,6 +71,7 @@ class AppDependencies {
     required this.completeExchange,
     required this.cancelExchange,
     required this.rateUser,
+    required this.getUserRatings,
     required this.getNotifications,
     required this.markNotificationOpened,
     required this.meetups,
@@ -99,6 +102,7 @@ class AppDependencies {
     final wishlist = WishlistRepositoryImpl(marketplaceRemote);
     final chats = ChatRepositoryImpl(marketplaceRemote);
     final exchanges = ExchangeRepositoryImpl(marketplaceRemote);
+    final ratings = RatingRepositoryImpl(marketplaceRemote);
     final notifications = NotificationRepositoryImpl(marketplaceRemote);
 
     final meetupRemote = MeetupRemoteDataSourceImpl(apiClient: apiClient);
@@ -127,6 +131,7 @@ class AppDependencies {
       completeExchange: CompleteExchangeUseCase(exchanges),
       cancelExchange: CancelExchangeUseCase(exchanges),
       rateUser: RateUserUseCase(exchanges),
+      getUserRatings: GetUserRatings(ratings),
       getNotifications: GetNotificationsUseCase(notifications),
       markNotificationOpened: MarkNotificationOpenedUseCase(notifications),
       meetups: MeetupUseCases(

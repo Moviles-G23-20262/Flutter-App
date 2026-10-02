@@ -4,6 +4,7 @@ import '../Entities/material_entity.dart';
 import '../Entities/new_listing_data.dart';
 import '../Entities/notification_entity.dart';
 import '../Entities/wishlist_item_entity.dart';
+import '../Entities/rating_entity.dart';
 
 // All of these throw `DataException` (with a user-presentable message) when the request fails.
 
@@ -53,6 +54,10 @@ abstract class ExchangeRepository {
   Future<ExchangeEntity> cancel(String exchangeId);
 
   Future<void> rate(NewRating rating);
+}
+
+abstract class RatingRepository {
+  Future<List<RatingEntity>> getRatingsForUser(String userId);
 }
 
 abstract class NotificationRepository {

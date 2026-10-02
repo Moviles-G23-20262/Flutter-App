@@ -5,6 +5,7 @@ import '../../Domain/Entities/meetup_entities.dart';
 import '../../Domain/Entities/notification_entity.dart';
 import '../../Domain/Entities/user_summary.dart';
 import '../../Domain/Entities/wishlist_item_entity.dart';
+import '../../Domain/Entities/rating_entity.dart';
 
 // JSON → domain mapping for what the NestJS backend returns.
 // Prisma `Decimal` fields (price) arrive as strings such as "18.00"; enum values match the Dart enum names.
@@ -165,6 +166,24 @@ ScheduleBlockEntity scheduleBlockFromJson(Json json) => ScheduleBlockEntity(
       endMinute: json['endMinute'] as int,
       label: json['label'] as String?,
     );
+
+RatingEntity ratingFromJson(Json json) {
+  return RatingEntity(
+    id: json['id'] as String,
+    exchangeId: json['exchangeId'] as String,
+    raterId: json['raterId'] as String,
+    ratedId: json['ratedId'] as String,
+    stars: json['stars'] as int,
+    tags: (json['tags'] as List<dynamic>? ?? const [])
+        .cast<String>(),
+    review: json['review'] as String?,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    rater: _optional(
+      json['rater'],
+      userSummaryFromJson,
+    ),
+  );
+}
 
 List<T> parseList<T>(Object? response, T Function(Json) parse) =>
     (response as List<dynamic>).map((item) => parse(item as Json)).toList();
