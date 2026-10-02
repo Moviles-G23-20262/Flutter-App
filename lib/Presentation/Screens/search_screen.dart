@@ -1,42 +1,89 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
+import '../../Domain/Entities/search_models.dart';
 import '../../Domain/Strategies/sort_strategy.dart';
-import 'home_screen.dart' show kMockMaterials;
+import '../../Domain/use_cases/search_materials_use_case.dart';
 
 // ─── Search Screen ────────────────────────────────────────────────────────────
 
 class SearchScreen extends StatefulWidget {
   final AppState appState;
+  final SearchMaterialsUseCase searchMaterials;
 
-  const SearchScreen({super.key, required this.appState});
+  const SearchScreen({
+    super.key,
+    required this.appState,
+    required this.searchMaterials,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  static const Duration _debounceDelay = Duration(milliseconds: 350);
+
   final _queryCtrl = TextEditingController();
-  String _query       = '';
   _SearchFilters _filters = const _SearchFilters();
 
-  List<MaterialEntity> get _results {
-    var list = kMockMaterials.where((m) {
-      if (_filters.category != null && m.category != _filters.category) return false;
-      if (_filters.condition != null && m.condition != _filters.condition) return false;
-      if (m.price > _filters.maxPrice) return false;
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        return m.title.toLowerCase().contains(q) ||
-               (m.courseCode?.toLowerCase().contains(q) ?? false) ||
-               m.category.displayName.toLowerCase().contains(q);
-      }
-      return true;
-    }).toList();
+  Timer? _debounce;
+  int _requestId = 0;
+  bool _loading = true;
+  SearchResult? _result;
 
-    return _filters.sort.sort(list);
+  List<MaterialEntity> get _items => _result?.items ?? const <MaterialEntity>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _runSearch();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _queryCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String _) {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDelay, _runSearch);
+  }
+
+  /// Delegates to the use case, which picks the online or offline strategy.
+  /// The screen never knows which one answered: it only reads [SearchResult].
+  Future<void> _runSearch() async {
+    final requestId = ++_requestId;
+    if (mounted && !_loading) setState(() => _loading = true);
+
+    final criteria = SearchCriteria(
+      query: _queryCtrl.text,
+      category: _filters.category,
+      condition: _filters.condition,
+      // The slider at its maximum means "no price limit".
+      maxPrice: _filters.maxPrice < _SearchFilters.defaultMaxPrice ? _filters.maxPrice : null,
+    );
+
+    try {
+      final result = await widget.searchMaterials.execute(criteria, sort: _filters.sort);
+      if (!mounted || requestId != _requestId) return; // a newer search replaced this one
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } on Exception {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _result = null;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _openFilters() async {
@@ -46,13 +93,10 @@ class _SearchScreenState extends State<SearchScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _FilterSheet(initial: _filters),
     );
-    if (result != null && mounted) setState(() => _filters = result);
-  }
-
-  @override
-  void dispose() {
-    _queryCtrl.dispose();
-    super.dispose();
+    if (result != null && mounted) {
+      setState(() => _filters = result);
+      _runSearch();
+    }
   }
 
   @override
@@ -63,7 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final txMuted     = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
-    final results = _results;
+    final results = _items;
 
     return Column(
       children: [
@@ -85,7 +129,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: AppTextField(
                       placeholder: 'Search course materials…',
                       controller: _queryCtrl,
-                      onChanged: (v) => setState(() => _query = v),
+                      onChanged: _onQueryChanged,
                       prefixIcon: Icon(Icons.search_rounded, color: txMuted, size: 18),
                     ),
                   ),
@@ -110,11 +154,15 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         Divider(color: border, height: 1),
+        if (_loading) const LinearProgressIndicator(minHeight: 2),
+        if (_result != null && _result!.isOffline) _OfflineBanner(result: _result!),
 
         // ── Results grid ────────────────────────────────────────────────────
         Expanded(
           child: results.isEmpty
-              ? _EmptySearch()
+              ? (_loading
+                  ? const SizedBox.shrink()
+                  : _EmptySearch(neverSynced: _result != null && _result!.isOffline && _result!.syncedAt == null))
               : GridView.builder(
                   padding: const EdgeInsets.all(14),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -371,6 +419,11 @@ class _SearchProductCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _EmptySearch extends StatelessWidget {
+  /// Offline and no listing was ever saved on this device.
+  final bool neverSynced;
+
+  const _EmptySearch({this.neverSynced = false});
+
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -383,12 +436,69 @@ class _EmptySearch extends StatelessWidget {
         children: [
           Icon(Icons.search_off_rounded, size: 48, color: borderSubtle),
           const SizedBox(height: 12),
-          Text('No items found', style: AppTextStyles.heading(txMuted, fontSize: AppTextStyles.sizeMd)),
+          Text(neverSynced ? 'Nothing saved yet' : 'No items found',
+              style: AppTextStyles.heading(txMuted, fontSize: AppTextStyles.sizeMd)),
           const SizedBox(height: 4),
-          Text('Try adjusting your filters', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+          Text(
+            neverSynced
+                ? 'Connect once to save listings for offline search'
+                : 'Try adjusting your filters',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+          ),
         ],
       ),
     );
   }
 }
 
+// ─── Offline banner ──────────────────────────────────────────────────────────
+
+/// Tells the student that the results come from the copy saved on the device.
+class _OfflineBanner extends StatelessWidget {
+  final SearchResult result;
+
+  const _OfflineBanner({required this.result});
+
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  String get _message {
+    final prefix = result.serverUnreachable ? "Can't reach the server" : "You're offline";
+    final syncedAt = result.syncedAt;
+    if (syncedAt == null) return '$prefix. No saved listings yet.';
+    final hh = syncedAt.hour.toString().padLeft(2, '0');
+    final mm = syncedAt.minute.toString().padLeft(2, '0');
+    return '$prefix. Showing listings saved on ${syncedAt.day} ${_months[syncedAt.month - 1]}, $hh:$mm.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final elevated = dark ? AppColors.darkElevated : AppColors.lightElevated;
+    final borderSubtle = dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
+    final txSecondary = dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: elevated,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderSubtle),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 16, color: txSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(_message, style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

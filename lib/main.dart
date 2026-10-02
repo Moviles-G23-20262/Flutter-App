@@ -96,7 +96,7 @@ class AppShell extends StatelessWidget {
 
     switch (appState.currentScreen) {
       case AppScreen.search:
-        child = SearchScreen(appState: appState);
+        child = SearchScreen(appState: appState, searchMaterials: null,);
         currentIndex = 1;
         break;
       case AppScreen.messages:
