@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'core/app_dependencies.dart';
+import 'Presentation/State Management/account_state.dart';
 import 'Presentation/State Management/app_state.dart';
+import 'Presentation/State Management/chat_state.dart';
+import 'Presentation/State Management/marketplace_state.dart';
+import 'Presentation/State Management/schedule_state.dart';
 import 'theme/app_theme.dart';
 import 'Presentation/Screens/login_screen.dart';
+import 'Presentation/Screens/register_screen.dart';
 import 'Presentation/Screens/home_screen.dart';
 import 'Presentation/Screens/search_screen.dart';
 import 'Presentation/Screens/material_detail_screen.dart';
@@ -10,7 +16,13 @@ import 'Presentation/Screens/profile_screen.dart';
 import 'Presentation/Screens/seller_hub_screen.dart';
 import 'Presentation/Screens/new_listing_screen.dart';
 import 'Presentation/Screens/new_listing_smart_screen.dart';
+import 'Presentation/Screens/complete_exchange_screen.dart';
 import 'Presentation/Screens/confirmation_screen.dart';
+import 'Presentation/Screens/meeting_point_screen.dart';
+import 'Presentation/Screens/schedule_screen.dart';
+import 'Presentation/Screens/favorites_screen.dart';
+import 'Presentation/Screens/notifications_screen.dart';
+import 'Presentation/Widgets/common_widgets.dart';
 
 void main() {
   runApp(const CampusSwapApp());
@@ -24,7 +36,58 @@ class CampusSwapApp extends StatefulWidget {
 }
 
 class _CampusSwapAppState extends State<CampusSwapApp> {
-  final AppState _appState = AppState();
+  final AppDependencies _deps = AppDependencies.create();
+  late final AppState _appState = AppState(
+    onLogout: _deps.logout.execute,
+    marketplace: MarketplaceState(
+      getMaterials: _deps.getMaterials,
+      createListing: _deps.createListing,
+      getWishlist: _deps.getWishlist,
+      addToWishlist: _deps.addToWishlist,
+      removeFromWishlist: _deps.removeFromWishlist,
+    ),
+    chats: ChatState(
+      getChatRooms: _deps.getChatRooms,
+      openChatRoom: _deps.openChatRoom,
+      getMessages: _deps.getMessages,
+      sendMessage: _deps.sendMessage,
+      markRead: _deps.markChatRead,
+      answerProposal: _deps.meetups.answer,
+    ),
+    account: AccountState(
+      getExchanges: _deps.getExchanges,
+      getNotifications: _deps.getNotifications,
+      markNotificationOpened: _deps.markNotificationOpened,
+      placeOrder: _deps.placeOrder,
+      completeExchange: _deps.completeExchange,
+      cancelExchange: _deps.cancelExchange,
+      rateUser: _deps.rateUser,
+    ),
+    schedule: ScheduleState(
+      getSchedule: _deps.getSchedule,
+      addBlock: _deps.addScheduleBlock,
+      removeBlock: _deps.removeScheduleBlock,
+    ),
+    meetups: _deps.meetups,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final user = await _deps.restoreSession.execute();
+    if (!mounted) return;
+    // From here on a rejected token means the session expired mid-use: sign out.
+    _deps.apiClient.onUnauthorized = _appState.logout;
+    if (user != null) {
+      _appState.login(user);
+    } else {
+      _appState.sessionRestoreFinished();
+    }
+  }
 
   @override
   void dispose() {
@@ -50,14 +113,22 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
   }
 
   Widget _buildScreen() {
+    if (_appState.restoringSession) return const _SplashScreen();
+
     switch (_appState.currentScreen) {
       case AppScreen.login:
-        return LoginScreen(appState: _appState);
+        return LoginScreen(appState: _appState, login: _deps.login);
+      case AppScreen.register:
+        return RegisterScreen(appState: _appState, registerStudent: _deps.registerStudent);
       case AppScreen.materialDetail:
         return MaterialDetailScreen(
           appState: _appState,
           material: _appState.selectedMaterial!,
         );
+      case AppScreen.favorites:
+        return FavoritesScreen(appState: _appState);
+      case AppScreen.notifications:
+        return NotificationsScreen(appState: _appState);
       case AppScreen.sellerHub:
         return SellerHubScreen(appState: _appState);
       case AppScreen.newListing:
@@ -65,13 +136,37 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.newListingSmart:
         return NewListingSmartScreen(appState: _appState);
       case AppScreen.confirmation:
-        return ConfirmationScreen(appState: _appState);
+        final order = _appState.selectedExchange;
+        if (order == null) return AppShell(appState: _appState);
+        return ConfirmationScreen(appState: _appState, exchange: order);
+      case AppScreen.completeExchange:
+        final exchange = _appState.selectedExchange;
+        if (exchange == null) return AppShell(appState: _appState);
+        return CompleteExchangeScreen(appState: _appState, exchange: exchange);
+      case AppScreen.meetingPlanner:
+        final room = _appState.plannerRoom;
+        if (room == null) return AppShell(appState: _appState);
+        return MeetingPointScreen(appState: _appState, room: room);
+      case AppScreen.schedule:
+        return ScheduleScreen(appState: _appState);
       case AppScreen.home:
       case AppScreen.search:
       case AppScreen.messages:
       case AppScreen.profile:
         return AppShell(appState: _appState);
     }
+  }
+}
+
+/// Shown while the stored session is being checked, so the login form doesn't flash.
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CampusSwapLogo(size: 72)),
+    );
   }
 }
 

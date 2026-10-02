@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
-import '../../Domain/Entities/user_entity.dart';
+import '../../Domain/exceptions/auth_exceptions.dart';
+import '../../Domain/use_cases/login_use_case.dart';
 
 /// Login / welcome screen for Campus Swap.
 class LoginScreen extends StatefulWidget {
   final AppState appState;
+  final LoginUseCase login;
 
-  const LoginScreen({super.key, required this.appState});
+  const LoginScreen({super.key, required this.appState, required this.login});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -21,44 +23,31 @@ class _LoginScreenState extends State<LoginScreen> {
   bool   _loading   = false;
   bool   _obscure   = true;
 
-  // Demo credentials
-  static const _demoEmail    = 'uwu';
-  static const _demoPassword = 'uwu123';
-
   Future<void> _handleLogin() async {
     if (_loading) return;
-    final email    = _emailController.text.trim();
-    final password = _passwordController.text;
+    FocusScope.of(context).unfocus();
 
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMsg = 'Please enter your credentials.');
+    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
+      setState(() => _errorMsg = 'Please enter your email and password.');
       return;
     }
 
     setState(() { _loading = true; _errorMsg = ''; });
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    if (!mounted) return;
-
-    if (email == _demoEmail && password == _demoPassword) {
-      widget.appState.login(
-        UserEntity(
-          id:        'demo-user-001',
-          email:     'maria.santos@university.edu',
-          fullName:  'Maria Santos',
-          major:     'BS Computer Science',
-          faculty:   'Faculty of Engineering',
-          rating:    4.9,
-          createdAt: DateTime.now(),
-        ),
+    try {
+      final user = await widget.login.execute(
+        email: _emailController.text,
+        password: _passwordController.text,
       );
-    } else {
-      setState(() {
-        _loading  = false;
-        _errorMsg = 'Wrong credentials. Check the demo note below.';
-      });
+      if (!mounted) return;
+      // AppState switches to Home; this screen is replaced, so keep _loading as is.
+      widget.appState.login(user);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() { _loading = false; _errorMsg = e.message; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _loading = false; _errorMsg = 'Unexpected error. Please try again.'; });
     }
   }
 
@@ -114,11 +103,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
 
                     // Username
-                    Text('Username',
+                    Text('Email',
                         style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 6),
                     AppTextField(
-                      placeholder: 'Enter your username',
+                      placeholder: 'Enter your email',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       onChanged: (_) => setState(() => _errorMsg = ''),
@@ -176,122 +165,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Sign up link
                     Center(
-                      child: RichText(
-                        text: TextSpan(
-                          text: 'No account? ',
-                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                          children: [
-                            TextSpan(
-                              text: 'Sign up free',
-                              style: AppTextStyles.body(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _loading ? null : () => widget.appState.navigateTo(AppScreen.register),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                          child: RichText(
+                            text: TextSpan(
+                              text: 'No account? ',
+                              style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                              children: [
+                                TextSpan(
+                                  text: 'Sign up free',
+                                  style: AppTextStyles.body(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-
-              // ── Demo credentials sticky note ───────────────────────────
-              _DemoNote(),
               const SizedBox(height: 40),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Wiggling demo-credentials note shown on the login screen.
-class _DemoNote extends StatefulWidget {
-  @override
-  State<_DemoNote> createState() => _DemoNoteState();
-}
-
-class _DemoNoteState extends State<_DemoNote> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _rotation;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
-      ..repeat(reverse: true);
-    _rotation = Tween<double>(begin: -0.026, end: 0.026).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final brightness   = Theme.of(context).brightness;
-    final elevated     = brightness == Brightness.dark ? AppColors.darkElevated     : AppColors.lightElevated;
-    final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
-    final txPrimary    = brightness == Brightness.dark ? AppColors.darkTextPrimary  : AppColors.lightTextPrimary;
-    final txSecondary  = brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
-    final txMuted      = brightness == Brightness.dark ? AppColors.darkTextMuted    : AppColors.lightTextMuted;
-
-    return AnimatedBuilder(
-      animation: _rotation,
-      builder: (_, child) => Transform.rotate(angle: _rotation.value, child: child),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
-        decoration: BoxDecoration(
-          color: elevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderSubtle),
-          boxShadow: [
-            BoxShadow(
-              color: brightness == Brightness.dark ? AppColors.darkShadowCard : AppColors.lightShadowCard,
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Pin decoration
-            Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                width: 28, height: 8,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: borderSubtle,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-                ),
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.edit_rounded, color: txMuted, size: 16),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Demo Credentials',
-                        style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('username: uwu',
-                        style: AppTextStyles.mono(txSecondary, fontSize: AppTextStyles.sizeXs)),
-                    Text('password: uwu123',
-                        style: AppTextStyles.mono(txSecondary, fontSize: AppTextStyles.sizeXs)),
-                  ],
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );
