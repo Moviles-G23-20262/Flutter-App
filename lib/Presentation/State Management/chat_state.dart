@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
+import '../../Domain/Entities/conversation_insight.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
+import '../../Domain/use_cases/conversation_insight_use_case.dart';
 import '../../Domain/use_cases/marketplace_use_cases.dart';
 import '../../Domain/use_cases/meetup_use_cases.dart';
 
@@ -18,6 +20,7 @@ class ChatState extends ChangeNotifier {
   final SendMessageUseCase sendMessage;
   final MarkChatReadUseCase markRead;
   final AnswerMeetingProposalUseCase answerProposal;
+  final GetConversationInsightUseCase getConversationInsight;
 
   ChatState({
     required this.getChatRooms,
@@ -26,6 +29,7 @@ class ChatState extends ChangeNotifier {
     required this.sendMessage,
     required this.markRead,
     required this.answerProposal,
+    required this.getConversationInsight,
   });
 
   String? _userId;
@@ -39,8 +43,29 @@ class ChatState extends ChangeNotifier {
   String? _messagesError;
   Timer? _timer;
   int _generation = 0;
+  ConversationInsight? _insight;
+  bool _loadingInsight = false;
 
   String? get userId => _userId;
+
+  /// BQ4 (Type 2): how long chats usually take to agree on a meeting point. Null until loaded.
+  ConversationInsight? get insight => _insight;
+
+  /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just hides the card.
+  Future<void> loadInsight() async {
+    if (_insight != null || _loadingInsight) return;
+    _loadingInsight = true;
+    try {
+      final insight = await getConversationInsight.execute();
+      if (insight.hasData) {
+        _insight = insight;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Analytics service unreachable or empty: keep the chat usable without the card.
+    }
+    _loadingInsight = false;
+  }
 
   /// Conversations, most recently active first.
   List<ChatRoomEntity> get rooms => _rooms;
@@ -209,6 +234,7 @@ class ChatState extends ChangeNotifier {
     _loadingMessages = false;
     _roomsError = null;
     _messagesError = null;
+    _insight = null;
     notifyListeners();
   }
 
