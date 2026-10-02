@@ -3,8 +3,9 @@ import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
-import '../../Domain/Strategies/sort_strategy.dart';
 import 'home_screen.dart' show kMockMaterials;
+import '../../Domain/Strategies/sort_strategy.dart';
+import '../../Domain/Strategies/search_strategy.dart';
 
 // ─── Search Screen ────────────────────────────────────────────────────────────
 
@@ -23,37 +24,51 @@ class _SearchScreenState extends State<SearchScreen> {
   _SearchFilters _filters = const _SearchFilters();
 
   List<MaterialEntity> get _results {
-    var list = kMockMaterials.where((m) {
-      if (_filters.category != null && m.category != _filters.category) return false;
-      if (_filters.condition != null && m.condition != _filters.condition) return false;
-      if (m.price > _filters.maxPrice) return false;
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        return m.title.toLowerCase().contains(q) ||
-               (m.courseCode?.toLowerCase().contains(q) ?? false) ||
-               m.category.displayName.toLowerCase().contains(q);
+    var list = kMockMaterials;
+    
+    list = _filters.searchStrategy.search(
+      list,
+      _query,
+    );
+
+    // Normal filters
+    list = list.where((m) {
+      if (_filters.category != null &&
+          m.category != _filters.category) {
+        return false;
       }
+
+      if (_filters.condition != null &&
+          m.condition != _filters.condition) {
+        return false;
+      }
+
+      if (m.price > _filters.maxPrice) {
+        return false;
+      }
+
       return true;
     }).toList();
 
+    // Sort Strategy
     return _filters.sort.sort(list);
   }
 
-  Future<void> _openFilters() async {
-    final result = await showModalBottomSheet<_SearchFilters>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FilterSheet(initial: _filters),
-    );
-    if (result != null && mounted) setState(() => _filters = result);
-  }
+    Future<void> _openFilters() async {
+      final result = await showModalBottomSheet<_SearchFilters>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _FilterSheet(initial: _filters),
+      );
+      if (result != null && mounted) setState(() => _filters = result);
+    }
 
-  @override
-  void dispose() {
-    _queryCtrl.dispose();
-    super.dispose();
-  }
+    @override
+    void dispose() {
+      _queryCtrl.dispose();
+      super.dispose();
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -148,19 +163,22 @@ class _SearchFilters {
   final MaterialConditionEnum? condition;
   final double maxPrice;
   final SortStrategy sort;
+  final SearchStrategy searchStrategy;
 
   const _SearchFilters({
     this.category,
     this.condition,
     this.maxPrice = defaultMaxPrice,
     this.sort = const RelevanceSortStrategy(),
+    this.searchStrategy = const GeneralSearchStrategy(),
   });
 
   bool get isActive =>
       category != null ||
       condition != null ||
       maxPrice < defaultMaxPrice ||
-      sort.id != const RelevanceSortStrategy().id;
+      sort.id != const RelevanceSortStrategy().id ||
+      searchStrategy.id != const GeneralSearchStrategy().id;
 }
 
 // ─── Filter bottom sheet (View 06) ───────────────────────────────────────────
@@ -177,21 +195,25 @@ class _FilterSheet extends StatefulWidget {
 class _FilterSheetState extends State<_FilterSheet> {
   late MaterialCategoryEnum? _category = widget.initial.category;
   late MaterialConditionEnum? _condition = widget.initial.condition;
+  late SearchStrategy _searchStrategy = widget.initial.searchStrategy;
   late double _maxPrice = widget.initial.maxPrice;
   late SortStrategy _sort = widget.initial.sort;
+  
 
   void _reset() => setState(() {
-        _category = null;
-        _condition = null;
-        _maxPrice = _SearchFilters.defaultMaxPrice;
-        _sort = kSortStrategies.first;
-      });
+    _category = null;
+    _condition = null;
+    _maxPrice = _SearchFilters.defaultMaxPrice;
+    _sort = kSortStrategies.first;
+    _searchStrategy = kSearchStrategies.first;
+  });
 
   void _apply() => Navigator.of(context).pop(_SearchFilters(
         category: _category,
         condition: _condition,
         maxPrice: _maxPrice,
         sort: _sort,
+        searchStrategy: _searchStrategy,
       ));
 
   @override
@@ -277,6 +299,30 @@ class _FilterSheetState extends State<_FilterSheet> {
                 ),
               ),
               const SizedBox(height: 8),
+
+              _SheetLabel(
+                'Search strategy',
+                color: txSecondary,
+              ),
+
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final strategy in kSearchStrategies)
+                    PillChip(
+                      label: strategy.label,
+                      active: _searchStrategy.id == strategy.id,
+                      onTap: () {
+                        setState(() {
+                          _searchStrategy = strategy;
+                        });
+                      },
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
 
               _SheetLabel('Sort by', color: txSecondary),
               Wrap(
@@ -391,4 +437,3 @@ class _EmptySearch extends StatelessWidget {
     );
   }
 }
-
