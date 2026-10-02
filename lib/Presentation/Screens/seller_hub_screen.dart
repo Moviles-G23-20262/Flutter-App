@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
-import 'home_screen.dart' show kMockMaterials;
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
@@ -14,6 +14,13 @@ class SellerHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([appState.marketplace, appState.chats, appState.account]),
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final brightness  = Theme.of(context).brightness;
     final surface     = brightness == Brightness.dark ? AppColors.darkSurface    : AppColors.lightSurface;
     final border      = brightness == Brightness.dark ? AppColors.darkBorder     : AppColors.lightBorder;
@@ -25,8 +32,16 @@ class SellerHubScreen extends StatelessWidget {
     final borderSubtle= brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
     final successColor= brightness == Brightness.dark ? AppColors.darkSuccess    : AppColors.lightSuccess;
 
-    // seller's listings (mock: use first seller)
-    final myListings = kMockMaterials.take(2).toList();
+    final me         = appState.currentUser;
+    final myId       = me?.id ?? '';
+    final myListings = appState.marketplace.listingsOf(myId);
+    final activeCount = myListings.where((m) => m.isAvailable).length;
+    final mySales    = appState.account.salesOf(myId).take(5).toList();
+    // Conversations on my listings that already have a message from a buyer.
+    final buyerChats = appState.chats.rooms
+        .where((r) => r.sellerId == myId && r.lastMessage != null)
+        .take(5)
+        .toList();
 
     return Scaffold(
       body: SafeArea(
@@ -79,11 +94,11 @@ class SellerHubScreen extends StatelessWidget {
                 // Stats row
                 Row(
                   children: [
-                    _StatCard(icon: Icons.inventory_2_outlined, value: '8',    label: 'Active Listings', brightness: brightness),
+                    _StatCard(icon: Icons.inventory_2_outlined, value: '$activeCount', label: 'Active Listings', brightness: brightness),
                     const SizedBox(width: 10),
-                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: '\$240', label: 'Earned This Month', brightness: brightness),
+                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: '\$${appState.account.earnedThisMonth(myId).toStringAsFixed(0)}', label: 'Earned This Month', brightness: brightness),
                     const SizedBox(width: 10),
-                    _StatCard(icon: Icons.trending_up_rounded, value: '4.9',   label: 'Your Rating', brightness: brightness),
+                    _StatCard(icon: Icons.trending_up_rounded, value: (me?.rating ?? 0).toStringAsFixed(1), label: 'Your Rating', brightness: brightness),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -93,10 +108,18 @@ class SellerHubScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.inventory_2_outlined, color: txMuted, size: 16),
                     const SizedBox(width: 6),
-                    SectionTitle('Active Listings'),
+                    SectionTitle('My Listings'),
                   ],
                 ),
                 const SizedBox(height: 10),
+                if (myListings.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      child: Text('You have not listed anything yet. Tap "Add Item" to sell your first material.',
+                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                    ),
+                  ),
                 ...myListings.map((m) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _ListingRow(
@@ -122,7 +145,15 @@ class SellerHubScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                ..._kRecentSales.map((s) => Padding(
+                if (mySales.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      child: Text('No completed sales yet.',
+                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                    ),
+                  ),
+                ...mySales.map((s) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppCard(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -132,8 +163,10 @@ class SellerHubScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.title, style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
-                              Text('Sold to ${s.buyer} · ${s.date}',
+                              Text(s.material?.title ?? 'Item', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
+                              Text(s.isPending
+                                      ? 'Ordered by ${s.buyer?.fullName ?? 'a classmate'} · pending meetup'
+                                      : 'Sold to ${s.buyer?.fullName ?? 'a classmate'} · ${s.completedAt == null ? '' : timeAgo(s.completedAt!)}',
                                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
                             ],
                           ),
@@ -155,26 +188,36 @@ class SellerHubScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                ..._kBuyerMessages.map((msg) => Padding(
+                if (buyerChats.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      child: Text('No buyer messages yet.',
+                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                    ),
+                  ),
+                ...buyerChats.map((room) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppCard(
+                    onTap: () => appState.openChat(room.id),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            UserAvatar(initials: msg.initials, size: 28, outlined: true),
+                            UserAvatar(initials: room.buyer?.initials ?? '?', size: 28, outlined: true),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(msg.from, style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
+                              child: Text(room.buyer?.fullName ?? 'Campus user', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
                             ),
-                            Text(msg.time, style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
+                            Text(timeAgo(room.lastActivity), style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text('Re: ${msg.item}', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
-                        Text(msg.message, style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
+                        Text('Re: ${room.material?.title ?? 'your listing'}', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+                        Text(room.lastMessage!.content, maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
                       ],
                     ),
                   ),
@@ -266,10 +309,6 @@ class _ListingRow extends StatelessWidget {
                 Row(
                   children: [
                     AppBadge(material.conditionDisplayName),
-                    const SizedBox(width: 8),
-                    Icon(Icons.visibility_outlined, size: 13, color: txMuted),
-                    const SizedBox(width: 3),
-                    Text('24 views', style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -286,8 +325,8 @@ class _ListingRow extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: borderSubtle),
                       ),
-                      child: Text('Active',
-                          style: AppTextStyles.body(successColor, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w500)),
+                      child: Text(material.status.displayName,
+                          style: AppTextStyles.body(material.isAvailable ? successColor : txMuted, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w500)),
                     ),
                   ],
                 ),
@@ -299,20 +338,3 @@ class _ListingRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-class _Sale { final String title, buyer, date; final double price; const _Sale({required this.title, required this.buyer, required this.date, required this.price}); }
-class _BuyerMsg { final String from, initials, item, message, time; const _BuyerMsg({required this.from, required this.initials, required this.item, required this.message, required this.time}); }
-
-const _kRecentSales = [
-  _Sale(title: 'Casio fx-991EX Scientific Calculator', buyer: 'Ana Cruz', date: '2 days ago', price: 18.00),
-  _Sale(title: 'Organic Chemistry Textbook 12th Ed.', buyer: 'Leo Tan',   date: '5 days ago', price: 24.50),
-];
-
-const _kBuyerMessages = [
-  _BuyerMsg(from: 'Jake Reyes', initials: 'JR', item: 'Casio fx-991EX',   message: 'Is this still available?',    time: '2m ago'),
-  _BuyerMsg(from: 'Sofia Lim',  initials: 'SL', item: 'Organic Chemistry', message: 'Can we meet at the library?', time: '1h ago'),
-  _BuyerMsg(from: 'Leo Tan',    initials: 'LT', item: 'Lab Coat',           message: 'What size is this?',          time: '3h ago'),
-];
-
