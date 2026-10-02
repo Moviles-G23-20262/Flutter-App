@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
 
@@ -23,6 +24,7 @@ class MaterialDetailScreen extends StatefulWidget {
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   final int  _imageIndex = 0;
   bool _openingChat = false;
+  bool _buying = false;
 
   bool get _isFav => widget.appState.marketplace.isFavorite(widget.material.id);
   bool get _isMine => widget.material.sellerId == widget.appState.currentUser?.id;
@@ -42,6 +44,32 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     final error = await widget.appState.messageSeller(widget.material);
     if (!mounted) return;
     setState(() => _openingChat = false);
+    if (error != null) _showMessage(error);
+  }
+
+  Future<void> _buy() async {
+    if (_buying) return;
+    final m = widget.material;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Buy this item?'),
+        content: Text(
+          '${m.title} for ${copPrice(m.price)}.\n\n'
+          'It will be reserved for you. You pay in person when you meet '
+          '${m.seller?.fullName.split(' ').first ?? 'the seller'} on campus.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Place order')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _buying = true);
+    final error = await widget.appState.buy(m);
+    if (!mounted) return;
+    setState(() => _buying = false);
     if (error != null) _showMessage(error);
   }
 
@@ -176,7 +204,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           // Price + rating
                           Row(
                             children: [
-                              Text('\$${m.price.toStringAsFixed(2)}',
+                              Text(copPrice(m.price),
                                   style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeLg)),
                               const SizedBox(width: 14),
                               if (seller != null) StarRating(rating: seller.rating),
@@ -258,34 +286,48 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           if (_isMine)
                             Text('This is your listing. Manage it from your Seller Hub.',
                                 style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs))
-                          else
+                          else ...[
+                            if (!m.isAvailable)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.lock_clock_outlined, size: 15, color: txMuted),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'This item is ${m.status.displayName.toLowerCase()}. You can still message the seller.',
+                                        style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             Row(
                               children: [
                                 Expanded(
                                   child: SecondaryButton(
-                                    label: _isFav ? 'Saved' : 'Save Item',
-                                    leadingIcon: Icon(
-                                      _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                      color: accentHi, size: 16,
-                                    ),
-                                    onPressed: _toggleFav,
-                                    fullWidth: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: PrimaryButton(
-                                    label: _openingChat ? 'Opening…' : 'Message Seller',
-                                    leadingIcon: _openingChat
-                                        ? null
-                                        : const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 16),
+                                    label: _openingChat ? 'Opening…' : 'Message',
+                                    leadingIcon: Icon(Icons.chat_bubble_outline_rounded, color: accentHi, size: 16),
                                     onPressed: _openingChat ? null : _messageSeller,
-                                    isLoading: _openingChat,
                                     fullWidth: true,
                                   ),
                                 ),
+                                if (m.isAvailable) ...[
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: PrimaryButton(
+                                      label: 'Buy now',
+                                      leadingIcon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
+                                      onPressed: _buying ? null : _buy,
+                                      isLoading: _buying,
+                                      fullWidth: true,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
+                          ],
                         ],
                       ),
                     ),

@@ -94,6 +94,57 @@ class GetExchangesUseCase {
   Future<List<ExchangeEntity>> execute() => repository.getExchanges();
 }
 
+class PlaceOrderUseCase {
+  final ExchangeRepository repository;
+  PlaceOrderUseCase(this.repository);
+
+  Future<ExchangeEntity> execute(MaterialEntity material, {required String buyerId}) {
+    if (material.sellerId == buyerId) throw const DataException('This is your own listing.');
+    if (!material.isAvailable) throw const DataException('This item is no longer available.');
+    return repository.placeOrder(material.id);
+  }
+}
+
+class CompleteExchangeUseCase {
+  final ExchangeRepository repository;
+  CompleteExchangeUseCase(this.repository);
+
+  Future<ExchangeEntity> execute(ExchangeEntity exchange, {MaterialConditionEnum? receivedCondition}) {
+    if (!exchange.isPending) throw const DataException('This exchange is already closed.');
+    return repository.complete(exchange.id, receivedCondition: receivedCondition);
+  }
+}
+
+class CancelExchangeUseCase {
+  final ExchangeRepository repository;
+  CancelExchangeUseCase(this.repository);
+
+  Future<ExchangeEntity> execute(ExchangeEntity exchange) {
+    if (!exchange.isPending) throw const DataException('This exchange is already closed.');
+    return repository.cancel(exchange.id);
+  }
+}
+
+class RateUserUseCase {
+  final ExchangeRepository repository;
+  RateUserUseCase(this.repository);
+
+  Future<void> execute(NewRating rating) {
+    if (rating.stars < 1 || rating.stars > 5) throw const DataException('Pick from 1 to 5 stars.');
+    final review = rating.review?.trim();
+    if (review != null && review.length > 500) {
+      throw const DataException('Reviews can have at most 500 characters.');
+    }
+    return repository.rate(NewRating(
+      exchangeId: rating.exchangeId,
+      ratedId: rating.ratedId,
+      stars: rating.stars,
+      tags: rating.tags,
+      review: review == null || review.isEmpty ? null : review,
+    ));
+  }
+}
+
 class GetNotificationsUseCase {
   final NotificationRepository repository;
   GetNotificationsUseCase(this.repository);

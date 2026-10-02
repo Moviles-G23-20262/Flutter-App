@@ -4,12 +4,17 @@ import 'material_entity.dart';
 enum NotificationTypeEnum {
   /// A new listing matched something the user was looking for.
   SMART_MATCH,
+
+  /// Someone ordered one of the user's listings.
+  ORDER_PLACED,
   OTHER;
 
   String get displayName {
     switch (this) {
       case NotificationTypeEnum.SMART_MATCH:
         return 'New match for you';
+      case NotificationTypeEnum.ORDER_PLACED:
+        return 'New order';
       case NotificationTypeEnum.OTHER:
         return 'Notification';
     }

@@ -26,6 +26,10 @@ abstract class MarketplaceRemoteDataSource {
   Future<void> markChatRead(String chatRoomId);
 
   Future<List<ExchangeEntity>> getExchanges();
+  Future<ExchangeEntity> placeOrder(String materialId);
+  Future<ExchangeEntity> completeExchange(String exchangeId, {String? receivedCondition});
+  Future<ExchangeEntity> cancelExchange(String exchangeId);
+  Future<void> createRating(Map<String, dynamic> body);
 
   Future<List<NotificationEntity>> getNotifications();
   Future<void> markNotificationOpened(String notificationId);
@@ -95,6 +99,27 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
   @override
   Future<List<ExchangeEntity>> getExchanges() async =>
       parseList(await apiClient.get('/exchanges'), exchangeFromJson);
+
+  @override
+  Future<ExchangeEntity> placeOrder(String materialId) async => exchangeFromJson(
+        await apiClient.post('/exchanges/orders', body: {'materialId': materialId}) as Json,
+      );
+
+  @override
+  Future<ExchangeEntity> completeExchange(String exchangeId, {String? receivedCondition}) async =>
+      exchangeFromJson(await apiClient.post(
+        '/exchanges/$exchangeId/complete',
+        body: {'receivedCondition': ?receivedCondition},
+      ) as Json);
+
+  @override
+  Future<ExchangeEntity> cancelExchange(String exchangeId) async =>
+      exchangeFromJson(await apiClient.post('/exchanges/$exchangeId/cancel') as Json);
+
+  @override
+  Future<void> createRating(Map<String, dynamic> body) async {
+    await apiClient.post('/ratings', body: body);
+  }
 
   @override
   Future<List<NotificationEntity>> getNotifications() async =>

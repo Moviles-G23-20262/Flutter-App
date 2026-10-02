@@ -164,7 +164,9 @@ class SellerHubScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(s.material?.title ?? 'Item', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
-                              Text('Sold to ${s.buyer?.fullName ?? 'a classmate'} · ${s.completedAt == null ? '' : timeAgo(s.completedAt!)}',
+                              Text(s.isPending
+                                      ? 'Ordered by ${s.buyer?.fullName ?? 'a classmate'} · pending meetup'
+                                      : 'Sold to ${s.buyer?.fullName ?? 'a classmate'} · ${s.completedAt == null ? '' : timeAgo(s.completedAt!)}',
                                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
                             ],
                           ),

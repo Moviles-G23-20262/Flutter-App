@@ -4,6 +4,7 @@ import 'Presentation/State Management/account_state.dart';
 import 'Presentation/State Management/app_state.dart';
 import 'Presentation/State Management/chat_state.dart';
 import 'Presentation/State Management/marketplace_state.dart';
+import 'Presentation/State Management/schedule_state.dart';
 import 'theme/app_theme.dart';
 import 'Presentation/Screens/login_screen.dart';
 import 'Presentation/Screens/register_screen.dart';
@@ -15,7 +16,10 @@ import 'Presentation/Screens/profile_screen.dart';
 import 'Presentation/Screens/seller_hub_screen.dart';
 import 'Presentation/Screens/new_listing_screen.dart';
 import 'Presentation/Screens/new_listing_smart_screen.dart';
+import 'Presentation/Screens/complete_exchange_screen.dart';
 import 'Presentation/Screens/confirmation_screen.dart';
+import 'Presentation/Screens/meeting_point_screen.dart';
+import 'Presentation/Screens/schedule_screen.dart';
 import 'Presentation/Screens/favorites_screen.dart';
 import 'Presentation/Screens/notifications_screen.dart';
 import 'Presentation/Widgets/common_widgets.dart';
@@ -48,12 +52,23 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       getMessages: _deps.getMessages,
       sendMessage: _deps.sendMessage,
       markRead: _deps.markChatRead,
+      answerProposal: _deps.meetups.answer,
     ),
     account: AccountState(
       getExchanges: _deps.getExchanges,
       getNotifications: _deps.getNotifications,
       markNotificationOpened: _deps.markNotificationOpened,
+      placeOrder: _deps.placeOrder,
+      completeExchange: _deps.completeExchange,
+      cancelExchange: _deps.cancelExchange,
+      rateUser: _deps.rateUser,
     ),
+    schedule: ScheduleState(
+      getSchedule: _deps.getSchedule,
+      addBlock: _deps.addScheduleBlock,
+      removeBlock: _deps.removeScheduleBlock,
+    ),
+    meetups: _deps.meetups,
   );
 
   @override
@@ -121,7 +136,19 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.newListingSmart:
         return NewListingSmartScreen(appState: _appState);
       case AppScreen.confirmation:
-        return ConfirmationScreen(appState: _appState);
+        final order = _appState.selectedExchange;
+        if (order == null) return AppShell(appState: _appState);
+        return ConfirmationScreen(appState: _appState, exchange: order);
+      case AppScreen.completeExchange:
+        final exchange = _appState.selectedExchange;
+        if (exchange == null) return AppShell(appState: _appState);
+        return CompleteExchangeScreen(appState: _appState, exchange: exchange);
+      case AppScreen.meetingPlanner:
+        final room = _appState.plannerRoom;
+        if (room == null) return AppShell(appState: _appState);
+        return MeetingPointScreen(appState: _appState, room: room);
+      case AppScreen.schedule:
+        return ScheduleScreen(appState: _appState);
       case AppScreen.home:
       case AppScreen.search:
       case AppScreen.messages:

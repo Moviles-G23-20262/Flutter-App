@@ -8,6 +8,7 @@ import 'package:flutter_front_end/Data/data_sources/marketplace_remote_data_sour
 import 'package:flutter_front_end/Domain/Entities/chat_room_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/exchange_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
+import 'package:flutter_front_end/Domain/Entities/meetup_entities.dart';
 import 'package:flutter_front_end/Domain/Entities/new_listing_data.dart';
 import 'package:flutter_front_end/Domain/Entities/notification_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
@@ -15,12 +16,16 @@ import 'package:flutter_front_end/Domain/Entities/user_summary.dart';
 import 'package:flutter_front_end/Domain/Entities/wishlist_item_entity.dart';
 import 'package:flutter_front_end/Domain/exceptions/data_exceptions.dart';
 import 'package:flutter_front_end/Domain/repositories/marketplace_repositories.dart';
+import 'package:flutter_front_end/Domain/repositories/meetup_repositories.dart';
 import 'package:flutter_front_end/Domain/use_cases/marketplace_use_cases.dart';
+import 'package:flutter_front_end/Domain/use_cases/meetup_use_cases.dart';
 import 'package:flutter_front_end/Presentation/Screens/home_screen.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/account_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/chat_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/marketplace_state.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/meeting_planner_state.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/schedule_state.dart';
 import 'package:flutter_front_end/Presentation/Widgets/formatters.dart';
 import 'package:flutter_front_end/core/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +55,15 @@ Map<String, dynamic> _materialJson({String id = 'm1', String price = '18.00', St
       'updatedAt': '2026-09-01T10:00:00.000Z',
       'seller': _sellerJson(sellerId),
     };
+
+UserEntity _user() => UserEntity(
+      id: _me,
+      email: 'me@uniandes.edu.co',
+      fullName: 'Maria Santos',
+      major: 'CS',
+      rating: 4.8,
+      createdAt: DateTime(2026, 1, 1),
+    );
 
 MaterialEntity _material({String id = 'm1', String sellerId = _other, double price = 18}) => MaterialEntity(
       id: id,
@@ -127,11 +141,152 @@ class _FakeChats implements ChatRepository {
   Future<void> markRead(String chatRoomId) async => markedRead.add(chatRoomId);
 }
 
+ExchangeEntity _order({
+  String id = 'x1',
+  String materialId = 'm1',
+  String buyerId = _me,
+  String sellerId = _other,
+  double price = 18,
+  ExchangeStatusEnum status = ExchangeStatusEnum.PENDING,
+  DateTime? completedAt,
+}) =>
+    ExchangeEntity(
+      id: id,
+      orderNumber: 1001,
+      materialId: materialId,
+      buyerId: buyerId,
+      sellerId: sellerId,
+      price: price,
+      status: status,
+      createdAt: DateTime(2026, 9, 1),
+      completedAt: completedAt,
+    );
+
 class _FakeExchanges implements ExchangeRepository {
   List<ExchangeEntity> exchanges = [];
+  final ordered = <String>[];
+  final ratings = <NewRating>[];
+  DataException? orderError;
 
   @override
   Future<List<ExchangeEntity>> getExchanges() async => exchanges;
+
+  @override
+  Future<ExchangeEntity> placeOrder(String materialId) async {
+    if (orderError != null) throw orderError!;
+    ordered.add(materialId);
+    return _order(id: 'new', materialId: materialId);
+  }
+
+  @override
+  Future<ExchangeEntity> complete(String exchangeId, {MaterialConditionEnum? receivedCondition}) async =>
+      _order(id: exchangeId, status: ExchangeStatusEnum.COMPLETED, completedAt: DateTime(2026, 9, 2));
+
+  @override
+  Future<ExchangeEntity> cancel(String exchangeId) async =>
+      _order(id: exchangeId, status: ExchangeStatusEnum.CANCELLED);
+
+  @override
+  Future<void> rate(NewRating rating) async => ratings.add(rating);
+}
+
+const _library = MeetingPointEntity(
+  id: 'lib',
+  name: 'Central Library lobby',
+  zoneType: MeetingZoneTypeEnum.LIBRARY,
+  isMonitored: true,
+  location: GeoPoint(4.60198, -74.06532),
+);
+const _plaza = MeetingPointEntity(
+  id: 'plaza',
+  name: 'Plazoleta Lleras',
+  zoneType: MeetingZoneTypeEnum.PLAZA,
+  isMonitored: false,
+  location: GeoPoint(4.60165, -74.06642),
+);
+const _lobby = MeetingPointEntity(
+  id: 'ml',
+  name: 'Mario Laserna lobby',
+  zoneType: MeetingZoneTypeEnum.BUILDING_LOBBY,
+  isMonitored: true,
+  location: GeoPoint(4.60286, -74.06485),
+);
+
+class _FakeMeetups implements MeetupRepository {
+  List<MeetingPointEntity> points = [_library, _plaza, _lobby];
+  MeetingSuggestions suggestions = const MeetingSuggestions(slots: [], callerHasSchedule: true, otherHasSchedule: true);
+  final proposed = <(String, String, DateTime)>[];
+  final answers = <String>[];
+
+  MeetingProposalEntity _proposal(String id, MeetingProposalStatusEnum status) => MeetingProposalEntity(
+        id: id,
+        chatRoomId: 'r1',
+        proposerId: _me,
+        startsAt: DateTime(2026, 9, 16, 10),
+        endsAt: DateTime(2026, 9, 16, 11),
+        status: status,
+      );
+
+  @override
+  Future<List<MeetingPointEntity>> getMeetingPoints() async => points;
+
+  @override
+  Future<MeetingSuggestions> getSuggestions(String chatRoomId) async => suggestions;
+
+  @override
+  Future<MeetingProposalEntity> propose({
+    required String chatRoomId,
+    required String meetingPointId,
+    required DateTime startsAt,
+    required DateTime endsAt,
+  }) async {
+    proposed.add((chatRoomId, meetingPointId, startsAt));
+    return _proposal('p1', MeetingProposalStatusEnum.PENDING);
+  }
+
+  @override
+  Future<MeetingProposalEntity> accept(String proposalId) async {
+    answers.add('accept $proposalId');
+    return _proposal(proposalId, MeetingProposalStatusEnum.ACCEPTED);
+  }
+
+  @override
+  Future<MeetingProposalEntity> decline(String proposalId) async {
+    answers.add('decline $proposalId');
+    return _proposal(proposalId, MeetingProposalStatusEnum.DECLINED);
+  }
+
+  @override
+  Future<MeetingProposalEntity> withdraw(String proposalId) async {
+    answers.add('withdraw $proposalId');
+    return _proposal(proposalId, MeetingProposalStatusEnum.CANCELLED);
+  }
+}
+
+class _FakeSchedule implements ScheduleRepository {
+  List<ScheduleBlockEntity> blocks = [];
+
+  @override
+  Future<List<ScheduleBlockEntity>> getSchedule() async => blocks;
+
+  @override
+  Future<ScheduleBlockEntity> add(NewScheduleBlock block) async => ScheduleBlockEntity(
+        id: 'b${blocks.length}',
+        dayOfWeek: block.dayOfWeek,
+        startMinute: block.startMinute,
+        endMinute: block.endMinute,
+        label: block.label,
+      );
+
+  @override
+  Future<void> remove(String blockId) async {}
+}
+
+class _FakeLocation implements LocationRepository {
+  GeoPoint? here;
+
+  @override
+  Future<GeoPoint?> currentLocation() async => here;
 }
 
 class _FakeNotifications implements NotificationRepository {
@@ -148,6 +303,18 @@ class _World {
   final chats = _FakeChats();
   final exchanges = _FakeExchanges();
   final notifications = _FakeNotifications();
+  final meetupRepo = _FakeMeetups();
+  final scheduleRepo = _FakeSchedule();
+  final location = _FakeLocation();
+
+  late final meetups = MeetupUseCases(
+    getMeetingPoints: GetMeetingPointsUseCase(meetupRepo),
+    getSuggestions: GetMeetingSuggestionsUseCase(meetupRepo),
+    propose: ProposeMeetingUseCase(meetupRepo),
+    answer: AnswerMeetingProposalUseCase(meetupRepo),
+    currentLocation: GetCurrentLocationUseCase(location),
+    rankZones: RankSafeZonesUseCase(),
+  );
 
   late final marketplaceState = MarketplaceState(
     getMaterials: GetMaterialsUseCase(materials),
@@ -163,15 +330,32 @@ class _World {
     getMessages: GetMessagesUseCase(chats),
     sendMessage: SendMessageUseCase(chats),
     markRead: MarkChatReadUseCase(chats),
+    answerProposal: meetups.answer,
   );
 
   late final accountState = AccountState(
     getExchanges: GetExchangesUseCase(exchanges),
     getNotifications: GetNotificationsUseCase(notifications),
     markNotificationOpened: MarkNotificationOpenedUseCase(notifications),
+    placeOrder: PlaceOrderUseCase(exchanges),
+    completeExchange: CompleteExchangeUseCase(exchanges),
+    cancelExchange: CancelExchangeUseCase(exchanges),
+    rateUser: RateUserUseCase(exchanges),
   );
 
-  late final appState = AppState(marketplace: marketplaceState, chats: chatState, account: accountState);
+  late final scheduleState = ScheduleState(
+    getSchedule: GetScheduleUseCase(scheduleRepo),
+    addBlock: AddScheduleBlockUseCase(scheduleRepo),
+    removeBlock: RemoveScheduleBlockUseCase(scheduleRepo),
+  );
+
+  late final appState = AppState(
+    marketplace: marketplaceState,
+    chats: chatState,
+    account: accountState,
+    schedule: scheduleState,
+    meetups: meetups,
+  );
 }
 
 class _FakeRemote implements MarketplaceRemoteDataSource {
@@ -398,7 +582,8 @@ void main() {
 
   group('AccountState', () {
     ExchangeEntity exchange(String id, {required String buyer, required String seller, required double price, required DateTime at}) =>
-        ExchangeEntity(id: id, materialId: 'm$id', buyerId: buyer, sellerId: seller, price: price, completedAt: at);
+        _order(id: id, materialId: 'm$id', buyerId: buyer, sellerId: seller, price: price,
+            status: ExchangeStatusEnum.COMPLETED, completedAt: at);
 
     test('splits purchases and sales and counts this month\'s earnings', () async {
       final world = _World();
@@ -414,6 +599,240 @@ void main() {
       expect(world.accountState.salesOf(_me).map((e) => e.id), ['1', '2']);
       expect(world.accountState.swapCountOf(_me), 3);
       expect(world.accountState.earnedThisMonth(_me, now: DateTime(2026, 9, 20)), 18);
+    });
+
+    test('pending orders are listed but only completed ones count as swaps and earnings', () async {
+      final world = _World();
+      world.exchanges.exchanges = [
+        _order(id: 'p', sellerId: _me, buyerId: _other, price: 50),
+        _order(id: 'c', sellerId: _me, buyerId: _other, price: 20, status: ExchangeStatusEnum.CANCELLED),
+        _order(id: 'd', sellerId: _me, buyerId: _other, price: 18,
+            status: ExchangeStatusEnum.COMPLETED, completedAt: DateTime(2026, 9, 10)),
+      ];
+
+      await world.accountState.load();
+
+      expect(world.accountState.salesOf(_me).map((e) => e.id), ['d', 'p']);
+      expect(world.accountState.swapCountOf(_me), 1);
+      expect(world.accountState.earnedThisMonth(_me, now: DateTime(2026, 9, 20)), 18);
+      expect(world.accountState.pendingOrderFor('m1', _other)?.id, 'p');
+    });
+  });
+
+  group('Orders', () {
+    test('buying places the order and opens the confirmation for it', () async {
+      final world = _World();
+      world.appState.login(_user());
+
+      final error = await world.appState.buy(_material(id: 'm9', sellerId: _other));
+
+      expect(error, isNull);
+      expect(world.exchanges.ordered, ['m9']);
+      expect(world.appState.currentScreen, AppScreen.confirmation);
+      expect(world.appState.selectedExchange?.orderCode, 'CSW-1001');
+      expect(world.accountState.pendingOrderFor('m9', _me), isNotNull);
+      world.chatState.clear();
+    });
+
+    test('you cannot buy your own or an unavailable listing', () async {
+      final world = _World();
+      world.appState.login(_user());
+
+      expect(await world.appState.buy(_material(sellerId: _me)), 'This is your own listing.');
+      expect(
+        await world.appState.buy(_material().copyWith(status: MaterialStatusEnum.RESERVED)),
+        'This item is no longer available.',
+      );
+      expect(world.exchanges.ordered, isEmpty);
+      world.chatState.clear();
+    });
+
+    test('the server refusing an order is shown to the user', () async {
+      final world = _World();
+      world.appState.login(_user());
+      world.exchanges.orderError = const DataException('This listing is no longer available');
+
+      expect(await world.appState.buy(_material()), 'This listing is no longer available');
+      expect(world.appState.currentScreen, isNot(AppScreen.confirmation));
+      world.chatState.clear();
+    });
+
+    test('completing marks the order completed; ratings trim an empty review', () async {
+      final world = _World();
+      final completed = await world.accountState.complete(_order(), receivedCondition: MaterialConditionEnum.GOOD);
+      await world.accountState.rate(const NewRating(exchangeId: 'x1', ratedId: _other, stars: 5, review: '   '));
+
+      expect(completed.isCompleted, isTrue);
+      expect(world.exchanges.ratings.single.review, isNull);
+      expect(
+        () => world.accountState.rate(const NewRating(exchangeId: 'x1', ratedId: _other, stars: 0)),
+        throwsA(isA<DataException>()),
+      );
+      expect(
+        () => world.accountState.complete(_order(status: ExchangeStatusEnum.COMPLETED)),
+        throwsA(isA<DataException>()),
+      );
+    });
+  });
+
+  group('Meetups', () {
+    test('zones are ranked by walking time and the closest monitored one is the best match', () {
+      // Right next to the plaza, which is not monitored.
+      const here = GeoPoint(4.60160, -74.06650);
+
+      final ranked = RankSafeZonesUseCase().execute([_library, _plaza, _lobby], here);
+
+      expect(ranked.map((r) => r.zone.id), ['plaza', 'lib', 'ml']);
+      expect(ranked.firstWhere((r) => r.bestMatch).zone.id, 'lib');
+      expect(ranked.first.walkMinutes, 1);
+    });
+
+    test('without a location, monitored zones come first and there are no walking times', () {
+      final ranked = RankSafeZonesUseCase().execute([_plaza, _lobby, _library], null);
+
+      expect(ranked.map((r) => r.zone.id), ['lib', 'ml', 'plaza']);
+      expect(ranked.every((r) => r.walkMinutes == null), isTrue);
+      expect(ranked.first.bestMatch, isTrue);
+    });
+
+    test('walking time is distance at 80 m per minute, rounded up', () {
+      // About 445 m apart.
+      const a = GeoPoint(4.6000, -74.0650);
+      const b = GeoPoint(4.6040, -74.0650);
+
+      expect(RankSafeZonesUseCase.distanceMeters(a, b), closeTo(445, 5));
+      expect(RankSafeZonesUseCase.walkMinutes(a, b), 6);
+    });
+
+    test('the planner preselects the suggested hour and the best zone, then proposes them', () async {
+      final world = _World();
+      final slot = FreeSlot(
+        startsAt: DateTime.now().add(const Duration(days: 2)),
+        endsAt: DateTime.now().add(const Duration(days: 2, hours: 1)),
+        sharedBreak: true,
+      );
+      world.meetupRepo.suggestions = MeetingSuggestions(
+        slots: [slot],
+        suggested: slot,
+        callerHasSchedule: true,
+        otherHasSchedule: false,
+      );
+      world.location.here = const GeoPoint(4.60286, -74.06485);
+      final planner = MeetingPlannerState(useCases: world.meetups, chatRoomId: 'r1');
+
+      await planner.load();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(planner.selectedSlot, slot);
+      expect(planner.selectedZone?.zone.id, 'ml');
+      expect(await planner.propose(), isNull);
+      expect(world.meetupRepo.proposed.single.$2, 'ml');
+      planner.dispose();
+    });
+
+    test('a meeting in the past cannot be proposed', () {
+      final world = _World();
+      final past = FreeSlot(
+        startsAt: DateTime(2020, 1, 1, 10),
+        endsAt: DateTime(2020, 1, 1, 11),
+        sharedBreak: false,
+      );
+
+      expect(
+        () => world.meetups.propose.execute(chatRoomId: 'r1', zone: _library, slot: past),
+        throwsA(isA<DataException>()),
+      );
+    });
+
+    test('answering a proposal goes to the server and refreshes the chat', () async {
+      final world = _World();
+      world.chatState.start(_me);
+      world.chatState.openRoom('r1');
+
+      expect(await world.chatState.answer('p1', ProposalAnswer.accept), isNull);
+      expect(world.meetupRepo.answers, ['accept p1']);
+      world.chatState.clear();
+    });
+
+    test('schedule rejects overlapping classes and classes that end before they start', () async {
+      final world = _World();
+      expect(
+        await world.scheduleState.add(const NewScheduleBlock(dayOfWeek: 1, startMinute: 600, endMinute: 540)),
+        'A class has to end after it starts.',
+      );
+      expect(await world.scheduleState.add(const NewScheduleBlock(dayOfWeek: 1, startMinute: 420, endMinute: 540, label: 'MATH-201')), isNull);
+      expect(
+        await world.scheduleState.add(const NewScheduleBlock(dayOfWeek: 1, startMinute: 480, endMinute: 600)),
+        'Overlaps with MATH-201 on the same day.',
+      );
+      expect(world.scheduleState.blocksOn(1), hasLength(1));
+    });
+  });
+
+  group('Meetup JSON', () {
+    test('an order with its agreed meetup', () {
+      final exchange = exchangeFromJson({
+        'id': 'x1',
+        'orderNumber': 1001,
+        'materialId': 'm1',
+        'buyerId': _me,
+        'sellerId': _other,
+        'price': '320000.00',
+        'status': 'PENDING',
+        'createdAt': '2026-09-15T10:00:00.000Z',
+        'completedAt': null,
+        'receivedCondition': null,
+        'meetingPointId': 'lib',
+        'meetingStartsAt': '2026-09-17T14:00:00.000Z',
+        'meetingEndsAt': '2026-09-17T15:00:00.000Z',
+        'meetingPoint': {
+          'id': 'lib', 'name': 'Central Library lobby', 'detail': null, 'zoneType': 'LIBRARY',
+          'isMonitored': true, 'lat': 4.6, 'lng': -74.06, 'createdAt': '2026-09-01T00:00:00.000Z',
+        },
+        'lat': 4.6,
+        'lng': -74.06,
+      });
+
+      expect(exchange.orderCode, 'CSW-1001');
+      expect(exchange.isPending, isTrue);
+      expect(exchange.price, 320000);
+      expect(exchange.meetingPoint?.isMonitored, isTrue);
+      expect(exchange.meetingStartsAt, DateTime.utc(2026, 9, 17, 14));
+    });
+
+    test('a meeting message carries its proposal; unknown types fall back safely', () {
+      final message = messageFromJson({
+        'id': 'a', 'chatRoomId': 'r1', 'senderId': _other, 'content': 'Proposed meeting', 'isRead': false,
+        'createdAt': '2026-09-01T10:01:00.000Z', 'type': 'MEETING',
+        'meetingProposal': {
+          'id': 'p1', 'chatRoomId': 'r1', 'proposerId': _other, 'meetingPointId': 'lib', 'status': 'ACCEPTED',
+          'startsAt': '2026-09-17T14:00:00.000Z', 'endsAt': '2026-09-17T15:00:00.000Z',
+        },
+      });
+      final legacy = messageFromJson({
+        'id': 'b', 'chatRoomId': 'r1', 'senderId': _other, 'content': 'hi', 'isRead': true,
+        'createdAt': '2026-09-01T10:01:00.000Z',
+      });
+      final notification = notificationFromJson({
+        'id': 'n', 'userId': _me, 'materialId': null, 'type': 'SOMETHING_NEW',
+        'sentAt': '2026-09-01T10:01:00.000Z', 'openedAt': null,
+      });
+
+      expect(message.type, MessageTypeEnum.MEETING);
+      expect(message.meetingProposal?.isAccepted, isTrue);
+      expect(legacy.type, MessageTypeEnum.TEXT);
+      expect(notification.type, NotificationTypeEnum.OTHER);
+    });
+  });
+
+  group('Meetup formatting', () {
+    test('prices in pesos and campus times', () {
+      expect(copPrice(320000), r'$320.000 COP');
+      expect(copPrice(9500), r'$9.500 COP');
+      expect(copPrice(800), r'$800 COP');
+      expect(timeRange(DateTime(2026, 9, 16, 10), DateTime(2026, 9, 16, 11)), '10:00 - 11:00');
+      expect(dayLabel(DateTime(2026, 9, 16, 10)), 'Wed 16 Sep');
+      expect(minuteOfDay(450), '07:30');
     });
   });
 

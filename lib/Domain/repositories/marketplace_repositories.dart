@@ -40,8 +40,19 @@ abstract class ChatRepository {
 }
 
 abstract class ExchangeRepository {
-  /// Completed exchanges where the signed-in user is buyer or seller.
+  /// Orders where the signed-in user is buyer or seller, newest first.
   Future<List<ExchangeEntity>> getExchanges();
+
+  /// Orders [materialId] as the signed-in user; the listing becomes reserved.
+  Future<ExchangeEntity> placeOrder(String materialId);
+
+  /// The buyer checked the item at the meetup; the listing becomes sold.
+  Future<ExchangeEntity> complete(String exchangeId, {MaterialConditionEnum? receivedCondition});
+
+  /// Either side backs out; the listing goes back on the market.
+  Future<ExchangeEntity> cancel(String exchangeId);
+
+  Future<void> rate(NewRating rating);
 }
 
 abstract class NotificationRepository {

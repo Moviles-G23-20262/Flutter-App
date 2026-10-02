@@ -1,19 +1,28 @@
 import 'package:flutter/foundation.dart';
 import '../../Domain/Entities/exchange_entity.dart';
+import '../../Domain/Entities/material_entity.dart';
 import '../../Domain/Entities/notification_entity.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
 import '../../Domain/use_cases/marketplace_use_cases.dart';
 
-/// The signed-in user's history: completed exchanges (purchases, sales) and notifications.
+/// The signed-in user's orders (purchases, sales) and notifications.
 class AccountState extends ChangeNotifier {
   final GetExchangesUseCase getExchanges;
   final GetNotificationsUseCase getNotifications;
   final MarkNotificationOpenedUseCase markNotificationOpened;
+  final PlaceOrderUseCase placeOrder;
+  final CompleteExchangeUseCase completeExchange;
+  final CancelExchangeUseCase cancelExchange;
+  final RateUserUseCase rateUser;
 
   AccountState({
     required this.getExchanges,
     required this.getNotifications,
     required this.markNotificationOpened,
+    required this.placeOrder,
+    required this.completeExchange,
+    required this.cancelExchange,
+    required this.rateUser,
   });
 
   List<ExchangeEntity> _exchanges = const [];
@@ -30,23 +39,33 @@ class AccountState extends ChangeNotifier {
   String? get error => _error;
   int get unreadNotifications => _notifications.where((n) => n.isUnread).length;
 
-  /// Newest first.
+  /// Orders [userId] placed, newest first (cancelled ones left out).
   List<ExchangeEntity> purchasesOf(String userId) => _sortedBy((e) => e.buyerId == userId);
 
   List<ExchangeEntity> salesOf(String userId) => _sortedBy((e) => e.sellerId == userId);
 
   /// Completed exchanges as buyer or seller.
   int swapCountOf(String userId) =>
-      _exchanges.where((e) => e.buyerId == userId || e.sellerId == userId).length;
+      _exchanges.where((e) => e.isCompleted && (e.buyerId == userId || e.sellerId == userId)).length;
 
   /// What [userId] sold since the first day of the current month.
   double earnedThisMonth(String userId, {DateTime? now}) {
     final today = now ?? DateTime.now();
     final monthStart = DateTime(today.year, today.month);
     return salesOf(userId)
-        .where((e) => !(e.completedAt ?? monthStart).isBefore(monthStart))
+        .where((e) => e.isCompleted && !(e.completedAt ?? monthStart).isBefore(monthStart))
         .fold(0.0, (sum, e) => sum + e.price);
   }
+
+  /// The open order between this buyer and seller for [materialId], if any.
+  ExchangeEntity? pendingOrderFor(String materialId, String buyerId) => _exchanges
+      .where((e) => e.isPending && e.materialId == materialId && e.buyerId == buyerId)
+      .firstOrNull;
+
+  /// The latest order (pending or completed) for [materialId] with [buyerId].
+  ExchangeEntity? latestOrderFor(String materialId, String buyerId) => _sortedBy(
+        (e) => e.materialId == materialId && e.buyerId == buyerId,
+      ).firstOrNull;
 
   Future<void> load() async {
     final generation = _generation;
@@ -69,6 +88,43 @@ class AccountState extends ChangeNotifier {
     _loadedOnce = true;
     notifyListeners();
   }
+
+  /// Re-reads the orders only, e.g. after the other side may have changed one.
+  Future<void> refreshExchanges() async {
+    final generation = _generation;
+    try {
+      final exchanges = await getExchanges.execute();
+      if (generation != _generation) return;
+      _exchanges = exchanges;
+      notifyListeners();
+    } on DataException {
+      // Keep what is on screen; the next full load shows the error.
+    }
+  }
+
+  /// Orders [material]. Throws [DataException] with a message to show.
+  Future<ExchangeEntity> order(MaterialEntity material, {required String buyerId}) async {
+    final exchange = await placeOrder.execute(material, buyerId: buyerId);
+    _upsert(exchange);
+    return exchange;
+  }
+
+  /// Throws [DataException] with a message to show.
+  Future<ExchangeEntity> complete(ExchangeEntity exchange, {MaterialConditionEnum? receivedCondition}) async {
+    final updated = await completeExchange.execute(exchange, receivedCondition: receivedCondition);
+    _upsert(updated);
+    return updated;
+  }
+
+  /// Throws [DataException] with a message to show.
+  Future<ExchangeEntity> cancel(ExchangeEntity exchange) async {
+    final updated = await cancelExchange.execute(exchange);
+    _upsert(updated);
+    return updated;
+  }
+
+  /// Throws [DataException] with a message to show.
+  Future<void> rate(NewRating rating) => rateUser.execute(rating);
 
   Future<void> openNotification(String id) async {
     final index = _notifications.indexWhere((n) => n.id == id);
@@ -97,9 +153,18 @@ class AccountState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _upsert(ExchangeEntity exchange) {
+    final exists = _exchanges.any((e) => e.id == exchange.id);
+    _exchanges = exists
+        ? [for (final e in _exchanges) if (e.id == exchange.id) exchange else e]
+        : [exchange, ..._exchanges];
+    notifyListeners();
+  }
+
   List<ExchangeEntity> _sortedBy(bool Function(ExchangeEntity) test) {
-    final list = _exchanges.where(test).toList();
-    list.sort((a, b) => (b.completedAt ?? DateTime(0)).compareTo(a.completedAt ?? DateTime(0)));
+    final list = _exchanges.where((e) => e.status != ExchangeStatusEnum.CANCELLED && test(e)).toList();
+    DateTime when(ExchangeEntity e) => e.completedAt ?? e.createdAt ?? DateTime(0);
+    list.sort((a, b) => when(b).compareTo(when(a)));
     return list;
   }
 }

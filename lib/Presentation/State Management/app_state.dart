@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../Domain/Entities/chat_room_entity.dart';
+import '../../Domain/Entities/exchange_entity.dart';
 import '../../Domain/Entities/material_entity.dart';
+import '../../Domain/use_cases/meetup_use_cases.dart';
 import '../../Domain/Entities/user_entity.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
 import 'account_state.dart';
 import 'chat_state.dart';
 import 'marketplace_state.dart';
+import 'meeting_planner_state.dart';
+import 'schedule_state.dart';
 
 // ─── App Navigation State ─────────────────────────────────────────────────────
 
@@ -22,7 +27,18 @@ enum AppScreen {
   sellerHub,
   newListing,
   newListingSmart,
+
+  /// "Order Placed", right after buying.
   confirmation,
+
+  /// Pick a safe zone and a shared free hour for the open chat.
+  meetingPlanner,
+
+  /// Check the item and rate the other person.
+  completeExchange,
+
+  /// The user's weekly classes.
+  schedule,
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -37,16 +53,24 @@ class AppState extends ChangeNotifier {
   final MarketplaceState marketplace;
   final ChatState chats;
   final AccountState account;
+  final ScheduleState schedule;
+  final MeetupUseCases meetups;
 
   AppState({
     this.onLogout,
     required this.marketplace,
     required this.chats,
     required this.account,
+    required this.schedule,
+    required this.meetups,
   });
 
   AppScreen _currentScreen = AppScreen.login;
   MaterialEntity? _selectedMaterial;
+  ExchangeEntity? _selectedExchange;
+  ChatRoomEntity? _plannerRoom;
+  AppScreen _scheduleReturnTo = AppScreen.profile;
+  AppScreen _exchangeReturnTo = AppScreen.home;
   UserEntity? _currentUser;
   ThemeMode _themeMode = ThemeMode.dark;
   bool _isLoggedIn = false;
@@ -56,6 +80,12 @@ class AppState extends ChangeNotifier {
 
   AppScreen get currentScreen  => _currentScreen;
   MaterialEntity? get selectedMaterial => _selectedMaterial;
+
+  /// The order shown on the confirmation and complete-exchange screens.
+  ExchangeEntity? get selectedExchange => _selectedExchange;
+
+  /// The chat the meeting planner proposes into.
+  ChatRoomEntity? get plannerRoom => _plannerRoom;
   UserEntity? get currentUser  => _currentUser;
   ThemeMode get themeMode      => _themeMode;
   bool get isLoggedIn          => _isLoggedIn;
@@ -79,6 +109,67 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Orders & meetups ──────────────────────────────────────────────────────
+
+  /// Orders [material] and shows the confirmation. Returns an error message, or `null`.
+  Future<String?> buy(MaterialEntity material) async {
+    final me = _currentUser;
+    if (me == null) return 'Log in to buy.';
+    try {
+      final exchange = await account.order(material, buyerId: me.id);
+      // The listing is reserved now; refresh so it stops showing as available.
+      marketplace.load();
+      _selectedExchange = exchange;
+      navigateTo(AppScreen.confirmation);
+      return null;
+    } on DataException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Opens the chat with the other side of [exchange] to agree on the meetup.
+  Future<String?> arrangeMeetup(ExchangeEntity exchange) async {
+    try {
+      final room = await chats.openRoomFor(exchange.materialId);
+      openChat(room.id);
+      return null;
+    } on DataException catch (e) {
+      return e.message;
+    }
+  }
+
+  void openCompleteExchange(ExchangeEntity exchange) {
+    _selectedExchange = exchange;
+    // From the "Order Placed" screen there is nothing to go back to.
+    _exchangeReturnTo = _currentScreen == AppScreen.confirmation ? AppScreen.home : _currentScreen;
+    navigateTo(AppScreen.completeExchange);
+  }
+
+  void closeCompleteExchange() => navigateTo(_exchangeReturnTo);
+
+  void openMeetingPlanner(ChatRoomEntity room) {
+    _plannerRoom = room;
+    navigateTo(AppScreen.meetingPlanner);
+  }
+
+  /// A fresh planner for [plannerRoom]; the screen owns and disposes it.
+  MeetingPlannerState createMeetingPlanner(ChatRoomEntity room) =>
+      MeetingPlannerState(useCases: meetups, chatRoomId: room.id);
+
+  /// Back from the planner to the chat it was opened from.
+  void closeMeetingPlanner() {
+    navigateTo(AppScreen.messages);
+    chats.refreshMessages();
+  }
+
+  /// Opens the class schedule; its back button returns to [returnTo].
+  void openSchedule({AppScreen returnTo = AppScreen.profile}) {
+    _scheduleReturnTo = returnTo;
+    navigateTo(AppScreen.schedule);
+  }
+
+  void closeSchedule() => navigateTo(_scheduleReturnTo);
+
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   void login(UserEntity user) {
@@ -90,6 +181,7 @@ class AppState extends ChangeNotifier {
     marketplace.load();
     chats.start(user.id);
     account.load();
+    schedule.load();
   }
 
   /// "Message seller": opens (creating it if needed) the conversation about [material].
@@ -121,6 +213,9 @@ class AppState extends ChangeNotifier {
     marketplace.clear();
     chats.clear();
     account.clear();
+    schedule.clear();
+    _selectedExchange = null;
+    _plannerRoom = null;
     _currentUser = null;
     _isLoggedIn = false;
     _currentScreen = AppScreen.login;
@@ -133,6 +228,7 @@ class AppState extends ChangeNotifier {
     marketplace.dispose();
     chats.dispose();
     account.dispose();
+    schedule.dispose();
     super.dispose();
   }
 

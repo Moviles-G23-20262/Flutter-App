@@ -10,7 +10,8 @@ import '../../Domain/repositories/marketplace_repositories.dart';
 import '../data_sources/marketplace_remote_data_source.dart';
 
 /// Runs [request], turning transport and HTTP failures into a [DataException] the UI can show.
-Future<T> _guard<T>(Future<T> Function() request) async {
+/// Shared by every repository that talks to the API.
+Future<T> guardRequest<T>(Future<T> Function() request) async {
   try {
     return await request();
   } on NetworkException {
@@ -37,10 +38,10 @@ class MaterialRepositoryImpl implements MaterialRepository {
   MaterialRepositoryImpl(this.remote);
 
   @override
-  Future<List<MaterialEntity>> getMaterials() => _guard(remote.getMaterials);
+  Future<List<MaterialEntity>> getMaterials() => guardRequest(remote.getMaterials);
 
   @override
-  Future<MaterialEntity> createListing(NewListingData data) => _guard(() async {
+  Future<MaterialEntity> createListing(NewListingData data) => guardRequest(() async {
         final imageUrls = <String>[];
         for (final image in data.images) {
           imageUrls.add(await remote.uploadImage(bytes: image.bytes, filename: image.filename));
@@ -65,13 +66,13 @@ class WishlistRepositoryImpl implements WishlistRepository {
   WishlistRepositoryImpl(this.remote);
 
   @override
-  Future<List<WishlistItemEntity>> getWishlist() => _guard(remote.getWishlist);
+  Future<List<WishlistItemEntity>> getWishlist() => guardRequest(remote.getWishlist);
 
   @override
-  Future<WishlistItemEntity> add(String materialId) => _guard(() => remote.addToWishlist(materialId));
+  Future<WishlistItemEntity> add(String materialId) => guardRequest(() => remote.addToWishlist(materialId));
 
   @override
-  Future<void> remove(String wishlistItemId) => _guard(() => remote.removeFromWishlist(wishlistItemId));
+  Future<void> remove(String wishlistItemId) => guardRequest(() => remote.removeFromWishlist(wishlistItemId));
 }
 
 class ChatRepositoryImpl implements ChatRepository {
@@ -80,20 +81,20 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this.remote);
 
   @override
-  Future<List<ChatRoomEntity>> getChatRooms() => _guard(remote.getChatRooms);
+  Future<List<ChatRoomEntity>> getChatRooms() => guardRequest(remote.getChatRooms);
 
   @override
-  Future<ChatRoomEntity> openChatRoom(String materialId) => _guard(() => remote.openChatRoom(materialId));
+  Future<ChatRoomEntity> openChatRoom(String materialId) => guardRequest(() => remote.openChatRoom(materialId));
 
   @override
-  Future<List<MessageEntity>> getMessages(String chatRoomId) => _guard(() => remote.getMessages(chatRoomId));
+  Future<List<MessageEntity>> getMessages(String chatRoomId) => guardRequest(() => remote.getMessages(chatRoomId));
 
   @override
   Future<MessageEntity> sendMessage(String chatRoomId, String content) =>
-      _guard(() => remote.sendMessage(chatRoomId, content));
+      guardRequest(() => remote.sendMessage(chatRoomId, content));
 
   @override
-  Future<void> markRead(String chatRoomId) => _guard(() => remote.markChatRead(chatRoomId));
+  Future<void> markRead(String chatRoomId) => guardRequest(() => remote.markChatRead(chatRoomId));
 }
 
 class ExchangeRepositoryImpl implements ExchangeRepository {
@@ -102,7 +103,26 @@ class ExchangeRepositoryImpl implements ExchangeRepository {
   ExchangeRepositoryImpl(this.remote);
 
   @override
-  Future<List<ExchangeEntity>> getExchanges() => _guard(remote.getExchanges);
+  Future<List<ExchangeEntity>> getExchanges() => guardRequest(remote.getExchanges);
+
+  @override
+  Future<ExchangeEntity> placeOrder(String materialId) => guardRequest(() => remote.placeOrder(materialId));
+
+  @override
+  Future<ExchangeEntity> complete(String exchangeId, {MaterialConditionEnum? receivedCondition}) =>
+      guardRequest(() => remote.completeExchange(exchangeId, receivedCondition: receivedCondition?.name));
+
+  @override
+  Future<ExchangeEntity> cancel(String exchangeId) => guardRequest(() => remote.cancelExchange(exchangeId));
+
+  @override
+  Future<void> rate(NewRating rating) => guardRequest(() => remote.createRating({
+        'exchangeId': rating.exchangeId,
+        'ratedId': rating.ratedId,
+        'stars': rating.stars,
+        'tags': rating.tags,
+        'review': ?rating.review,
+      }));
 }
 
 class NotificationRepositoryImpl implements NotificationRepository {
@@ -111,8 +131,8 @@ class NotificationRepositoryImpl implements NotificationRepository {
   NotificationRepositoryImpl(this.remote);
 
   @override
-  Future<List<NotificationEntity>> getNotifications() => _guard(remote.getNotifications);
+  Future<List<NotificationEntity>> getNotifications() => guardRequest(remote.getNotifications);
 
   @override
-  Future<void> markOpened(String notificationId) => _guard(() => remote.markNotificationOpened(notificationId));
+  Future<void> markOpened(String notificationId) => guardRequest(() => remote.markNotificationOpened(notificationId));
 }

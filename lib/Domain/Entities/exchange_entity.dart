@@ -1,20 +1,39 @@
 import 'package:flutter/foundation.dart';
 import 'material_entity.dart';
+import 'meetup_entities.dart';
 import 'user_summary.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ExchangeEntity
 // ──────────────────────────────────────────────────────────────────────────────
 
-/// Domain entity representing a recorded transaction between a buyer and a
-/// seller for a specific [MaterialEntity].
-///
-/// When [meetingPointId], [lat], and [lng] are provided, the exchange includes
-/// a physical in-campus meeting location.
+enum ExchangeStatusEnum {
+  /// Ordered; buyer and seller still have to meet.
+  PENDING,
+  COMPLETED,
+  CANCELLED;
+
+  String get displayName {
+    switch (this) {
+      case ExchangeStatusEnum.PENDING:
+        return 'Pending';
+      case ExchangeStatusEnum.COMPLETED:
+        return 'Completed';
+      case ExchangeStatusEnum.CANCELLED:
+        return 'Cancelled';
+    }
+  }
+}
+
+/// An order for a [MaterialEntity]: placed by the buyer, completed after they meet
+/// on campus and the buyer checks the item, or cancelled by either side.
 @immutable
 class ExchangeEntity {
   /// Unique identifier (UUID).
   final String id;
+
+  /// Sequential number shown to people, see [orderCode].
+  final int orderNumber;
 
   /// ID of the [MaterialEntity] being exchanged.
   final String materialId;
@@ -25,14 +44,25 @@ class ExchangeEntity {
   /// ID of the [UserEntity] selling the material.
   final String sellerId;
 
-  /// Agreed transaction price at the time of the exchange.
+  /// Listing price when the order was placed.
   final double price;
 
-  /// Timestamp when the exchange was finalised. `null` if still pending.
+  final ExchangeStatusEnum status;
+
+  /// When the order was placed.
+  final DateTime? createdAt;
+
+  /// When the buyer confirmed the exchange. `null` while pending or if cancelled.
   final DateTime? completedAt;
 
-  /// Optional ID referencing a known campus meeting point (e.g. a building).
+  /// The condition the buyer says they received.
+  final MaterialConditionEnum? receivedCondition;
+
+  /// The agreed campus meetup, once one was accepted in the chat.
   final String? meetingPointId;
+  final MeetingPointEntity? meetingPoint;
+  final DateTime? meetingStartsAt;
+  final DateTime? meetingEndsAt;
 
   /// Latitude of the agreed meeting location. `null` if not specified.
   final double? lat;
@@ -47,12 +77,19 @@ class ExchangeEntity {
 
   const ExchangeEntity({
     required this.id,
+    required this.orderNumber,
     required this.materialId,
     required this.buyerId,
     required this.sellerId,
     required this.price,
+    required this.status,
+    this.createdAt,
     this.completedAt,
+    this.receivedCondition,
     this.meetingPointId,
+    this.meetingPoint,
+    this.meetingStartsAt,
+    this.meetingEndsAt,
     this.lat,
     this.lng,
     this.material,
@@ -62,38 +99,18 @@ class ExchangeEntity {
 
   // ── Convenience getters ───────────────────────────────────────────────────────
 
-  /// Returns `true` when [completedAt] has been set.
-  bool get isCompleted => completedAt != null;
+  /// "CSW-1001".
+  String get orderCode => 'CSW-$orderNumber';
+
+  bool get isPending => status == ExchangeStatusEnum.PENDING;
+
+  bool get isCompleted => status == ExchangeStatusEnum.COMPLETED;
 
   /// Returns `true` when a geo-coordinate meeting point has been specified.
   bool get hasMeetingLocation => lat != null && lng != null;
 
-  // ── copyWith ─────────────────────────────────────────────────────────────────
-
-  /// Returns a copy of this entity with the given fields replaced.
-  ExchangeEntity copyWith({
-    String? id,
-    String? materialId,
-    String? buyerId,
-    String? sellerId,
-    double? price,
-    Object? completedAt    = _sentinel,
-    Object? meetingPointId = _sentinel,
-    Object? lat            = _sentinel,
-    Object? lng            = _sentinel,
-  }) {
-    return ExchangeEntity(
-      id:             id             ?? this.id,
-      materialId:     materialId     ?? this.materialId,
-      buyerId:        buyerId        ?? this.buyerId,
-      sellerId:       sellerId       ?? this.sellerId,
-      price:          price          ?? this.price,
-      completedAt:    completedAt    == _sentinel ? this.completedAt    : completedAt    as DateTime?,
-      meetingPointId: meetingPointId == _sentinel ? this.meetingPointId : meetingPointId as String?,
-      lat:            lat            == _sentinel ? this.lat            : lat            as double?,
-      lng:            lng            == _sentinel ? this.lng            : lng            as double?,
-    );
-  }
+  /// The person on the other side, from [myId]'s point of view.
+  UserSummary? otherParty(String myId) => myId == buyerId ? seller : buyer;
 
   @override
   bool operator ==(Object other) {
@@ -106,10 +123,25 @@ class ExchangeEntity {
 
   @override
   String toString() =>
-      'ExchangeEntity(id: $id, materialId: $materialId, price: $price, '
-      'isCompleted: $isCompleted)';
+      'ExchangeEntity(id: $id, order: $orderCode, materialId: $materialId, status: ${status.name})';
 }
 
-/// Private sentinel used by [ExchangeEntity.copyWith] to distinguish `null`
-/// from "not provided".
-const Object _sentinel = Object();
+/// A rating one side of a completed exchange gives the other.
+@immutable
+class NewRating {
+  final String exchangeId;
+  final String ratedId;
+
+  /// 1 to 5.
+  final int stars;
+  final List<String> tags;
+  final String? review;
+
+  const NewRating({
+    required this.exchangeId,
+    required this.ratedId,
+    required this.stars,
+    this.tags = const [],
+    this.review,
+  });
+}

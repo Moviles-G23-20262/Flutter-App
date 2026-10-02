@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'material_entity.dart';
+import 'meetup_entities.dart';
 import 'user_summary.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -93,6 +94,13 @@ class ChatRoomEntity {
 // MessageEntity
 // ──────────────────────────────────────────────────────────────────────────────
 
+enum MessageTypeEnum {
+  TEXT,
+
+  /// A meetup proposal, shown as a card with its current status.
+  MEETING,
+}
+
 /// Domain entity representing a single message inside a [ChatRoomEntity].
 @immutable
 class MessageEntity {
@@ -108,6 +116,11 @@ class MessageEntity {
   /// Plain-text message body.
   final String content;
 
+  final MessageTypeEnum type;
+
+  /// Set for [MessageTypeEnum.MEETING] messages.
+  final MeetingProposalEntity? meetingProposal;
+
   /// Whether the recipient has read this message.
   final bool isRead;
 
@@ -119,6 +132,8 @@ class MessageEntity {
     required this.chatRoomId,
     required this.senderId,
     required this.content,
+    this.type = MessageTypeEnum.TEXT,
+    this.meetingProposal,
     required this.isRead,
     required this.createdAt,
   });
@@ -139,6 +154,8 @@ class MessageEntity {
       chatRoomId: chatRoomId ?? this.chatRoomId,
       senderId:   senderId   ?? this.senderId,
       content:    content    ?? this.content,
+      type:       type,
+      meetingProposal: meetingProposal,
       isRead:     isRead     ?? this.isRead,
       createdAt:  createdAt  ?? this.createdAt,
     );

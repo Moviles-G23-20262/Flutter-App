@@ -22,7 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.appState.account,
+      listenable: Listenable.merge([widget.appState.account, widget.appState.schedule]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -188,6 +188,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         brightness: brightness,
                       ),
+                      _SettingsRow(
+                        icon: Icons.calendar_month_outlined,
+                        title: 'Class Schedule',
+                        detail: widget.appState.schedule.blocks.isEmpty
+                            ? 'Add your classes to get meetup time suggestions'
+                            : '${widget.appState.schedule.blocks.length} classes · used to suggest meetup times',
+                        onTap: widget.appState.openSchedule,
+                        brightness: brightness,
+                      ),
                       _SettingsRow(icon: Icons.account_balance_wallet_outlined, title: 'Payment Methods',    detail: 'GCash, Maya, cash preferences', brightness: brightness),
                       _SettingsRow(icon: Icons.location_on_outlined,            title: 'Meetup Locations',  detail: 'Saved handoff spots around campus', brightness: brightness),
                       _SettingsRow(icon: Icons.security_outlined,               title: 'Privacy and Safety', detail: 'Blocked users, report history, visibility', brightness: brightness),
@@ -263,6 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ...purchases.map((p) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: AppCard(
+                    onTap: () => widget.appState.openCompleteExchange(p),
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
@@ -285,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Text(p.material?.title ?? 'Item', maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 3),
-                              Text('From ${p.seller?.fullName ?? 'a classmate'} – ${p.completedAt == null ? '' : shortDate(p.completedAt!)}',
+                              Text('From ${p.seller?.fullName ?? 'a classmate'} · ${p.orderCode}${p.completedAt == null ? '' : ' · ${shortDate(p.completedAt!)}'}',
                                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
                               const SizedBox(height: 5),
                               Container(
@@ -295,16 +305,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: borderSubtle),
                                 ),
-                                child: Text('Completed',
+                                child: Text(p.isPending ? 'Pending · tap to complete' : p.status.displayName,
                                     style: AppTextStyles.body(
-                                        brightness == Brightness.dark ? AppColors.darkSuccess : AppColors.lightSuccess,
+                                        p.isPending
+                                            ? accentHi
+                                            : (brightness == Brightness.dark ? AppColors.darkSuccess : AppColors.lightSuccess),
                                         fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w500)),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text('\$${p.price.toStringAsFixed(2)}',
+                        Text(copPrice(p.price),
                             style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
                       ],
                     ),
@@ -356,6 +368,7 @@ class _SettingsRow extends StatelessWidget {
   final String title;
   final String detail;
   final Widget? trailing;
+  final VoidCallback? onTap;
   final bool isLast;
   final Brightness brightness;
 
@@ -364,6 +377,7 @@ class _SettingsRow extends StatelessWidget {
     required this.title,
     required this.detail,
     this.trailing,
+    this.onTap,
     this.isLast = false,
     required this.brightness,
   });
@@ -378,7 +392,7 @@ class _SettingsRow extends StatelessWidget {
     final borderSubtle= brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
     final border     = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
 
-    return Container(
+    final row = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: isLast ? null : BoxDecoration(border: Border(bottom: BorderSide(color: border))),
       child: Row(
@@ -407,6 +421,7 @@ class _SettingsRow extends StatelessWidget {
         ],
       ),
     );
+    return onTap == null ? row : InkWell(onTap: onTap, child: row);
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
 import '../../Domain/use_cases/marketplace_use_cases.dart';
+import '../../Domain/use_cases/meetup_use_cases.dart';
 
 /// Conversations and the messages of the open one.
 /// The backend has no push channel, so while the Messages tab is visible this polls.
@@ -16,6 +17,7 @@ class ChatState extends ChangeNotifier {
   final GetMessagesUseCase getMessages;
   final SendMessageUseCase sendMessage;
   final MarkChatReadUseCase markRead;
+  final AnswerMeetingProposalUseCase answerProposal;
 
   ChatState({
     required this.getChatRooms,
@@ -23,6 +25,7 @@ class ChatState extends ChangeNotifier {
     required this.getMessages,
     required this.sendMessage,
     required this.markRead,
+    required this.answerProposal,
   });
 
   String? _userId;
@@ -118,6 +121,24 @@ class ChatState extends ChangeNotifier {
       return e.message;
     }
   }
+
+  /// Accepts, declines or withdraws a meetup proposal shown in the open chat.
+  /// Returns an error message to show, or `null`.
+  Future<String?> answer(String proposalId, ProposalAnswer answer) async {
+    try {
+      await answerProposal.execute(proposalId, answer);
+    } on DataException catch (e) {
+      return e.message;
+    }
+    // Accepting also posts a confirmation message; show it together with the card's new status.
+    await refreshMessages();
+    return null;
+  }
+
+  /// The meetup both sides agreed on in [roomId], if any.
+  MessageEntity? agreedMeetingIn(String roomId) => messagesOf(roomId)
+      .where((m) => m.meetingProposal?.isAccepted ?? false)
+      .lastOrNull;
 
   Future<void> refreshMessages({bool showSpinner = false}) async {
     final roomId = _activeRoomId;

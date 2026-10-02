@@ -1,3 +1,12 @@
+import java.util.Properties
+
+// Google Maps key: put MAPS_API_KEY=... in android/local.properties (not committed).
+val mapsApiKey: String = Properties().run {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+    getProperty("MAPS_API_KEY") ?: "YOUR_MAPS_API_KEY"
+}
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -23,6 +32,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     buildTypes {
