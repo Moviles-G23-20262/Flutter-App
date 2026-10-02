@@ -14,6 +14,10 @@ final class EmailAlreadyRegisteredException extends AuthException {
       : super('An account with this email already exists.');
 }
 
+final class InvalidCredentialsException extends AuthException {
+  const InvalidCredentialsException() : super('Incorrect email or password.');
+}
+
 final class AuthNetworkException extends AuthException {
   const AuthNetworkException()
       : super("Can't reach the server. Check your connection and try again.");

@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'material_entity.dart';
+import 'user_summary.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ExchangeEntity
@@ -38,6 +40,11 @@ class ExchangeEntity {
   /// Longitude of the agreed meeting location. `null` if not specified.
   final double? lng;
 
+  /// The item and the two people, when the API included them.
+  final MaterialEntity? material;
+  final UserSummary? buyer;
+  final UserSummary? seller;
+
   const ExchangeEntity({
     required this.id,
     required this.materialId,
@@ -48,6 +55,9 @@ class ExchangeEntity {
     this.meetingPointId,
     this.lat,
     this.lng,
+    this.material,
+    this.buyer,
+    this.seller,
   });
 
   // ── Convenience getters ───────────────────────────────────────────────────────

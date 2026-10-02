@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
 import '../../Domain/Strategies/sort_strategy.dart';
-import 'home_screen.dart' show kMockMaterials;
 
 // ─── Search Screen ────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
   _SearchFilters _filters = const _SearchFilters();
 
   List<MaterialEntity> get _results {
-    var list = kMockMaterials.where((m) {
+    var list = widget.appState.marketplace.availableMaterials.where((m) {
       if (_filters.category != null && m.category != _filters.category) return false;
       if (_filters.condition != null && m.condition != _filters.condition) return false;
       if (m.price > _filters.maxPrice) return false;
@@ -57,6 +57,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.appState.marketplace,
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final market      = widget.appState.marketplace;
     final brightness  = Theme.of(context).brightness;
     final surface     = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
     final border      = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
@@ -113,9 +121,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
         // ── Results grid ────────────────────────────────────────────────────
         Expanded(
-          child: results.isEmpty
+          child: market.isFirstLoad && market.isLoading
+              ? const LoadingView()
+              : market.error != null && market.materials.isEmpty
+                  ? ErrorView(message: market.error!, onRetry: market.load)
+                  : results.isEmpty
               ? _EmptySearch()
-              : GridView.builder(
+              : RefreshIndicator(
+                  onRefresh: market.load,
+                  child: GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(14),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
@@ -131,6 +146,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       onTap: () => widget.appState.openMaterialDetail(m),
                     );
                   },
+                ),
                 ),
         ),
       ],
@@ -352,8 +368,10 @@ class _SearchProductCard extends StatelessWidget {
                       maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  StarRating(rating: 4.7, reviewCount: 8, iconSize: 12),
-                  const SizedBox(height: 4),
+                  if (material.seller != null) ...[
+                    StarRating(rating: material.seller!.rating, iconSize: 12),
+                    const SizedBox(height: 4),
+                  ],
                   AppBadge(material.conditionDisplayName),
                   const SizedBox(height: 6),
                   Text('\$${material.price.toStringAsFixed(2)}',

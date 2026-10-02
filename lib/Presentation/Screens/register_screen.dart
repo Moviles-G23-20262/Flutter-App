@@ -1,18 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../Domain/exceptions/auth_exceptions.dart';
 import '../../Domain/rules/registration_rules.dart';
-import '../../Domain/use_cases/check_email_availability_use_case.dart';
 import '../../Domain/use_cases/register_student_use_case.dart';
 import '../../theme/app_theme.dart';
 import '../State Management/app_state.dart';
 import '../Widgets/common_widgets.dart';
 
 enum _Field { name, email, major, password, confirm }
-
-enum _EmailStatus { idle, checking, available, taken }
 
 const List<String> _faculties = [
   'Faculty of Administration',
@@ -32,13 +27,11 @@ const String _noFaculty = '';
 class RegisterScreen extends StatefulWidget {
   final AppState appState;
   final RegisterStudentUseCase registerStudent;
-  final CheckEmailAvailabilityUseCase checkEmailAvailability;
 
   const RegisterScreen({
     super.key,
     required this.appState,
     required this.registerStudent,
-    required this.checkEmailAvailability,
   });
 
   @override
@@ -59,13 +52,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   bool _obscure = true;
 
-  _EmailStatus _emailStatus = _EmailStatus.idle;
-  Timer? _emailDebounce;
-  int _emailCheckId = 0;
-
   @override
   void dispose() {
-    _emailDebounce?.cancel();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _facultyCtrl.dispose();
@@ -85,44 +73,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _onEmailChanged(String raw) {
-    _emailDebounce?.cancel();
-    final checkId = ++_emailCheckId;
-    setState(() {
-      _errors.remove(_Field.email);
-      _bannerError = '';
-      _emailStatus = _EmailStatus.idle;
-    });
-
-    final email = RegistrationRules.normalizeEmail(raw);
-    if (RegistrationRules.validateEmail(email) != null) return;
-
-    _emailDebounce = Timer(
-      const Duration(milliseconds: 500),
-      () => _checkEmail(email, checkId),
-    );
-  }
-
-  Future<void> _checkEmail(String email, int checkId) async {
-    if (!mounted) return;
-    setState(() => _emailStatus = _EmailStatus.checking);
-    try {
-      final available = await widget.checkEmailAvailability.execute(email);
-      if (!mounted || checkId != _emailCheckId) return;
-      setState(() {
-        _emailStatus = available ? _EmailStatus.available : _EmailStatus.taken;
-        if (!available) {
-          _errors[_Field.email] = 'An account with this email already exists.';
-        }
-      });
-    } catch (_) {
-      // Best effort: if the check fails (offline, server down) the server still
-      // rejects duplicates when the form is submitted.
-      if (!mounted || checkId != _emailCheckId) return;
-      setState(() => _emailStatus = _EmailStatus.idle);
-    }
-  }
-
   Map<_Field, String> _validateAll() {
     final errors = <_Field, String>{};
     void check(_Field field, String? message) {
@@ -137,9 +87,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _Field.confirm,
       RegistrationRules.validateConfirmation(_passwordCtrl.text, _confirmCtrl.text),
     );
-    if (!errors.containsKey(_Field.email) && _emailStatus == _EmailStatus.taken) {
-      errors[_Field.email] = 'An account with this email already exists.';
-    }
     return errors;
   }
 
@@ -176,10 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       widget.appState.login(user);
     } on EmailAlreadyRegisteredException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _emailStatus = _EmailStatus.taken;
-        _errors[_Field.email] = e.message;
-      });
+      setState(() => _errors[_Field.email] = e.message);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _bannerError = e.message);
@@ -320,8 +264,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             enabled: !_loading,
             keyboardType: TextInputType.emailAddress,
             errorText: _errors[_Field.email],
-            onChanged: _onEmailChanged,
-            suffixIcon: _emailSuffix(),
+            onChanged: (_) => _clearError(_Field.email),
           ),
         ),
         _LabeledField(
@@ -394,30 +337,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ],
     );
-  }
-
-  Widget? _emailSuffix() {
-    switch (_emailStatus) {
-      case _EmailStatus.checking:
-        return const Padding(
-          padding: EdgeInsets.all(14),
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        );
-      case _EmailStatus.available:
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        return Icon(
-          Icons.check_circle_rounded,
-          size: 20,
-          color: dark ? AppColors.darkSuccess : AppColors.lightSuccess,
-        );
-      case _EmailStatus.idle:
-      case _EmailStatus.taken:
-        return null;
-    }
   }
 }
 

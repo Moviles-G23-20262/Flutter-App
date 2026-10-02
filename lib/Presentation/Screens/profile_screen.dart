@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 
 // ─── Profile Screen ───────────────────────────────────────────────────────────
@@ -20,7 +21,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.appState.account,
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final user       = widget.appState.currentUser;
+    final account    = widget.appState.account;
+    final purchases  = user == null ? const [] : account.purchasesOf(user.id);
     final brightness = Theme.of(context).brightness;
     final surface    = brightness == Brightness.dark ? AppColors.darkSurface    : AppColors.lightSurface;
     final border     = brightness == Brightness.dark ? AppColors.darkBorder     : AppColors.lightBorder;
@@ -75,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Center(
                               child: Text(
-                                user?.initials ?? 'MS',
+                                user?.initials ?? '',
                                 style: AppTextStyles.heading(Colors.white, fontSize: AppTextStyles.sizeMd),
                               ),
                             ),
@@ -85,18 +95,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(user?.fullName ?? 'Maria Santos',
+                                Text(user?.fullName ?? '',
                                     style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
                                 const SizedBox(height: 3),
-                                Text(user?.email ?? 'maria.santos@university.edu',
+                                Text(user?.email ?? '',
                                     style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    Text('${user?.rating.toStringAsFixed(1) ?? '4.9'} rating',
+                                    Text('${user?.rating.toStringAsFixed(1) ?? '0.0'} rating',
                                         style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs)),
                                     const SizedBox(width: 12),
-                                    Text('18 swaps',
+                                    Text('${user == null ? 0 : account.swapCountOf(user.id)} swaps',
                                         style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.sizeXs)),
                                   ],
                                 ),
@@ -130,10 +140,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   child: Column(
                     children: [
-                      _InfoRow(label: 'Faculty',  value: user?.faculty ?? 'Faculty of Engineering', isLast: false, brightness: brightness),
-                      _InfoRow(label: 'Major',    value: user?.major   ?? 'BS Computer Science',     isLast: false, brightness: brightness),
-                      _InfoRow(label: 'Semester', value: '6th Semester',                              isLast: false, brightness: brightness),
-                      _InfoRow(label: 'Campus',   value: 'UP Diliman',                                isLast: true,  brightness: brightness),
+                      _InfoRow(label: 'Faculty',  value: user?.faculty ?? 'Not set', isLast: false, brightness: brightness),
+                      _InfoRow(label: 'Major',    value: user?.major   ?? 'Not set', isLast: true,  brightness: brightness),
                     ],
                   ),
                 ),
@@ -155,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _SettingsRow(
                         icon: Icons.person_outline_rounded,
                         title: 'Personal Information',
-                        detail: 'Name, avatar, email, faculty, major, and semester',
+                        detail: 'Name, email, faculty and major',
                         brightness: brightness,
                       ),
                       _SettingsRow(
@@ -230,7 +238,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                ..._kPurchases.map((p) => Padding(
+                if (account.isFirstLoad && account.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+                  )
+                else if (account.error != null && account.exchanges.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      onTap: account.load,
+                      child: Text('${account.error}  Tap to retry.',
+                          style: AppTextStyles.body(errorColor, fontSize: AppTextStyles.sizeXs)),
+                    ),
+                  )
+                else if (purchases.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      child: Text('Nothing bought yet. Items you buy on Campus Swap will show up here.',
+                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                    ),
+                  ),
+                ...purchases.map((p) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: AppCard(
                     padding: const EdgeInsets.all(12),
@@ -240,9 +270,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: SizedBox(
                             width: 56, height: 56,
-                            child: Image.network(p.imageUrl, fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(
-                                    color: elevated, child: const Icon(Icons.image_outlined))),
+                            child: (p.material?.primaryImageUrl ?? '').isNotEmpty
+                                ? Image.network(p.material!.primaryImageUrl, fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Container(
+                                        color: elevated, child: const Icon(Icons.image_outlined)))
+                                : Container(color: elevated, child: const Icon(Icons.image_outlined)),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -250,10 +282,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              Text(p.material?.title ?? 'Item', maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 3),
-                              Text('From ${p.seller} – ${p.date}',
+                              Text('From ${p.seller?.fullName ?? 'a classmate'} – ${p.completedAt == null ? '' : shortDate(p.completedAt!)}',
                                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
                               const SizedBox(height: 5),
                               Container(
@@ -263,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: borderSubtle),
                                 ),
-                                child: Text(p.status,
+                                child: Text('Completed',
                                     style: AppTextStyles.body(
                                         brightness == Brightness.dark ? AppColors.darkSuccess : AppColors.lightSuccess,
                                         fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w500)),
@@ -421,35 +453,3 @@ class _Toggle extends StatelessWidget {
     );
   }
 }
-
-// ─── Mock Purchase Data ────────────────────────────────────────────────────────
-
-class _Purchase {
-  final String title;
-  final String seller;
-  final String date;
-  final String status;
-  final double price;
-  final String imageUrl;
-
-  const _Purchase({required this.title, required this.seller, required this.date, required this.status, required this.price, required this.imageUrl});
-}
-
-const _kPurchases = [
-  _Purchase(
-    title: 'Organic Chemistry Textbook 12th Ed.', seller: 'Jake Reyes', date: 'Sep 12',
-    status: 'Meetup complete', price: 24.50,
-    imageUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200&h=200&fit=crop&auto=format',
-  ),
-  _Purchase(
-    title: 'Data Structures & Algorithms Book', seller: 'Leo Tan', date: 'Aug 28',
-    status: 'Picked up', price: 20.00,
-    imageUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=200&h=200&fit=crop&auto=format',
-  ),
-  _Purchase(
-    title: 'Engineering Drawing Set', seller: 'Karl Mendoza', date: 'Aug 11',
-    status: 'Paid in cash', price: 9.00,
-    imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=200&h=200&fit=crop&auto=format',
-  ),
-];
-

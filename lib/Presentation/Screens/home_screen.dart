@@ -1,68 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-/// Sample listings used while the API layer is not yet wired.
-final List<MaterialEntity> kMockMaterials = [
-  MaterialEntity(
-    id: '1', title: 'Casio fx-991EX Scientific Calculator',
-    description: 'Barely used during one semester. No scratches, all buttons work perfectly. Comes with original case and manual.',
-    courseCode: 'MATH 201', price: 18.00,
-    condition: MaterialConditionEnum.LIKE_NEW, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-ms', category: MaterialCategoryEnum.CALCULATORS,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-  MaterialEntity(
-    id: '2', title: 'Organic Chemistry Textbook 12th Ed.',
-    description: 'Used for CHEM 301. Some highlighting in chapters 3-5 but otherwise clean. All pages intact.',
-    courseCode: 'CHEM 301', price: 24.50,
-    condition: MaterialConditionEnum.GOOD, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-jr', category: MaterialCategoryEnum.BOOKS,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-  MaterialEntity(
-    id: '3', title: 'Lab Coat Size M — Pristine',
-    description: 'Standard white lab coat, size medium. Worn only a few times in BIO lab. Washed and ready.',
-    courseCode: 'BIO 201', price: 12.00,
-    condition: MaterialConditionEnum.LIKE_NEW, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-ac', category: MaterialCategoryEnum.LAB_EQUIPMENT,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-  MaterialEntity(
-    id: '4', title: 'Data Structures & Algorithms Book',
-    description: 'Used for CS 301. Notes written in pencil (mostly erasable). Solid reference for algorithm interviews.',
-    courseCode: 'CS 301', price: 20.00,
-    condition: MaterialConditionEnum.GOOD, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-lt', category: MaterialCategoryEnum.BOOKS,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-  MaterialEntity(
-    id: '5', title: 'TI-84 Plus Graphing Calculator',
-    description: 'TI-84 Plus in good working condition. Battery door has minor crack but functions perfectly.',
-    courseCode: 'STAT 201', price: 35.00,
-    condition: MaterialConditionEnum.GOOD, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-sl', category: MaterialCategoryEnum.CALCULATORS,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-  MaterialEntity(
-    id: '6', title: 'Engineering Drawing Set',
-    description: 'Complete set with compass, protractor, and drafting pencils. Used for one semester.',
-    courseCode: 'ENG 101', price: 9.00,
-    condition: MaterialConditionEnum.FAIR, status: MaterialStatusEnum.AVAILABLE,
-    imageUrls: ['https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=300&fit=crop&auto=format'],
-    sellerId: 'user-km', category: MaterialCategoryEnum.OTHER,
-    createdAt: DateTime.now(), updatedAt: DateTime.now(),
-  ),
-];
+import '../../Domain/Entities/user_summary.dart';
 
 const kCategories = ['All', 'Books', 'Calculators', 'Lab Equipment', 'Furniture', 'Other'];
 
@@ -79,20 +21,59 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _activeCategory = 'All';
-  final Set<String> _favorites = {};
-
-  void _toggleFav(String id) =>
-      setState(() => _favorites.contains(id) ? _favorites.remove(id) : _favorites.add(id));
 
   List<MaterialEntity> get _filtered {
-    if (_activeCategory == 'All') return kMockMaterials;
-    return kMockMaterials
-        .where((m) => m.category.displayName == _activeCategory)
-        .toList();
+    final available = widget.appState.marketplace.availableMaterials;
+    if (_activeCategory == 'All') return available;
+    return available.where((m) => m.category.displayName == _activeCategory).toList();
+  }
+
+  Future<void> _toggleFav(String materialId) async {
+    final error = await widget.appState.marketplace.toggleFavorite(materialId);
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  Future<void> _messageSeller(MaterialEntity material) async {
+    final error = await widget.appState.messageSeller(material);
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  Future<void> _refresh() => Future.wait([
+        widget.appState.marketplace.load(),
+        widget.appState.account.load(),
+      ]);
+
+  /// Sellers with the most available items, computed from the listings themselves.
+  List<_FeaturedSeller> _featuredSellers() {
+    final bySeller = <String, _FeaturedSeller>{};
+    for (final m in widget.appState.marketplace.availableMaterials) {
+      final seller = m.seller;
+      if (seller == null) continue;
+      final current = bySeller[seller.id];
+      bySeller[seller.id] = _FeaturedSeller(seller, (current?.items ?? 0) + 1);
+    }
+    final sellers = bySeller.values.toList()
+      ..sort((a, b) {
+        final byItems = b.items.compareTo(a.items);
+        return byItems != 0 ? byItems : b.seller.rating.compareTo(a.seller.rating);
+      });
+    return sellers.take(4).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.appState.marketplace, widget.appState.account]),
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    final market      = widget.appState.marketplace;
     final brightness  = Theme.of(context).brightness;
     final surface     = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
     final border      = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
@@ -100,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final txMuted     = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final accentHi    = brightness == Brightness.dark ? AppColors.darkAccentHi    : AppColors.lightAccentHi;
     final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
+    final offers      = _filtered;
+    final recommended = offers.skip(4).take(3).toList();
+    final sellers     = _featuredSellers();
+    final unreadAlerts = widget.appState.account.unreadNotifications;
 
     return Column(
       children: [
@@ -125,12 +111,32 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: widget.appState.toggleTheme,
                   ),
                   const SizedBox(width: 8),
-                  AppIconButton(
-                    icon: Icon(Icons.notifications_outlined, color: txSecondary, size: 18),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AppIconButton(
+                        icon: Icon(Icons.notifications_outlined, color: txSecondary, size: 18),
+                        onTap: () => widget.appState.navigateTo(AppScreen.notifications),
+                      ),
+                      if (unreadAlerts > 0)
+                        Positioned(
+                          right: -2, top: -2,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text('$unreadAlerts',
+                                style: AppTextStyles.mono(Colors.white, fontSize: AppTextStyles.size2xs)),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 8),
                   AppIconButton(
                     icon: Icon(Icons.favorite_border_rounded, color: txSecondary, size: 18),
+                    onTap: () => widget.appState.navigateTo(AppScreen.favorites),
                   ),
                 ],
               ),
@@ -162,150 +168,180 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ── Scrollable body ─────────────────────────────────────────────────
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Hero banner
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: _HeroBanner(
-                    onBrowse: () => widget.appState.navigateTo(AppScreen.search),
-                    brightness: brightness,
-                  ),
-                ),
+          child: market.isFirstLoad && market.isLoading
+              ? const LoadingView()
+              : market.error != null && market.materials.isEmpty
+                  ? ErrorView(message: market.error!, onRetry: market.load)
+                  : RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Hero banner
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                              child: _HeroBanner(
+                                onBrowse: () => widget.appState.navigateTo(AppScreen.search),
+                                brightness: brightness,
+                              ),
+                            ),
 
-                // Categories
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
-                  child: SectionTitle('Categories'),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 36,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: kCategories.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (_, i) => PillChip(
-                      label: kCategories[i],
-                      active: _activeCategory == kCategories[i],
-                      onTap: () => setState(() => _activeCategory = kCategories[i]),
+                            // Categories
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
+                              child: SectionTitle('Categories'),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 36,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: kCategories.length,
+                                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                                itemBuilder: (_, i) => PillChip(
+                                  label: kCategories[i],
+                                  active: _activeCategory == kCategories[i],
+                                  onTap: () => setState(() => _activeCategory = kCategories[i]),
+                                ),
+                              ),
+                            ),
+
+                            // Current Offers
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.local_fire_department_rounded, color: accentHi, size: 16),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: SectionTitle('Current Offers')),
+                                  TextButton(
+                                    onPressed: () => widget.appState.navigateTo(AppScreen.search),
+                                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                    child: Row(
+                                      children: [
+                                        Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                                        Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (offers.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 24),
+                                child: EmptyView(
+                                  icon: Icons.inventory_2_outlined,
+                                  title: 'Nothing listed yet',
+                                  subtitle: _activeCategory == 'All'
+                                      ? 'Be the first to list something with the Sell button.'
+                                      : 'No items in $_activeCategory right now.',
+                                ),
+                              )
+                            else
+                              SizedBox(
+                                height: 240,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  itemCount: offers.take(4).length,
+                                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                                  itemBuilder: (_, i) {
+                                    final m = offers[i];
+                                    return _ProductCard(
+                                      material: m,
+                                      isFav: market.isFavorite(m.id),
+                                      onFavToggle: () => _toggleFav(m.id),
+                                      onTap: () => widget.appState.openMaterialDetail(m),
+                                      width: 155,
+                                    );
+                                  },
+                                ),
+                              ),
+
+                            // Recommended
+                            if (recommended.isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.menu_book_rounded, color: accentHi, size: 16),
+                                    const SizedBox(width: 6),
+                                    Expanded(child: SectionTitle('Recommended')),
+                                    TextButton(
+                                      onPressed: () => widget.appState.navigateTo(AppScreen.search),
+                                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                      child: Row(
+                                        children: [
+                                          Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                                          Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ...recommended.map((m) => Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                                    child: _RecommendedRow(
+                                      material: m,
+                                      onTap: () => widget.appState.openMaterialDetail(m),
+                                      onMessage: () => _messageSeller(m),
+                                    ),
+                                  )),
+                            ],
+
+                            // Featured sellers
+                            if (sellers.isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.star_rounded, color: accentHi, size: 16),
+                                    const SizedBox(width: 6),
+                                    SectionTitle('Featured Sellers'),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 140,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  itemCount: sellers.length,
+                                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                                  itemBuilder: (_, i) => _SellerCard(
+                                    name: sellers[i].seller.fullName,
+                                    initials: sellers[i].seller.initials,
+                                    rating: sellers[i].seller.rating,
+                                    items: sellers[i].items,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-
-                // Current Offers
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_fire_department_rounded, color: accentHi, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(child: SectionTitle('Current Offers')),
-                      TextButton(
-                        onPressed: () => widget.appState.navigateTo(AppScreen.search),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                        child: Row(
-                          children: [
-                            Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
-                            Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 240,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _filtered.take(4).length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (_, i) {
-                      final m = _filtered[i];
-                      return _ProductCard(
-                        material: m,
-                        isFav: _favorites.contains(m.id),
-                        onFavToggle: () => _toggleFav(m.id),
-                        onTap: () => widget.appState.openMaterialDetail(m),
-                        width: 155,
-                      );
-                    },
-                  ),
-                ),
-
-                // Recommended
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.menu_book_rounded, color: accentHi, size: 16),
-                      const SizedBox(width: 6),
-                      Expanded(child: SectionTitle('Recommended')),
-                      TextButton(
-                        onPressed: () => widget.appState.navigateTo(AppScreen.search),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                        child: Row(
-                          children: [
-                            Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
-                            Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ...kMockMaterials.skip(1).take(3).map((m) => Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: _RecommendedRow(
-                    material: m,
-                    onTap: () => widget.appState.openMaterialDetail(m),
-                    onMessage: () => widget.appState.navigateTo(AppScreen.messages),
-                  ),
-                )),
-
-                // Featured sellers
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.star_rounded, color: accentHi, size: 16),
-                      const SizedBox(width: 6),
-                      SectionTitle('Featured Sellers'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 140,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: const [
-                      _SellerCard(name: 'Maria Santos', initials: 'MS', rating: 4.9, items: 8),
-                      SizedBox(width: 10),
-                      _SellerCard(name: 'Jake Reyes',   initials: 'JR', rating: 4.7, items: 5),
-                      SizedBox(width: 10),
-                      _SellerCard(name: 'Ana Cruz',     initials: 'AC', rating: 4.8, items: 12),
-                      SizedBox(width: 10),
-                      _SellerCard(name: 'Leo Tan',      initials: 'LT', rating: 4.6, items: 3),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
         ),
       ],
     );
   }
+}
+
+class _FeaturedSeller {
+  final UserSummary seller;
+  final int items;
+
+  const _FeaturedSeller(this.seller, this.items);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

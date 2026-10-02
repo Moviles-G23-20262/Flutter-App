@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'material_entity.dart';
+import 'user_summary.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ChatRoomEntity
@@ -23,13 +25,36 @@ class ChatRoomEntity {
   /// Timestamp when the chat room was created.
   final DateTime createdAt;
 
+  /// The listing being discussed.
+  final MaterialEntity? material;
+
+  final UserSummary? buyer;
+  final UserSummary? seller;
+
+  /// Most recent message, if any (conversation list only).
+  final MessageEntity? lastMessage;
+
+  /// Messages from the other person the caller has not read yet.
+  final int unreadCount;
+
   const ChatRoomEntity({
     required this.id,
     required this.materialId,
     required this.buyerId,
     required this.sellerId,
     required this.createdAt,
+    this.material,
+    this.buyer,
+    this.seller,
+    this.lastMessage,
+    this.unreadCount = 0,
   });
+
+  /// The person on the other side of the conversation, from [myId]'s point of view.
+  UserSummary? otherParty(String myId) => myId == buyerId ? seller : buyer;
+
+  /// When the conversation last changed: the last message, else its creation.
+  DateTime get lastActivity => lastMessage?.createdAt ?? createdAt;
 
   // ── copyWith ─────────────────────────────────────────────────────────────────
 

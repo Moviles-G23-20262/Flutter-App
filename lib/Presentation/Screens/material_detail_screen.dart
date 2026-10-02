@@ -21,16 +21,41 @@ class MaterialDetailScreen extends StatefulWidget {
 }
 
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
-  bool _isFav = false;
   final int  _imageIndex = 0;
+  bool _openingChat = false;
 
-  // Related materials (same category, mock)
-  List<MaterialEntity> _related(List<MaterialEntity> all) =>
-      all.where((m) => m.category == widget.material.category && m.id != widget.material.id).take(3).toList();
+  bool get _isFav => widget.appState.marketplace.isFavorite(widget.material.id);
+  bool get _isMine => widget.material.sellerId == widget.appState.currentUser?.id;
+
+  void _showMessage(String message) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _toggleFav() async {
+    final error = await widget.appState.marketplace.toggleFavorite(widget.material.id);
+    if (error != null) _showMessage(error);
+  }
+
+  Future<void> _messageSeller() async {
+    if (_openingChat) return;
+    setState(() => _openingChat = true);
+    final error = await widget.appState.messageSeller(widget.material);
+    if (!mounted) return;
+    setState(() => _openingChat = false);
+    if (error != null) _showMessage(error);
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.appState.marketplace,
+      builder: (context, _) => _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final m          = widget.material;
+    final seller     = m.seller;
     final brightness = Theme.of(context).brightness;
     final surface    = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
     final bg         = brightness == Brightness.dark ? AppColors.darkBg          : AppColors.lightBg;
@@ -92,7 +117,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                                   color: accentHi,
                                   size: 18,
                                 ),
-                                onTap: () => setState(() => _isFav = !_isFav),
+                                onTap: _toggleFav,
                               ),
                             ],
                           ),
@@ -154,7 +179,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                               Text('\$${m.price.toStringAsFixed(2)}',
                                   style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeLg)),
                               const SizedBox(width: 14),
-                              const StarRating(rating: 4.8, reviewCount: 12),
+                              if (seller != null) StarRating(rating: seller.rating),
                             ],
                           ),
                           const SizedBox(height: 18),
@@ -169,28 +194,37 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                             ),
                             child: Row(
                               children: [
-                                UserAvatar(initials: 'MS', size: 42, outlined: true),
+                                UserAvatar(initials: seller?.initials ?? '?', size: 42, outlined: true),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Maria Santos',
+                                      Text(seller?.fullName ?? 'Campus seller',
                                           style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
                                       const SizedBox(height: 4),
                                       Row(
                                         children: [
                                           Icon(Icons.star_rounded, color: accentHi, size: 12),
                                           const SizedBox(width: 3),
-                                          Text('4.8 · 12 items sold · UP Student',
-                                              style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
+                                          Flexible(
+                                            child: Text(
+                                              seller == null
+                                                  ? 'Seller'
+                                                  : '${seller.rating.toStringAsFixed(1)} · ${seller.major}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ],
                                   ),
                                 ),
+                                if (!_isMine)
                                 GestureDetector(
-                                  onTap: () => widget.appState.navigateTo(AppScreen.messages),
+                                  onTap: _messageSeller,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
@@ -221,30 +255,37 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           const SizedBox(height: 24),
 
                           // Action buttons
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SecondaryButton(
-                                  label: _isFav ? 'Saved' : 'Save Item',
-                                  leadingIcon: Icon(
-                                    _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                    color: accentHi, size: 16,
+                          if (_isMine)
+                            Text('This is your listing. Manage it from your Seller Hub.',
+                                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs))
+                          else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SecondaryButton(
+                                    label: _isFav ? 'Saved' : 'Save Item',
+                                    leadingIcon: Icon(
+                                      _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                      color: accentHi, size: 16,
+                                    ),
+                                    onPressed: _toggleFav,
+                                    fullWidth: true,
                                   ),
-                                  onPressed: () => setState(() => _isFav = !_isFav),
-                                  fullWidth: true,
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: PrimaryButton(
-                                  label: 'Message Seller',
-                                  leadingIcon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 16),
-                                  onPressed: () => widget.appState.navigateTo(AppScreen.messages),
-                                  fullWidth: true,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: PrimaryButton(
+                                    label: _openingChat ? 'Opening…' : 'Message Seller',
+                                    leadingIcon: _openingChat
+                                        ? null
+                                        : const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 16),
+                                    onPressed: _openingChat ? null : _messageSeller,
+                                    isLoading: _openingChat,
+                                    fullWidth: true,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
