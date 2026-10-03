@@ -1,7 +1,8 @@
-import 'dart:math' as math;
-
 import '../Entities/meetup_entities.dart';
 import '../exceptions/data_exceptions.dart';
+import '../rules/walking_distance.dart';
+import 'get_meeting_point_density_use_case.dart';
+import 'meeting_point_recommendation_use_case.dart';
 import '../repositories/meetup_repositories.dart';
 
 class GetMeetingPointsUseCase {
@@ -69,7 +70,7 @@ class GetCurrentLocationUseCase {
 /// the closest monitored zone. Without a location, monitored zones come first, then by name.
 class RankSafeZonesUseCase {
   /// Typical walking pace on campus, in meters per minute.
-  static const double walkingMetersPerMinute = 80;
+  static const double walkingMetersPerMinute = WalkingDistance.metersPerMinute;
 
   List<RankedZone> execute(List<MeetingPointEntity> zones, GeoPoint? from) {
     final ranked = [
@@ -91,19 +92,10 @@ class RankSafeZonesUseCase {
   }
 
   /// Straight-line distance at walking pace, rounded up; at least one minute.
-  static int walkMinutes(GeoPoint from, GeoPoint to) =>
-      math.max(1, (distanceMeters(from, to) / walkingMetersPerMinute).ceil());
+  static int walkMinutes(GeoPoint from, GeoPoint to) => WalkingDistance.minutes(from, to);
 
   /// Great-circle (haversine) distance.
-  static double distanceMeters(GeoPoint a, GeoPoint b) {
-    const earthRadius = 6371000.0;
-    double rad(double degrees) => degrees * math.pi / 180;
-    final dLat = rad(b.lat - a.lat);
-    final dLng = rad(b.lng - a.lng);
-    final h = math.pow(math.sin(dLat / 2), 2) +
-        math.cos(rad(a.lat)) * math.cos(rad(b.lat)) * math.pow(math.sin(dLng / 2), 2);
-    return 2 * earthRadius * math.asin(math.sqrt(h));
-  }
+  static double distanceMeters(GeoPoint a, GeoPoint b) => WalkingDistance.meters(a, b);
 }
 
 class GetScheduleUseCase {
@@ -152,6 +144,8 @@ class MeetupUseCases {
   final AnswerMeetingProposalUseCase answer;
   final GetCurrentLocationUseCase currentLocation;
   final RankSafeZonesUseCase rankZones;
+  final RecommendMeetingPointUseCase recommend;
+  final GetMeetingPointDensityUseCase getDensity;
 
   const MeetupUseCases({
     required this.getMeetingPoints,
@@ -160,5 +154,7 @@ class MeetupUseCases {
     required this.answer,
     required this.currentLocation,
     required this.rankZones,
+    required this.recommend,
+    required this.getDensity,
   });
 }

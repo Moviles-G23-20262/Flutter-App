@@ -6,8 +6,10 @@ import 'package:flutter_front_end/Data/Models/marketplace_models.dart';
 import 'package:flutter_front_end/Data/Repositories/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/Data/data_sources/marketplace_remote_data_source.dart';
 import 'package:flutter_front_end/Domain/Entities/chat_room_entity.dart';
+import 'package:flutter_front_end/Domain/Entities/conversation_insight.dart';
 import 'package:flutter_front_end/Domain/Entities/exchange_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
+import 'package:flutter_front_end/Domain/Entities/meeting_point_density.dart';
 import 'package:flutter_front_end/Domain/Entities/meetup_entities.dart';
 import 'package:flutter_front_end/Domain/Entities/new_listing_data.dart';
 import 'package:flutter_front_end/Domain/Entities/notification_entity.dart';
@@ -15,10 +17,16 @@ import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/user_summary.dart';
 import 'package:flutter_front_end/Domain/Entities/wishlist_item_entity.dart';
 import 'package:flutter_front_end/Domain/exceptions/data_exceptions.dart';
+import 'package:flutter_front_end/Domain/repositories/conversation_insight_repository.dart';
 import 'package:flutter_front_end/Domain/repositories/marketplace_repositories.dart';
+import 'package:flutter_front_end/Domain/repositories/meeting_density_repository.dart';
 import 'package:flutter_front_end/Domain/repositories/meetup_repositories.dart';
+import 'package:flutter_front_end/Domain/use_cases/conversation_insight_use_case.dart';
+import 'package:flutter_front_end/Domain/use_cases/get_meeting_point_density_use_case.dart';
 import 'package:flutter_front_end/Domain/use_cases/marketplace_use_cases.dart';
+import 'package:flutter_front_end/Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import 'package:flutter_front_end/Domain/use_cases/meetup_use_cases.dart';
+import 'package:flutter_front_end/Domain/use_cases/rank_meeting_points_use_case.dart';
 import 'package:flutter_front_end/Presentation/Screens/home_screen.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/account_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
@@ -289,6 +297,19 @@ class _FakeLocation implements LocationRepository {
   Future<GeoPoint?> currentLocation() async => here;
 }
 
+class _FakeDensity implements MeetingDensityRepository {
+  MeetingPointDensity density = MeetingPointDensity.empty;
+
+  @override
+  Future<MeetingPointDensity> getDensity() async => density;
+}
+
+class _FakeInsights implements ConversationInsightRepository {
+  @override
+  Future<ConversationInsight> getConversationInsight() async =>
+      const ConversationInsight(conversationsAnalyzed: 0, medianMessages: 0, medianMinutes: 0);
+}
+
 class _FakeNotifications implements NotificationRepository {
   @override
   Future<List<NotificationEntity>> getNotifications() async => [];
@@ -306,6 +327,8 @@ class _World {
   final meetupRepo = _FakeMeetups();
   final scheduleRepo = _FakeSchedule();
   final location = _FakeLocation();
+  final density = _FakeDensity();
+  final insights = _FakeInsights();
 
   late final meetups = MeetupUseCases(
     getMeetingPoints: GetMeetingPointsUseCase(meetupRepo),
@@ -314,6 +337,8 @@ class _World {
     answer: AnswerMeetingProposalUseCase(meetupRepo),
     currentLocation: GetCurrentLocationUseCase(location),
     rankZones: RankSafeZonesUseCase(),
+    recommend: RecommendMeetingPointUseCase(const RankMeetingPointsUseCase()),
+    getDensity: GetMeetingPointDensityUseCase(density),
   );
 
   late final marketplaceState = MarketplaceState(
@@ -331,6 +356,7 @@ class _World {
     sendMessage: SendMessageUseCase(chats),
     markRead: MarkChatReadUseCase(chats),
     answerProposal: meetups.answer,
+    getConversationInsight: GetConversationInsightUseCase(insights),
   );
 
   late final accountState = AccountState(

@@ -640,6 +640,14 @@ class _SelectedZoneCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SafeZoneLabel(monitored: zone.isMonitored),
+          if (ranked.reasons.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            for (final reason in ranked.reasons.take(3))
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text('• $reason', style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
+              ),
+          ],
         ],
       ),
     );
