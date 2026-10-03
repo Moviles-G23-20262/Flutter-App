@@ -187,8 +187,20 @@ class RankedZone {
   /// `null` when the user's location is unknown.
   final int? walkMinutes;
 
-  /// The zone the app recommends: monitored and closest.
+  /// The zone the app recommends: the highest score (distance, hour and past activity).
   final bool bestMatch;
 
-  const RankedZone({required this.zone, this.walkMinutes, this.bestMatch = false});
+  /// 0..1 combined score, when the zone was ranked by [RankMeetingPointsUseCase].
+  final double? score;
+
+  /// Why it ranks here, e.g. "4 min walk from you".
+  final List<String> reasons;
+
+  const RankedZone({
+    required this.zone,
+    this.walkMinutes,
+    this.bestMatch = false,
+    this.score,
+    this.reasons = const [],
+  });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../Domain/Entities/meeting_point_density.dart';
 import '../../Domain/Entities/meetup_entities.dart';
 import '../../Domain/exceptions/data_exceptions.dart';
 import '../../Domain/use_cases/meetup_use_cases.dart';
@@ -15,6 +16,7 @@ class MeetingPlannerState extends ChangeNotifier {
   List<RankedZone> _ranked = const [];
   MeetingSuggestions? _suggestions;
   GeoPoint? _location;
+  MeetingPointDensity _density = MeetingPointDensity.empty;
   bool _locating = true;
   bool _loading = true;
   String? _error;
@@ -24,7 +26,7 @@ class MeetingPlannerState extends ChangeNotifier {
   bool _sending = false;
   bool _disposed = false;
 
-  /// Closest first; see [RankSafeZonesUseCase].
+  /// Best match first; see [RankMeetingPointsUseCase].
   List<RankedZone> get zones => _ranked;
   MeetingSuggestions? get suggestions => _suggestions;
   List<FreeSlot> get slots => _suggestions?.slots ?? const [];
@@ -46,6 +48,7 @@ class MeetingPlannerState extends ChangeNotifier {
     _notify();
     // The location prompt can take a while; zones and hours show up without waiting for it.
     _locate();
+    _loadDensity();
     try {
       final results = await Future.wait([
         useCases.getMeetingPoints.execute(),
@@ -70,6 +73,7 @@ class MeetingPlannerState extends ChangeNotifier {
 
   void selectSlot(FreeSlot slot) {
     _selectedSlot = slot;
+    _rank(); // the hour changed, so which zone suits best can change too
     _notify();
   }
 
@@ -99,8 +103,17 @@ class MeetingPlannerState extends ChangeNotifier {
     _notify();
   }
 
+  /// Past activity per zone and hour. It arrives whenever the analytics service answers.
+  Future<void> _loadDensity() async {
+    _density = await useCases.getDensity.execute();
+    _rank();
+    _notify();
+  }
+
   void _rank() {
-    _ranked = useCases.rankZones.execute(_zones, _location);
+    _ranked = useCases.recommend
+        .execute(zones: _zones, from: _location, meetingAt: _selectedSlot?.startsAt, density: _density)
+        .ranked;
     if (!_zonePickedByUser) {
       _selectedZoneId = _ranked.where((r) => r.bestMatch).firstOrNull?.zone.id;
     }

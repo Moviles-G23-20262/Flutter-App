@@ -1,6 +1,10 @@
 import 'package:http/http.dart' as http;
 
 import '../Data/data_sources/analytics_remote_data_source.dart';
+import '../Data/Repositories/meeting_density_repository_impl.dart';
+import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
+import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
+import '../Domain/use_cases/rank_meeting_points_use_case.dart';
 import '../Data/data_sources/auth_remote_data_source.dart';
 import '../Data/data_sources/device_location_data_source.dart';
 import '../Data/data_sources/marketplace_remote_data_source.dart';
@@ -19,7 +23,6 @@ import '../Domain/use_cases/register_student_use_case.dart';
 import '../Domain/use_cases/restore_session_use_case.dart';
 import 'network/api_client.dart';
 
-/// Composition root: the only place that knows which implementations back the use cases.
 class AppDependencies {
   final LoginUseCase login;
   final RegisterStudentUseCase registerStudent;
@@ -83,7 +86,6 @@ class AppDependencies {
   });
 
   factory AppDependencies.create() {
-    // Provided with --dart-define-from-file=config/development.json
     const baseUrl = String.fromEnvironment('API_BASE_URL');
     if (baseUrl.isEmpty) {
       throw StateError(
@@ -94,12 +96,11 @@ class AppDependencies {
 
     final apiClient = ApiClient(baseUrl: baseUrl, client: http.Client());
 
-    // The Django analytics service is a separate deployment with its own URL and no auth.
     const analyticsBaseUrl = String.fromEnvironment('ANALYTICS_BASE_URL');
     final analyticsClient = ApiClient(baseUrl: analyticsBaseUrl, client: http.Client());
-    final conversationInsights = ConversationInsightRepositoryImpl(
-      remoteDataSource: AnalyticsRemoteDataSource(apiClient: analyticsClient),
-    );
+    final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
+    final conversationInsights = ConversationInsightRepositoryImpl(remoteDataSource: analyticsRemote);
+    final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
       storage: SecureSessionStorage(),
@@ -148,6 +149,8 @@ class AppDependencies {
         answer: AnswerMeetingProposalUseCase(meetupRepository),
         currentLocation: GetCurrentLocationUseCase(locationRepository),
         rankZones: RankSafeZonesUseCase(),
+        recommend: RecommendMeetingPointUseCase(const RankMeetingPointsUseCase()),
+        getDensity: GetMeetingPointDensityUseCase(meetingDensity),
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
       getSchedule: GetScheduleUseCase(scheduleRepository),
