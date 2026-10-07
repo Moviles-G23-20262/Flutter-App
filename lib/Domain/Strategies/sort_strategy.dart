@@ -75,10 +75,38 @@ class NewestSortStrategy extends SortStrategy {
       List.of(items)..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
 
+/// Highest seller rating first.
+class SellerRatingSortStrategy extends SortStrategy {
+  const SellerRatingSortStrategy();
+
+  @override
+  String get id => 'seller-rating';
+
+  @override
+  String get label => 'Rating';
+
+  @override
+  List<MaterialEntity> sort(List<MaterialEntity> items) {
+    return List.of(items)
+      ..sort((a, b) {
+        final aRating = a.seller?.rating ?? 0;
+        final bRating = b.seller?.rating ?? 0;
+
+        final ratingCompare = bRating.compareTo(aRating);
+
+        // If ratings are equal, newest listing first.
+        if (ratingCompare != 0) return ratingCompare;
+
+        return b.createdAt.compareTo(a.createdAt);
+      });
+  }
+}
+
 /// All strategies offered in the sort panel, in display order.
 const List<SortStrategy> kSortStrategies = [
   RelevanceSortStrategy(),
   PriceAscSortStrategy(),
   PriceDescSortStrategy(),
+  SellerRatingSortStrategy(),
   NewestSortStrategy(),
 ];

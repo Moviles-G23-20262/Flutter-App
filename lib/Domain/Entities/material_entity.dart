@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'user_summary.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Enums
@@ -134,6 +135,9 @@ class MaterialEntity {
   /// ID of the [UserEntity] who posted this listing.
   final String sellerId;
 
+  /// Public profile of the seller, when the API included it.
+  final UserSummary? seller;
+
   /// Broad category this listing belongs to.
   final MaterialCategoryEnum category;
 
@@ -155,6 +159,7 @@ class MaterialEntity {
     this.model,
     required this.imageUrls,
     required this.sellerId,
+    this.seller,
     required this.category,
     required this.createdAt,
     required this.updatedAt,
@@ -187,6 +192,7 @@ class MaterialEntity {
     Object? model = _sentinel,
     List<String>? imageUrls,
     String? sellerId,
+    Object? seller = _sentinel,
     MaterialCategoryEnum? category,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -203,6 +209,7 @@ class MaterialEntity {
       model:       model       == _sentinel ? this.model       : model as String?,
       imageUrls:   imageUrls   ?? this.imageUrls,
       sellerId:    sellerId    ?? this.sellerId,
+      seller:      seller      == _sentinel ? this.seller : seller as UserSummary?,
       category:    category    ?? this.category,
       createdAt:   createdAt   ?? this.createdAt,
       updatedAt:   updatedAt   ?? this.updatedAt,

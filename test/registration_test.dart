@@ -24,7 +24,14 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<bool> isEmailAvailable(String email) async => true;
+  Future<UserEntity> login({required String email, required String password}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<UserEntity?> restoreSession() async => null;
+
+  @override
+  Future<void> logout() async {}
 }
 
 void main() {

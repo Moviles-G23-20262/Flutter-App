@@ -105,3 +105,6 @@ xcuserdata/
 # IDE / local tool settings
 .vscode/settings.json
 .claude/settings.local.json
+
+# Local test accounts for manual runs
+config/*.local.json

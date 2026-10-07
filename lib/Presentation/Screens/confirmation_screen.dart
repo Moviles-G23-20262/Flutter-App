@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 import '../../theme/app_theme.dart';
+import '../../Domain/Entities/exchange_entity.dart';
 import '../State Management/app_state.dart';
 
-// ─── Confirmation Screen ──────────────────────────────────────────────────────
+// ─── Order Placed Screen ──────────────────────────────────────────────────────
 
 class ConfirmationScreen extends StatefulWidget {
   final AppState appState;
 
-  const ConfirmationScreen({super.key, required this.appState});
+  /// The order that was just placed.
+  final ExchangeEntity exchange;
+
+  const ConfirmationScreen({super.key, required this.appState, required this.exchange});
 
   @override
   State<ConfirmationScreen> createState() => _ConfirmationScreenState();
@@ -18,12 +21,11 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _scale;
-  late final int _orderNum;
+  bool _openingChat = false;
 
   @override
   void initState() {
     super.initState();
-    _orderNum = 1000 + Random().nextInt(9000);
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _scale = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
     _ctrl.forward();
@@ -33,6 +35,15 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _arrangeMeetup() async {
+    if (_openingChat) return;
+    setState(() => _openingChat = true);
+    final error = await widget.appState.arrangeMeetup(widget.exchange);
+    if (!mounted) return;
+    setState(() => _openingChat = false);
+    if (error != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 
   @override
@@ -49,6 +60,8 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
     final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle   : AppColors.lightBorderSubtle;
     final surface      = brightness == Brightness.dark ? AppColors.darkSurface        : AppColors.lightSurface;
     final border       = brightness == Brightness.dark ? AppColors.darkBorder         : AppColors.lightBorder;
+
+    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
 
     return Scaffold(
       backgroundColor: bg,
@@ -68,15 +81,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
                     color: accent,
                     shape: BoxShape.circle,
                     border: Border.all(color: accentLo),
-                    boxShadow: [
-                      BoxShadow(
-                        color: brightness == Brightness.dark
-                            ? AppColors.darkShadowAccent
-                            : AppColors.lightShadowAccent,
-                        blurRadius: 24,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                    boxShadow: AppDecorations.accentShadow(brightness),
                   ),
                   child: const Center(
                     child: Icon(Icons.check_rounded, color: Colors.white, size: 44),
@@ -173,7 +178,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: border),
                 ),
-                child: Text('Order #CSW-$_orderNum',
+                child: Text('Order #${widget.exchange.orderCode}',
                     style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.sizeXs)),
               ),
               const SizedBox(height: 28),
@@ -182,14 +187,18 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => widget.appState.navigateTo(AppScreen.home),
-                  icon: const Icon(Icons.home_rounded, size: 16),
-                  label: const Text('Back to Home'),
+                  onPressed: _openingChat ? null : _arrangeMeetup,
+                  icon: _openingChat
+                      ? const SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                  label: const Text('Arrange the meetup'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: buttonShape,
                   ),
                 ),
               ),
@@ -197,12 +206,26 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => widget.appState.navigateTo(AppScreen.search),
-                  icon: Icon(Icons.shopping_bag_outlined, size: 16, color: txSecondary),
-                  label: Text('Keep Shopping', style: TextStyle(color: txSecondary)),
+                  onPressed: () => widget.appState.openCompleteExchange(widget.exchange),
+                  icon: Icon(Icons.check_circle_outline_rounded, size: 16, color: txSecondary),
+                  label: Text('Already met? Complete exchange', style: TextStyle(color: txSecondary)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: buttonShape,
+                    side: BorderSide(color: borderSubtle),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => widget.appState.navigateTo(AppScreen.home),
+                  icon: Icon(Icons.home_outlined, size: 16, color: txSecondary),
+                  label: Text('Back to Home', style: TextStyle(color: txSecondary)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: buttonShape,
                     side: BorderSide(color: borderSubtle),
                   ),
                 ),
@@ -217,7 +240,7 @@ class _ConfirmationScreenState extends State<ConfirmationScreen>
 
 const _kNextSteps = [
   (Icons.check_circle_outline_rounded, 'Seller has been notified'),
-  (Icons.location_on_outlined,         'Meetup details sent via chat'),
-  (Icons.access_time_rounded,          'Expected exchange: 1-2 days'),
-  (Icons.chat_bubble_outline_rounded,  'Chat with seller anytime'),
+  (Icons.chat_bubble_outline_rounded,  '1 · Agree on the meetup in chat'),
+  (Icons.location_on_outlined,         '2 · Meet at a monitored campus point'),
+  (Icons.star_rounded,                 '3 · Check the item and rate each other'),
 ];
