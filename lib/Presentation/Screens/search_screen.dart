@@ -37,7 +37,9 @@ class _SearchScreenState extends State<SearchScreen> {
       return true;
     }).toList();
 
-    return _filters.sort.sort(list);
+    // the ui simply executes the return
+    return _filters.sort.sort(list); // There is absolutely no if-else or switch statement cluttering the view
+    // ->>>>>>> The algorithmic logic is entirely decoupled.from the UI in sort_strategy.dart, between lines 6 and 112, 
   }
 
   Future<void> _openFilters() async {

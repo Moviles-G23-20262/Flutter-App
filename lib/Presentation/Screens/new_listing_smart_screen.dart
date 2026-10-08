@@ -23,19 +23,25 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   final _picker = ImagePicker();
   final _estimator = const PriceEstimatorUseCase();
 
-  Uint8List? _imageBytes;
+  Uint8List? _imageBytes; // Instead, we compress the image and read it directly into memory as a Uint8List ->>> line 42
   MaterialCategoryEnum _category = MaterialCategoryEnum.BOOKS;
   MaterialConditionEnum _condition = MaterialConditionEnum.GOOD;
   PriceEstimate? _estimate;
 
+// Architecturally, we chose not to save this image to the device's physical storage to respect the user's space
+// ->>>>>>> line 26
   Future<void> _pick(ImageSource source) async {
     try {
+      // the _pick method directly invokes ImagePicker().pickImage using ImageSource.camera. ->>> line 31
       final file = await _picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
       if (file == null) return;
       final bytes = await file.readAsBytes();
       if (!mounted) return;
       setState(() => _imageBytes = bytes);
     } catch (_) {
+      // If the OS denies camera permissions, our catch block gracefully handles the failure by displaying
+      // a SnackBar, ensuring the app never crashes
+      // ->>>>>>> lib/Domain/use_cases/price_estimator_use_case.dart, between lines 44 and 54, 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not access the camera or gallery. Check app permissions.')),
@@ -43,11 +49,19 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
     }
   }
 
+
+// the user triggers this calculation, and the range is rendered on a card ->>>>>>> line 60
   void _suggestPrice() {
     setState(() {
       _estimate = _estimator.execute(category: _category, condition: _condition);
     });
   }
+
+// The key architectural decision here is a Performance Tactic: 
+// by running this estimation locally on the client's processor, we provide
+// instant, zero-latency feedback without relying on expensive HTTP calls to the backend, 
+// preserving mobile data and battery.
+// ->>>>>>> BQ 2: analytics-back-end. In analytics/views.py, between lines 152 and 178
 
   void _resetEstimate(VoidCallback change) {
     setState(() {

@@ -41,6 +41,10 @@ class PriceEstimatorUseCase {
     MaterialConditionEnum.FAIR: 0.45,
   };
 
+// We built a Smart Price Estimator to guide them. 
+// This method takes the item's category and condition to calculate a baseline,
+// returning a suggested price along with a p25 to p75 fair-market range
+// ->>>>>>> line 61
   PriceEstimate execute({
     required MaterialCategoryEnum category,
     required MaterialConditionEnum condition,
@@ -53,3 +57,8 @@ class PriceEstimatorUseCase {
     );
   }
 }
+
+// IMPORTANT: Currently, this acts as a simulated algorithmic baseline to establish our domain logic.
+// In a production environment, this would be replaced with a call to a backend service that analyzes
+// historical sales data to provide accurate pricing recommendations.
+// ->>>>>>>  new_listing_smart_screen.dart, at line 53

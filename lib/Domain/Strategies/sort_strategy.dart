@@ -1,5 +1,11 @@
 import '../Entities/material_entity.dart';
 
+// Strictly enforces OCP (Open-Closed Principle) for sorting strategies. New strategies can be added without modifying existing code.
+// we can extend the business logic infinitely without ever touching the presentation layer.
+// ->>>>>>> HW CAMERA SENSOR: lib/Presentation/Screens/new_listing_smart_screen.dart. Between lines 35, the _pick method directly invokes ImagePicker().pickImage using ImageSource.camera.
+
+
+
 /// Strategy contract for ordering a list of marketplace listings.
 ///
 /// Implementations must not mutate the input list.
