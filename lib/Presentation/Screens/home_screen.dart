@@ -4,6 +4,7 @@ import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
+import '../../Domain/Entities/theme_preference.dart';
 import '../../Domain/Entities/user_summary.dart';
 
 const kCategories = ['All', 'Books', 'Calculators', 'Lab Equipment', 'Furniture', 'Other'];
@@ -104,8 +105,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
                   ),
                   AppIconButton(
+                    // Auto (light sensor) shows its own icon; tapping pins light or dark.
                     icon: Icon(
-                      brightness == Brightness.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                      widget.appState.theme.preference == ThemePreference.auto
+                          ? Icons.brightness_auto_rounded
+                          : brightness == Brightness.dark
+                              ? Icons.light_mode_rounded
+                              : Icons.dark_mode_rounded,
                       color: txSecondary, size: 18,
                     ),
                     onTap: widget.appState.toggleTheme,

@@ -11,6 +11,7 @@ import '../Widgets/common_widgets.dart';
 import '../Widgets/conversation_insight_card.dart';
 import '../Widgets/formatters.dart';
 import '../Widgets/meetup_widgets.dart';
+import '../Widgets/power_saving_note.dart';
 
 // ─── One conversation ─────────────────────────────────────────────────────────
 
@@ -228,6 +229,8 @@ class _ChatViewState extends State<ChatView> {
                       ],
                     ),
         ),
+
+        if (chats.isPowerSaving) const PowerSavingNote(),
 
         // ── Meetup + privacy row ──
         Container(

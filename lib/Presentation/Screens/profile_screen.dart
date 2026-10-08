@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../Widgets/appearance_card.dart';
 import '../Widgets/common_widgets.dart';
 import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
@@ -145,6 +146,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Appearance (ambient light sensor)
+                Row(
+                  children: [
+                    Icon(Icons.contrast_rounded, color: txMuted, size: 16),
+                    const SizedBox(width: 6),
+                    SectionTitle('Appearance'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                AppearanceCard(theme: widget.appState.theme),
                 const SizedBox(height: 16),
 
                 // Settings

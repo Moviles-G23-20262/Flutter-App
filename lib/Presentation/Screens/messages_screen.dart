@@ -5,6 +5,7 @@ import '../State Management/app_state.dart';
 import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
 import '../Widgets/formatters.dart';
+import '../Widgets/power_saving_note.dart';
 import 'chat_view.dart';
 
 // ─── Messages Screen ──────────────────────────────────────────────────────────
@@ -124,6 +125,7 @@ class _ConversationList extends StatelessWidget {
           ),
         ),
         Divider(color: border, height: 1),
+        if (chats.isPowerSaving) const PowerSavingNote(),
 
         Expanded(
           child: chats.isFirstRoomsLoad && chats.isLoadingRooms
