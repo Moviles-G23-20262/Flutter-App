@@ -1,0 +1,397 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="campusswap-patterns" name="Architectural patterns">
+    <mxGraphModel dx="1212" dy="675" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="800" pageHeight="6570" background="#FAFAFC" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="v1" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;fontColor=#0E122F;" value="&lt;span style=&quot;font-size: 28px;&quot;&gt;&lt;b&gt;uwu&lt;/b&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="44" width="720" x="50" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="v3" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="1 · Layered architecture (Clean Architecture)" vertex="1">
+          <mxGeometry height="760" width="720" x="40" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="v4" parent="v3" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=14;align=left;verticalAlign=top;spacing=14;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Presentation&lt;/b&gt;  &lt;i&gt;lib/Presentation&lt;/i&gt;&lt;br&gt;&lt;br&gt;• Screens &amp; widgets — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;HomeScreen · ChatView · MeetingPointScreen&lt;/span&gt;&lt;br&gt;• View-models — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ChatState · AccountState · MeetingPlannerState&lt;/span&gt;&lt;br&gt;• Navigation &amp; app-wide state — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;AppState&lt;/span&gt;&lt;br&gt;• Theme &amp; formatters" vertex="1">
+          <mxGeometry height="150" width="660" x="30" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="v5" parent="v3" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=14;align=left;verticalAlign=top;spacing=14;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fillColor=#C6C9E2;" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Domain&lt;/b&gt;  &lt;i&gt;lib/Domain · pure Dart, no UI&lt;/i&gt;&lt;br&gt;&lt;br&gt;• Entities — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MaterialEntity · ExchangeEntity · MeetingProposalEntity&lt;/span&gt;&lt;br&gt;• Use cases — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;PlaceOrderUseCase · ProposeMeetingUseCase&lt;/span&gt;&lt;br&gt;• Repository contracts — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ChatRepository · MeetupRepository&lt;/span&gt;&lt;br&gt;• Strategies · rules · &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;DataException&lt;/span&gt;" vertex="1">
+          <mxGeometry height="150" width="660" x="30" y="274" as="geometry" />
+        </mxCell>
+        <mxCell id="v6" parent="v3" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=14;align=left;verticalAlign=top;spacing=14;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b style=&quot;font-size:16px;&quot;&gt;Data&lt;/b&gt;  &lt;i&gt;lib/Data&lt;/i&gt;&lt;br&gt;&lt;br&gt;• Repository implementations — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ChatRepositoryImpl · MeetupRepositoryImpl&lt;/span&gt;&lt;br&gt;• Data sources — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MarketplaceRemoteDataSource · SecureSessionStorage&lt;/span&gt;&lt;br&gt;• Device — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;DeviceLocationDataSource&lt;/span&gt; (GPS)&lt;br&gt;• JSON mappers — &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;marketplace_models.dart&lt;/span&gt;" vertex="1">
+          <mxGeometry height="150" width="660" x="30" y="484" as="geometry" />
+        </mxCell>
+        <mxCell id="v7" parent="v3" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;align=center;" value="&lt;b&gt;core/&lt;/b&gt;  &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;AppDependencies&lt;/span&gt; wires Data implementations into Domain use cases and hands them to Presentation&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ApiClient&lt;/span&gt; is the single HTTP client for the NestJS API (JWT, timeouts, error messages)" vertex="1">
+          <mxGeometry height="76" width="660" x="30" y="664" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="v3" source="v4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v5" value="calls use cases ↓">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="v3" source="v6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;" target="v5" value="implements contracts ↑">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v10" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="2 · MVVM" vertex="1">
+          <mxGeometry height="750" width="720" x="780" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="v11" parent="v10" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;View — Screens (Flutter widgets)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;HomeScreen · ChatView · MeetingPointScreen&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;CompleteExchangeScreen · ScheduleScreen&lt;/span&gt;&lt;br&gt;Only draws state and forwards taps&lt;/span&gt;" vertex="1">
+          <mxGeometry height="110" width="620" x="50" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v12" parent="v10" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ViewModel — ChangeNotifier&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MarketplaceState · ChatState · AccountState&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ScheduleState · MeetingPlannerState&lt;/span&gt;&lt;br&gt;Holds UI state: loading, errors, selection, polling&lt;/span&gt;" vertex="1">
+          <mxGeometry height="120" width="620" x="50" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="v13" parent="v10" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Model — Domain&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;PlaceOrderUseCase · SendMessageUseCase …&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;ExchangeEntity · MaterialEntity · FreeSlot&lt;/span&gt;&lt;br&gt;Business rules and data, no Flutter&lt;/span&gt;" vertex="1">
+          <mxGeometry height="110" width="620" x="50" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="v10" source="v11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" target="v12" value="user action  e.g. chats.send()">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="v10" source="v12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;exitX=0.7;exitY=0;entryX=0.7;entryY=1;" target="v11" value="notifyListeners() → rebuild">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="v10" source="v12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=0.3;exitY=1;entryX=0.3;entryY=0;" target="v13" value="useCase.execute()">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="v10" source="v13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;exitX=0.7;exitY=0;entryX=0.7;entryY=1;" target="v12" value="entities / DataException">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v18" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="3 · Observer (ChangeNotifier · Listenable)" vertex="1">
+          <mxGeometry height="600" width="720" x="40" y="940" as="geometry" />
+        </mxCell>
+        <mxCell id="v19" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Timer.periodic&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;polls every 4 s (open chat)&lt;br&gt;and 12 s (conversation list)&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="230" x="30" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v20" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Subject — ChatState&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;extends ChangeNotifier&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;notifyListeners()&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="370" x="320" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v21" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ListenableBuilder&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MessagesScreen&lt;/span&gt;&lt;br&gt;rebuilds the chat&lt;/span&gt;" vertex="1">
+          <mxGeometry height="110" width="200" x="30" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="v22" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Listenable.merge&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;Home · Profile · SellerHub&lt;/span&gt;&lt;br&gt;one rebuild for several states&lt;/span&gt;" vertex="1">
+          <mxGeometry height="110" width="200" x="260" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="v23" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;addListener()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MeetingPointScreen&lt;/span&gt;&lt;br&gt;map follows the chosen zone&lt;/span&gt;" vertex="1">
+          <mxGeometry height="110" width="200" x="490" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" edge="1" parent="v18" source="v19" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v20" value="refresh">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e25" edge="1" parent="v18" source="v20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;" target="v21" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e26" edge="1" parent="v18" source="v20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;" target="v22" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e27" edge="1" parent="v18" source="v20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;" target="v23" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v28" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ApiClient.onUnauthorized&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;fires on any 401 response&lt;/span&gt;" vertex="1">
+          <mxGeometry height="80" width="300" x="30" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="v29" parent="v18" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AppState.logout()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;clears every state, back to login&lt;/span&gt;" vertex="1">
+          <mxGeometry height="80" width="300" x="390" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="e30" edge="1" parent="v18" source="v28" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v29" value="callback">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v31" parent="v18" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontSize=12;fontStyle=2;fontColor=#202A6A;" value="Screens subscribe; view-models never know which widgets listen to them." vertex="1">
+          <mxGeometry height="50" width="660" x="30" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="v32" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="4 · Repository" vertex="1">
+          <mxGeometry height="600" width="720" x="780" y="940" as="geometry" />
+        </mxCell>
+        <mxCell id="v33" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ChatState → SendMessageUseCase&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;asks for data, never knows where it comes from&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="360" x="180" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="v34" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B4DC4;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#0E122F;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;«interface» ChatRepository&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;Domain contract&lt;/span&gt;" vertex="1">
+          <mxGeometry height="70" width="360" x="180" y="164" as="geometry" />
+        </mxCell>
+        <mxCell id="v35" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ChatRepositoryImpl&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;Data · translates errors to DataException&lt;/span&gt;" vertex="1">
+          <mxGeometry height="70" width="360" x="180" y="284" as="geometry" />
+        </mxCell>
+        <mxCell id="v36" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B4DC4;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#0E122F;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;«interface» MarketplaceRemoteDataSource&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;MarketplaceRemoteDataSourceImpl&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="70" width="320" x="30" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="v37" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Other sources&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;SecureSessionStorage · DeviceLocationDataSource&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="70" width="310" x="380" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="v38" parent="v32" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ApiClient → NestJS REST API&lt;/b&gt;" vertex="1">
+          <mxGeometry height="56" width="320" x="30" y="514" as="geometry" />
+        </mxCell>
+        <mxCell id="v39" parent="v32" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="Same shape for &lt;b&gt;Auth · Material · Wishlist · Exchange · Notification · Meetup · Schedule · Location&lt;/b&gt;" vertex="1">
+          <mxGeometry height="80" width="310" x="380" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="e40" edge="1" parent="v32" source="v33" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v34" value="execute()">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e41" edge="1" parent="v32" source="v35" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;" target="v34" value="implements">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e42" edge="1" parent="v32" source="v35" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=0.3;exitY=1;entryX=0.5;entryY=0;" target="v36" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e43" edge="1" parent="v32" source="v35" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=0.7;exitY=1;entryX=0.5;entryY=0;" target="v37" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e44" edge="1" parent="v32" source="v36" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v38" value="HTTP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v45" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="5 · Singleton via Composition Root (DI)" vertex="1">
+          <mxGeometry height="560" width="720" x="40" y="1570" as="geometry" />
+        </mxCell>
+        <mxCell id="v46" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;main() → CampusSwapApp&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;app entry point&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="290" x="40" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="v47" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AppDependencies.create()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;composition root · runs once&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="290" x="390" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="v48" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ApiClient&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;one shared instance: base URL, JWT, http.Client&lt;br&gt;shared by every data source&lt;/span&gt;" vertex="1">
+          <mxGeometry height="70" width="300" x="210" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="v49" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AuthRemoteDataSource&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="200" x="40" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="v50" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;MarketplaceRemote DataSource&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="200" x="260" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="v51" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;MeetupRemote DataSource&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="200" x="480" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="v52" parent="v45" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AppState&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;one app-wide instance, passed to every screen&lt;br&gt;receives the use cases&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="300" x="210" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="e53" edge="1" parent="v45" source="v46" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v47" value="creates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e54" edge="1" parent="v45" source="v47" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=0.5;exitY=1;entryX=0.75;entryY=0;" target="v48" value="new ApiClient()">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e55" edge="1" parent="v45" source="v48" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v49" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e56" edge="1" parent="v45" source="v48" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v50" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e57" edge="1" parent="v45" source="v48" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v51" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e58" edge="1" parent="v45" source="v47" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;exitX=1;exitY=0.5;entryX=1;entryY=0.5;" target="v52" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v59" parent="v45" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="Single instances by construction, injected through constructors — no static getInstance(), so tests swap in fakes (see test/marketplace_test.dart)." vertex="1">
+          <mxGeometry height="70" width="640" x="40" y="478" as="geometry" />
+        </mxCell>
+        <mxCell id="v60" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="6 · Facade" vertex="1">
+          <mxGeometry height="560" width="720" x="790" y="1570" as="geometry" />
+        </mxCell>
+        <mxCell id="v61" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;align=center;" value="&lt;b&gt;Screens&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;one object to talk to&lt;/span&gt;" vertex="1">
+          <mxGeometry height="44" width="660" x="30" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="v62" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AppState&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;navigateTo() · buy() · arrangeMeetup()&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;openMeetingPlanner() · openCompleteExchange() · logout()&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="460" x="130" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="v63" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;MarketplaceState&lt;/b&gt;" vertex="1">
+          <mxGeometry height="56" width="150" x="30" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="v64" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ChatState&lt;/b&gt;" vertex="1">
+          <mxGeometry height="56" width="150" x="198" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="v65" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AccountState&lt;/b&gt;" vertex="1">
+          <mxGeometry height="56" width="150" x="366" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="v66" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ScheduleState&lt;/b&gt;" vertex="1">
+          <mxGeometry height="56" width="150" x="534" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="e67" edge="1" parent="v60" source="v61" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v62" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e68" edge="1" parent="v60" source="v62" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v63" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e69" edge="1" parent="v60" source="v62" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v64" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e70" edge="1" parent="v60" source="v62" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v65" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e71" edge="1" parent="v60" source="v62" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v66" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v72" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ApiClient&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;get · post · patch · delete · postFile&lt;/span&gt;&lt;br&gt;adds JWT header · 20 s timeout · NestJS error parsing&lt;/span&gt;" vertex="1">
+          <mxGeometry height="100" width="340" x="30" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="v73" parent="v60" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;package:http&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;raw requests&lt;/span&gt;" vertex="1">
+          <mxGeometry height="100" width="230" x="460" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="e74" edge="1" parent="v60" source="v72" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v73" value="wraps">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v75" parent="v60" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;buy()&lt;/span&gt; = place order → reserve listing → refresh marketplace → open confirmation, all behind one call." vertex="1">
+          <mxGeometry height="52" width="660" x="30" y="494" as="geometry" />
+        </mxCell>
+        <mxCell id="v76" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="7 · Adapter / Mapper" vertex="1">
+          <mxGeometry height="560" width="720" x="40" y="2170" as="geometry" />
+        </mxCell>
+        <mxCell id="v77" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;NestJS JSON&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;&quot;price&quot;: &quot;320000.00&quot;&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;&quot;status&quot;: &quot;PENDING&quot;&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="100" width="250" x="30" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v78" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;marketplace_models.dart&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;materialFromJson() · exchangeFromJson()&lt;/span&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;messageFromJson() · meetingPointFromJson()&lt;/span&gt;&lt;br&gt;unknown enum values fall back safely&lt;/span&gt;" vertex="1">
+          <mxGeometry height="100" width="360" x="330" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v79" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Domain entities&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;price: double · status: ExchangeStatusEnum&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="360" x="330" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="e80" edge="1" parent="v76" source="v77" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v78" value="maps">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e81" edge="1" parent="v76" source="v78" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v79" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v82" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;flutter_secure_storage&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;plugin&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="250" x="30" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="v83" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;SecureSessionStorage&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;implements SessionStorage&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="360" x="330" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="v84" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;geolocator&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;plugin&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="250" x="30" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="v85" parent="v76" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;DeviceLocationDataSource&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;Position → GeoPoint&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="360" x="330" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="e86" edge="1" parent="v76" source="v83" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v82" value="adapts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e87" edge="1" parent="v76" source="v85" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v84" value="adapts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v88" parent="v76" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontSize=12;fontStyle=2;fontColor=#202A6A;" value="Domain only ever sees its own types; changing a plugin touches one adapter." vertex="1">
+          <mxGeometry height="40" width="660" x="30" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="v89" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="8 · Strategy" vertex="1">
+          <mxGeometry height="560" width="720" x="800" y="2170" as="geometry" />
+        </mxCell>
+        <mxCell id="v90" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;SearchScreen&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;context: keeps the chosen &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;_sort&lt;/span&gt;&lt;br&gt;chips built from &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;kSortStrategies&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="280" x="40" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v91" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B4DC4;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#0E122F;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;«abstract» SortStrategy&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;sort(items) · id · label&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="290" x="390" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e92" edge="1" parent="v89" source="v90" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v91" value="uses">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v93" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Relevance&lt;br&gt;SortStrategy&lt;/b&gt;" vertex="1">
+          <mxGeometry height="64" width="150" x="40" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="v94" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;PriceAsc&lt;br&gt;SortStrategy&lt;/b&gt;" vertex="1">
+          <mxGeometry height="64" width="150" x="205" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="v95" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;PriceDesc&lt;br&gt;SortStrategy&lt;/b&gt;" vertex="1">
+          <mxGeometry height="64" width="150" x="370" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="v96" parent="v89" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Newest&lt;br&gt;SortStrategy&lt;/b&gt;" vertex="1">
+          <mxGeometry height="64" width="150" x="535" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="e97" edge="1" parent="v89" source="v93" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="v91" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e98" edge="1" parent="v89" source="v94" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="v91" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e99" edge="1" parent="v89" source="v95" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="v91" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e100" edge="1" parent="v89" source="v96" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="v91" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v101" parent="v89" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="A new sort order is one new class; &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;SearchScreen&lt;/span&gt; does not change." vertex="1">
+          <mxGeometry height="70" width="640" x="40" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="v102" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="9 · Decorator (function form)" vertex="1">
+          <mxGeometry height="440" width="720" x="40" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="v103" parent="v102" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;ChatRepositoryImpl.sendMessage()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;what the use case calls&lt;/span&gt;" vertex="1">
+          <mxGeometry height="64" width="300" x="30" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v104" parent="v102" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;guardRequest(request)&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;wraps every repository call&lt;br&gt;same &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;Future&amp;lt;T&amp;gt;&lt;/span&gt; in and out&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="300" x="30" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="v105" parent="v102" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;remote.sendMessage()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;the real request&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="300" x="30" y="324" as="geometry" />
+        </mxCell>
+        <mxCell id="e106" edge="1" parent="v102" source="v103" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v104" value="wrapped by">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e107" edge="1" parent="v102" source="v104" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v105" value="delegates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v108" parent="v102" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Adds behaviour without changing the call&lt;/b&gt;&lt;br&gt;&lt;br&gt;• NetworkException → “Can’t reach the server”&lt;br&gt;• 401 → “Your session expired”&lt;br&gt;• 400 / 403 / 404 / 409 → server message&lt;br&gt;• anything else → generic message&lt;br&gt;&lt;br&gt;All surface as &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;DataException&lt;/span&gt; the UI can show." vertex="1">
+          <mxGeometry height="230" width="310" x="380" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v109" parent="v102" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontSize=12;fontStyle=2;fontColor=#202A6A;" value="A Dart higher-order function instead of a wrapper class: same idea, less boilerplate." vertex="1">
+          <mxGeometry height="70" width="310" x="380" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="v110" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="10 · Use Case (Interactor)" vertex="1">
+          <mxGeometry height="440" width="720" x="810" y="2770" as="geometry" />
+        </mxCell>
+        <mxCell id="v111" parent="v110" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;AccountState.order()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;view-model&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="300" x="30" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v112" parent="v110" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;PlaceOrderUseCase.execute()&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;rules: not your own listing,&lt;br&gt;still available&lt;/span&gt;" vertex="1">
+          <mxGeometry height="90" width="300" x="30" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="v113" parent="v110" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B4DC4;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#0E122F;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;«interface» ExchangeRepository&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:12px;&quot;&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;placeOrder()&lt;/span&gt;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="300" x="30" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="e114" edge="1" parent="v110" source="v111" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v112" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e115" edge="1" parent="v110" source="v112" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" target="v113" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="v116" parent="v110" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#FFF9EC;strokeColor=#E6B35B;fontColor=#0E122F;fontSize=12;align=left;verticalAlign=top;spacing=10;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;One class per action, one &lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;execute()&lt;/span&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;span style=&quot;font-family:JetBrains Mono,monospace;font-size:12px;&quot;&gt;Login · Register · RestoreSession&lt;br&gt;GetMaterials · CreateListing&lt;br&gt;SendMessage · MarkChatRead&lt;br&gt;PlaceOrder · CompleteExchange&lt;br&gt;CancelExchange · RateUser&lt;br&gt;ProposeMeeting · AnswerMeetingProposal&lt;br&gt;RankSafeZones · AddScheduleBlock&lt;br&gt;PriceEstimator …&lt;/span&gt;" vertex="1">
+          <mxGeometry height="310" width="310" x="380" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="v119" parent="1" style="swimlane;startSize=44;rounded=1;arcSize=3;html=1;whiteSpace=wrap;fillColor=#202A6A;swimlaneFillColor=#FFFFFF;strokeColor=#202A6A;strokeWidth=2;fontColor=#FFFFFF;fontSize=19;fontStyle=1;align=left;spacingLeft=16;fontFamily=Fraunces;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DFraunces;" value="Legend" vertex="1">
+          <mxGeometry height="170" width="720" x="380" y="3260" as="geometry" />
+        </mxCell>
+        <mxCell id="v120" parent="v119" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EEF0FA;strokeColor=#3B4DC4;strokeWidth=1.5;fontColor=#0E122F;fontSize=13;verticalAlign=middle;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontStyle=0;" value="&lt;b&gt;Class&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="30" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="v121" parent="v119" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#C6C9E2;strokeColor=#202A6A;strokeWidth=2;fontColor=#0E122F;fontSize=13;spacing=8;shadow=1;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Key class&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="200" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="v122" parent="v119" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#3B4DC4;strokeWidth=1.5;dashed=1;dashPattern=6 4;fontColor=#0E122F;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;«interface»&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="370" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="v123" parent="v119" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F4F4F6;strokeColor=#8B94D0;strokeWidth=1.5;fontColor=#404045;fontSize=13;spacing=8;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;" value="&lt;b&gt;Library / external&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="540" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="e124" edge="1" parent="v119" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=1;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="30" y="132" as="sourcePoint" />
+            <mxPoint x="90" y="132" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v125" parent="v119" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontFamily=JetBrains Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DJetBrains%2BMono;fontSize=12;fontColor=#202A6A;" value="calls / creates" vertex="1">
+          <mxGeometry height="24" width="150" x="98" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e126" edge="1" parent="v119" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=block;endFill=0;endSize=10;dashed=1;dashPattern=6 4;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="255" y="132" as="sourcePoint" />
+            <mxPoint x="315" y="132" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v127" parent="v119" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontFamily=JetBrains Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DJetBrains%2BMono;fontSize=12;fontColor=#202A6A;" value="implements" vertex="1">
+          <mxGeometry height="24" width="150" x="323" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e128" edge="1" parent="v119" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#202A6A;strokeWidth=1.5;fontSize=11;fontColor=#3B4DC4;labelBackgroundColor=#FFFFFF;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;endArrow=open;endFill=0;dashed=1;strokeColor=#8B94D0;fontColor=#8B94D0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="132" as="sourcePoint" />
+            <mxPoint x="540" y="132" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="v129" parent="v119" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;fontColor=#0E122F;fontFamily=Outfit;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOutfit;fontFamily=JetBrains Mono;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DJetBrains%2BMono;fontSize=12;fontColor=#202A6A;" value="notifies / returns" vertex="1">
+          <mxGeometry height="24" width="150" x="548" y="120" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

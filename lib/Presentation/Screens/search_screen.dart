@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/async_views.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
 import '../../Domain/Strategies/sort_strategy.dart';
@@ -26,7 +27,7 @@ class _SearchScreenState extends State<SearchScreen> {
     var list = widget.appState.marketplace.availableMaterials.where((m) {
       if (_filters.category != null && m.category != _filters.category) return false;
       if (_filters.condition != null && m.condition != _filters.condition) return false;
-      if (m.price > _filters.maxPrice) return false;
+      if (_filters.hasPriceLimit && m.price > _filters.maxPrice) return false;
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         return m.title.toLowerCase().contains(q) ||
@@ -158,7 +159,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
 /// Applied search filters (null category/condition means "All").
 class _SearchFilters {
-  static const double defaultMaxPrice = 200;
+  /// Prices are in COP. The slider's top value means "any price", so nothing is hidden by default.
+  static const double minPrice = 10000;
+  static const double defaultMaxPrice = 1000000;
+  static const int priceSteps = 99; // 10.000 COP each
 
   final MaterialCategoryEnum? category;
   final MaterialConditionEnum? condition;
@@ -172,10 +176,12 @@ class _SearchFilters {
     this.sort = const RelevanceSortStrategy(),
   });
 
+  bool get hasPriceLimit => maxPrice < defaultMaxPrice;
+
   bool get isActive =>
       category != null ||
       condition != null ||
-      maxPrice < defaultMaxPrice ||
+      hasPriceLimit ||
       sort.id != const RelevanceSortStrategy().id;
 }
 
@@ -277,7 +283,10 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
               const SizedBox(height: 16),
 
-              _SheetLabel('Max Price: \$${_maxPrice.toInt()}', color: txSecondary),
+              _SheetLabel(
+                'Max Price: ${_maxPrice >= _SearchFilters.defaultMaxPrice ? 'Any' : copPrice(_maxPrice)}',
+                color: txSecondary,
+              ),
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   activeTrackColor: accent,
@@ -286,8 +295,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                   overlayColor: accent.withValues(alpha: 0.2),
                 ),
                 child: Slider(
-                  min: 5,
+                  min: _SearchFilters.minPrice,
                   max: _SearchFilters.defaultMaxPrice,
+                  divisions: _SearchFilters.priceSteps,
                   value: _maxPrice,
                   onChanged: (v) => setState(() => _maxPrice = v),
                 ),
@@ -374,7 +384,7 @@ class _SearchProductCard extends StatelessWidget {
                   ],
                   AppBadge(material.conditionDisplayName),
                   const SizedBox(height: 6),
-                  Text('\$${material.price.toStringAsFixed(2)}',
+                  Text(copPrice(material.price),
                       style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                 ],
               ),
