@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../theme/app_theme.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
 import '../../Domain/Entities/meetup_entities.dart';
+import '../../Domain/rules/campus_hours.dart';
 import '../State Management/app_state.dart';
 import '../State Management/meeting_planner_state.dart';
 import '../Widgets/async_views.dart';
@@ -161,6 +162,11 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      // Context: the clock. Outside campus hours, say so before suggesting anything.
+                                      if (!CampusHours.isOpen(DateTime.now())) ...[
+                                        _CampusClosedNotice(now: DateTime.now()),
+                                        const SizedBox(height: 10),
+                                      ],
                                       _GuardianCard(planner: planner, otherFirstName: _otherFirstName),
                                       if (!(planner.suggestions?.callerHasSchedule ?? true)) ...[
                                         const SizedBox(height: 10),
@@ -517,6 +523,50 @@ class _GuardianCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(_message(), style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown outside campus hours (after 20:00, before 07:00, Sundays).
+class _CampusClosedNotice extends StatelessWidget {
+  final DateTime now;
+
+  const _CampusClosedNotice({required this.now});
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final color = warningColor(brightness);
+    final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.nightlight_round, size: 20, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: 'Campus is closed right now. ',
+                  style: AppTextStyles.body(color, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700),
+                ),
+                TextSpan(
+                  text: 'Meetups can happen from ${CampusHours.describeNextOpening(now)}, '
+                      'so the hours below start then.',
+                  style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs),
+                ),
+              ]),
             ),
           ),
         ],

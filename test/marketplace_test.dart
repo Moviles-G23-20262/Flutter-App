@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -34,6 +35,14 @@ import 'package:flutter_front_end/Presentation/State%20Management/chat_state.dar
 import 'package:flutter_front_end/Presentation/State%20Management/marketplace_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/meeting_planner_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/schedule_state.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/theme_state.dart';
+import 'package:flutter_front_end/Domain/Entities/theme_preference.dart';
+import 'package:flutter_front_end/Domain/repositories/appearance_repositories.dart';
+import 'package:flutter_front_end/Domain/use_cases/appearance_use_cases.dart';
+import 'package:flutter_front_end/Domain/Entities/power_status.dart';
+import 'package:flutter_front_end/Domain/repositories/power_repositories.dart';
+import 'package:flutter_front_end/Domain/use_cases/power_use_cases.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/power_state.dart';
 import 'package:flutter_front_end/Presentation/Widgets/formatters.dart';
 import 'package:flutter_front_end/core/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -369,6 +378,8 @@ class _World {
     rateUser: RateUserUseCase(exchanges),
   );
 
+  final battery = _TestBattery();
+
   late final scheduleState = ScheduleState(
     getSchedule: GetScheduleUseCase(scheduleRepo),
     addBlock: AddScheduleBlockUseCase(scheduleRepo),
@@ -381,7 +392,33 @@ class _World {
     account: accountState,
     schedule: scheduleState,
     meetups: meetups,
+    theme: ThemeState(
+      watchAmbientLight: WatchAmbientLightUseCase(_NoLightSensor()),
+      loadPreference: LoadThemePreferenceUseCase(_NoSavedTheme()),
+      savePreference: SaveThemePreferenceUseCase(_NoSavedTheme()),
+    ),
+    power: PowerState(watchBattery: WatchBatteryUseCase(battery)),
   );
+}
+
+class _TestBattery implements BatteryRepository {
+  final controller = StreamController<PowerStatus>.broadcast();
+
+  @override
+  Stream<PowerStatus> watch() => controller.stream;
+}
+
+class _NoLightSensor implements AmbientLightRepository {
+  @override
+  Stream<double> luxReadings() => const Stream.empty();
+}
+
+class _NoSavedTheme implements ThemePreferenceRepository {
+  @override
+  Future<ThemePreference?> load() async => null;
+
+  @override
+  Future<void> save(ThemePreference preference) async {}
 }
 
 class _FakeRemote implements MarketplaceRemoteDataSource {
@@ -698,6 +735,23 @@ void main() {
         () => world.accountState.complete(_order(status: ExchangeStatusEnum.COMPLETED)),
         throwsA(isA<DataException>()),
       );
+    });
+  });
+
+  group('Battery saver', () {
+    test('a low battery slows the chat down, and charging restores it', () async {
+      final world = _World();
+      world.appState.power.start();
+      expect(world.chatState.isPowerSaving, isFalse);
+
+      world.battery.controller.add(const PowerStatus(level: 12, charging: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(world.chatState.isPowerSaving, isTrue);
+
+      world.battery.controller.add(const PowerStatus(level: 12, charging: true));
+      await Future<void>.delayed(Duration.zero);
+      expect(world.chatState.isPowerSaving, isFalse);
+      world.chatState.clear();
     });
   });
 

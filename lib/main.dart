@@ -5,6 +5,8 @@ import 'Presentation/State Management/app_state.dart';
 import 'Presentation/State Management/chat_state.dart';
 import 'Presentation/State Management/marketplace_state.dart';
 import 'Presentation/State Management/schedule_state.dart';
+import 'Presentation/State Management/power_state.dart';
+import 'Presentation/State Management/theme_state.dart';
 import 'theme/app_theme.dart';
 import 'Presentation/Screens/login_screen.dart';
 import 'Presentation/Screens/register_screen.dart';
@@ -70,11 +72,19 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       removeBlock: _deps.removeScheduleBlock,
     ),
     meetups: _deps.meetups,
+    theme: ThemeState(
+      watchAmbientLight: _deps.watchAmbientLight,
+      loadPreference: _deps.loadThemePreference,
+      savePreference: _deps.saveThemePreference,
+    ),
+    power: PowerState(watchBattery: _deps.watchBattery),
   );
 
   @override
   void initState() {
     super.initState();
+    _appState.theme.start();
+    _appState.power.start();
     _restoreSession();
   }
 

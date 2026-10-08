@@ -1,5 +1,7 @@
 import 'package:http/http.dart' as http;
 
+import '../Data/data_sources/ambient_light_data_source.dart';
+import '../Data/data_sources/battery_data_source.dart';
 import '../Data/data_sources/analytics_remote_data_source.dart';
 import '../Data/Repositories/meeting_density_repository_impl.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
@@ -10,10 +12,13 @@ import '../Data/data_sources/device_location_data_source.dart';
 import '../Data/data_sources/marketplace_remote_data_source.dart';
 import '../Data/data_sources/meetup_remote_data_source.dart';
 import '../Data/data_sources/session_storage.dart';
+import '../Data/Repositories/appearance_repositories_impl.dart';
 import '../Data/Repositories/auth_repository_impl.dart';
 import '../Data/Repositories/conversation_insight_repository_impl.dart';
 import '../Data/Repositories/marketplace_repositories_impl.dart';
 import '../Data/Repositories/meetup_repositories_impl.dart';
+import '../Domain/use_cases/appearance_use_cases.dart';
+import '../Domain/use_cases/power_use_cases.dart';
 import '../Domain/use_cases/conversation_insight_use_case.dart';
 import '../Domain/use_cases/login_use_case.dart';
 import '../Domain/use_cases/marketplace_use_cases.dart';
@@ -28,6 +33,14 @@ class AppDependencies {
   final RegisterStudentUseCase registerStudent;
   final RestoreSessionUseCase restoreSession;
   final LogoutUseCase logout;
+
+  /// Theme: ambient light sensor and the saved light/dark/auto choice.
+  final WatchAmbientLightUseCase watchAmbientLight;
+  final LoadThemePreferenceUseCase loadThemePreference;
+  final SaveThemePreferenceUseCase saveThemePreference;
+
+  /// Battery level and charging state, for battery saver.
+  final WatchBatteryUseCase watchBattery;
 
   /// Signs the app out when the server stops accepting our token.
   final ApiClient apiClient;
@@ -83,6 +96,10 @@ class AppDependencies {
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
+    required this.watchAmbientLight,
+    required this.loadThemePreference,
+    required this.saveThemePreference,
+    required this.watchBattery,
   });
 
   factory AppDependencies.create() {
@@ -118,6 +135,7 @@ class AppDependencies {
     final meetupRepository = MeetupRepositoryImpl(meetupRemote);
     final scheduleRepository = ScheduleRepositoryImpl(meetupRemote);
     final locationRepository = LocationRepositoryImpl(DeviceLocationDataSource());
+    final themePreferences = ThemePreferenceRepositoryImpl();
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -156,6 +174,10 @@ class AppDependencies {
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),
+      watchAmbientLight: WatchAmbientLightUseCase(AmbientLightRepositoryImpl(AmbientLightDataSource())),
+      loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
+      saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
+      watchBattery: WatchBatteryUseCase(BatteryDataSource()),
     );
   }
 }

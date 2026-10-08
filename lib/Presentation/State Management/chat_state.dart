@@ -14,6 +14,10 @@ class ChatState extends ChangeNotifier {
   static const _messagePollInterval = Duration(seconds: 4);
   static const _roomsPollInterval = Duration(seconds: 12);
 
+  /// Battery saver (low battery, not charging): poll a lot less.
+  static const _savingMessagePollInterval = Duration(seconds: 15);
+  static const _savingRoomsPollInterval = Duration(seconds: 45);
+
   final GetChatRoomsUseCase getChatRooms;
   final OpenChatRoomUseCase openChatRoom;
   final GetMessagesUseCase getMessages;
@@ -205,6 +209,19 @@ class ChatState extends ChangeNotifier {
     }
   }
 
+  bool _powerSaving = false;
+
+  /// Whether battery saver slowed down the refreshes.
+  bool get isPowerSaving => _powerSaving;
+
+  /// Set by the battery state; changes how often the chat refreshes, effective immediately.
+  void setPowerSaving(bool saving) {
+    if (saving == _powerSaving) return;
+    _powerSaving = saving;
+    if (_timer != null) _restartTimer();
+    notifyListeners();
+  }
+
   /// Poll while the Messages tab is on screen; call [stopPolling] when it leaves.
   void startPolling() => _restartTimer();
 
@@ -216,9 +233,15 @@ class ChatState extends ChangeNotifier {
   void _restartTimer() {
     _timer?.cancel();
     if (_activeRoomId != null) {
-      _timer = Timer.periodic(_messagePollInterval, (_) => refreshMessages());
+      _timer = Timer.periodic(
+        _powerSaving ? _savingMessagePollInterval : _messagePollInterval,
+        (_) => refreshMessages(),
+      );
     } else {
-      _timer = Timer.periodic(_roomsPollInterval, (_) => loadRooms());
+      _timer = Timer.periodic(
+        _powerSaving ? _savingRoomsPollInterval : _roomsPollInterval,
+        (_) => loadRooms(),
+      );
     }
   }
 

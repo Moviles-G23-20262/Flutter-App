@@ -10,6 +10,8 @@ import 'chat_state.dart';
 import 'marketplace_state.dart';
 import 'meeting_planner_state.dart';
 import 'schedule_state.dart';
+import 'power_state.dart';
+import 'theme_state.dart';
 
 // ─── App Navigation State ─────────────────────────────────────────────────────
 
@@ -56,6 +58,12 @@ class AppState extends ChangeNotifier {
   final ScheduleState schedule;
   final MeetupUseCases meetups;
 
+  /// Light/dark, including the automatic ambient-light mode.
+  final ThemeState theme;
+
+  /// Battery saver; slows the chat refreshes down on a low battery.
+  final PowerState power;
+
   AppState({
     this.onLogout,
     required this.marketplace,
@@ -63,7 +71,15 @@ class AppState extends ChangeNotifier {
     required this.account,
     required this.schedule,
     required this.meetups,
-  });
+    required this.theme,
+    required this.power,
+  }) {
+    // A theme change repaints the whole app, so it goes through the app-wide notifier.
+    theme.addListener(notifyListeners);
+    power.addListener(_applyPowerSaving);
+  }
+
+  void _applyPowerSaving() => chats.setPowerSaving(power.isSaving);
 
   AppScreen _currentScreen = AppScreen.login;
   MaterialEntity? _selectedMaterial;
@@ -72,7 +88,6 @@ class AppState extends ChangeNotifier {
   AppScreen _scheduleReturnTo = AppScreen.profile;
   AppScreen _exchangeReturnTo = AppScreen.home;
   UserEntity? _currentUser;
-  ThemeMode _themeMode = ThemeMode.dark;
   bool _isLoggedIn = false;
   bool _restoringSession = true;
 
@@ -87,14 +102,13 @@ class AppState extends ChangeNotifier {
   /// The chat the meeting planner proposes into.
   ChatRoomEntity? get plannerRoom => _plannerRoom;
   UserEntity? get currentUser  => _currentUser;
-  ThemeMode get themeMode      => _themeMode;
+  ThemeMode get themeMode      => theme.themeMode;
   bool get isLoggedIn          => _isLoggedIn;
 
   /// True until the startup attempt to restore a stored session has finished.
   bool get restoringSession    => _restoringSession;
 
-  Brightness get brightness =>
-      _themeMode == ThemeMode.dark ? Brightness.dark : Brightness.light;
+  Brightness get brightness => theme.isDark ? Brightness.dark : Brightness.light;
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -229,14 +243,16 @@ class AppState extends ChangeNotifier {
     chats.dispose();
     account.dispose();
     schedule.dispose();
+    theme.removeListener(notifyListeners);
+    theme.dispose();
+    power.removeListener(_applyPowerSaving);
+    power.dispose();
     super.dispose();
   }
 
   // ── Theme ─────────────────────────────────────────────────────────────────
 
-  void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-    notifyListeners();
-  }
+  /// The sun/moon button: pins light or dark. Auto is chosen again in Profile → Appearance.
+  void toggleTheme() => theme.toggle();
 }
 
