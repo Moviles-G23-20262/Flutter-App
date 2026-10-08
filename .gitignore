@@ -108,3 +108,5 @@ xcuserdata/
 
 # Local test accounts for manual runs
 config/*.local.json
+CLAUDE.md
+.claude
