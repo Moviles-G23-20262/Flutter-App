@@ -95,7 +95,10 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
   }
 
   Future<void> _restoreSession() async {
-    final user = await _deps.restoreSession.execute();
+    // With a fingerprint enrolled and an account enrolled for it, the session is not restored by
+    // itself: the login screen offers "Quick Unlock", which signs in after the sensor verifies the user.
+    final lockedBehindFingerprint = await _deps.canQuickUnlock.execute() != null;
+    final user = lockedBehindFingerprint ? null : await _deps.restoreSession.execute();
     if (!mounted) return;
     // From here on a rejected token means the session expired mid-use: sign out.
     _deps.apiClient.onUnauthorized = _appState.logout;
@@ -134,7 +137,13 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
 
     switch (_appState.currentScreen) {
       case AppScreen.login:
-        return LoginScreen(appState: _appState, login: _deps.login);
+        return LoginScreen(
+          appState: _appState,
+          login: _deps.login,
+          canQuickUnlock: _deps.canQuickUnlock,
+          quickUnlock: _deps.quickUnlock,
+          forgetBiometrics: _deps.forgetBiometrics,
+        );
       case AppScreen.register:
         return RegisterScreen(appState: _appState, registerStudent: _deps.registerStudent);
       case AppScreen.materialDetail:
