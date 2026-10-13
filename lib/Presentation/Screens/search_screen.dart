@@ -22,6 +22,21 @@ class _SearchScreenState extends State<SearchScreen> {
   final _queryCtrl = TextEditingController();
   String _query       = '';
   _SearchFilters _filters = _SearchFilters();
+  late bool _wasOffline = widget.appState.connectivity.isOffline;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.appState.connectivity.addListener(_onConnectivityChanged);
+  }
+
+  /// Back online after being offline: sync the listings again without the user asking.
+  void _onConnectivityChanged() {
+    final offline = widget.appState.connectivity.isOffline;
+    final restored = _wasOffline && !offline;
+    _wasOffline = offline;
+    if (restored) widget.appState.marketplace.load();
+  }
 
   List<MaterialEntity> get _results {
     var list = widget.appState.marketplace.availableMaterials.where((m) {
@@ -54,6 +69,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    widget.appState.connectivity.removeListener(_onConnectivityChanged);
     _queryCtrl.dispose();
     super.dispose();
   }
@@ -61,7 +77,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.appState.marketplace,
+      listenable: Listenable.merge([widget.appState.marketplace, widget.appState.connectivity]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -78,6 +94,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Column(
       children: [
+        // ── Offline notice ──────────────────────────────────────────────────
+        if (widget.appState.connectivity.isOffline)
+          _OfflineBanner(onRetry: market.isLoading ? null : market.load),
+
         // ── Header ─────────────────────────────────────────────────────────
         Container(
           color: surface,
@@ -158,6 +178,50 @@ class _SearchScreenState extends State<SearchScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Slim notice shown while the device has no network: search keeps working on the listings
+/// already loaded. Disappears by itself when the connection returns.
+class _OfflineBanner extends StatelessWidget {
+  final Future<void> Function()? onRetry;
+
+  const _OfflineBanner({this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final warning = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.darkWarning
+        : AppColors.lightWarning;
+    return Material(
+      color: warning.withValues(alpha: 0.15),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: warning, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                "You're offline. Showing saved results.",
+                key: const Key('offline-banner-text'),
+                style: AppTextStyles.body(warning, fontSize: AppTextStyles.sizeXs),
+              ),
+            ),
+            TextButton(
+              key: const Key('offline-banner-retry'),
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                foregroundColor: warning,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Applied search filters (null category/condition means "All").
 class _SearchFilters {

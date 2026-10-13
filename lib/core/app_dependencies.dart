@@ -2,6 +2,8 @@ import 'package:http/http.dart' as http;
 
 import '../Data/data_sources/ambient_light_data_source.dart';
 import '../Data/data_sources/battery_data_source.dart';
+import '../Data/data_sources/connectivity_data_source.dart';
+import '../Domain/use_cases/connectivity_use_cases.dart';
 import '../Data/data_sources/analytics_remote_data_source.dart';
 import '../Data/Repositories/meeting_density_repository_impl.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
@@ -41,6 +43,10 @@ class AppDependencies {
 
   /// Battery level and charging state, for battery saver.
   final WatchBatteryUseCase watchBattery;
+
+  /// Network state, for the offline notice.
+  final GetConnectivityUseCase getConnectivity;
+  final WatchConnectivityUseCase watchConnectivity;
 
   /// Signs the app out when the server stops accepting our token.
   final ApiClient apiClient;
@@ -100,6 +106,8 @@ class AppDependencies {
     required this.loadThemePreference,
     required this.saveThemePreference,
     required this.watchBattery,
+    required this.getConnectivity,
+    required this.watchConnectivity,
   });
 
   factory AppDependencies.create() {
@@ -136,6 +144,7 @@ class AppDependencies {
     final scheduleRepository = ScheduleRepositoryImpl(meetupRemote);
     final locationRepository = LocationRepositoryImpl(DeviceLocationDataSource());
     final themePreferences = ThemePreferenceRepositoryImpl();
+    final connectivity = ConnectivityDataSource();
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -178,6 +187,8 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
+      getConnectivity: GetConnectivityUseCase(connectivity),
+      watchConnectivity: WatchConnectivityUseCase(connectivity),
     );
   }
 }

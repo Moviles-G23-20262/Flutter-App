@@ -6,6 +6,7 @@ import 'Presentation/State Management/chat_state.dart';
 import 'Presentation/State Management/marketplace_state.dart';
 import 'Presentation/State Management/schedule_state.dart';
 import 'Presentation/State Management/power_state.dart';
+import 'Presentation/State Management/connectivity_state.dart';
 import 'Presentation/State Management/theme_state.dart';
 import 'theme/app_theme.dart';
 import 'Presentation/Screens/login_screen.dart';
@@ -78,6 +79,10 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       savePreference: _deps.saveThemePreference,
     ),
     power: PowerState(watchBattery: _deps.watchBattery),
+    connectivity: ConnectivityState(
+      getConnectivity: _deps.getConnectivity,
+      watchConnectivity: _deps.watchConnectivity,
+    ),
   );
 
   @override
@@ -85,6 +90,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
     super.initState();
     _appState.theme.start();
     _appState.power.start();
+    _appState.connectivity.start();
     _restoreSession();
   }
 
