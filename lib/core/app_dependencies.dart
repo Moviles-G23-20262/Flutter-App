@@ -222,8 +222,9 @@ class AppDependencies {
         AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
       ),
       classifyItemPhoto: ClassifyItemPhotoUseCase(
-        // Optional Hugging Face token: --dart-define=HF_API_TOKEN=...
-        ExternalVisionService(client: http.Client(), apiToken: const String.fromEnvironment('HF_API_TOKEN')),
+        // Gemini API key, only from the run configuration (config/development.json:
+        // "VISION_API_KEY"), never in source control.
+        ExternalVisionService(client: http.Client(), apiKey: const String.fromEnvironment('VISION_API_KEY')),
       ),
       imagePicker: ImagePickerService(),
       estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
