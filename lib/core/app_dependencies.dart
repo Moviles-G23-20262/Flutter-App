@@ -6,6 +6,8 @@ import '../Data/data_sources/connectivity_data_source.dart';
 import '../Domain/use_cases/connectivity_use_cases.dart';
 import '../Data/data_sources/analytics_remote_data_source.dart';
 import '../Data/Repositories/meeting_density_repository_impl.dart';
+import '../Data/Repositories/price_stats_repository_impl.dart';
+import '../Domain/use_cases/price_estimator_use_case.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
 import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import '../Domain/use_cases/rank_meeting_points_use_case.dart';
@@ -45,6 +47,9 @@ class AppDependencies {
   final WatchBatteryUseCase watchBattery;
 
   /// Network state, for the offline notice.
+  /// Smart feature: fair-price estimate from real sales, with an offline heuristic.
+  final PriceEstimatorUseCase estimatePrice;
+
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
 
@@ -106,6 +111,7 @@ class AppDependencies {
     required this.loadThemePreference,
     required this.saveThemePreference,
     required this.watchBattery,
+    required this.estimatePrice,
     required this.getConnectivity,
     required this.watchConnectivity,
   });
@@ -187,6 +193,7 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
+      estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
       getConnectivity: GetConnectivityUseCase(connectivity),
       watchConnectivity: WatchConnectivityUseCase(connectivity),
     );
