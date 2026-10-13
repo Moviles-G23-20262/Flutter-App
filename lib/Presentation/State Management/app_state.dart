@@ -11,6 +11,7 @@ import 'marketplace_state.dart';
 import 'meeting_planner_state.dart';
 import 'schedule_state.dart';
 import 'power_state.dart';
+import 'connectivity_state.dart';
 import 'theme_state.dart';
 
 // ─── App Navigation State ─────────────────────────────────────────────────────
@@ -64,6 +65,9 @@ class AppState extends ChangeNotifier {
   /// Battery saver; slows the chat refreshes down on a low battery.
   final PowerState power;
 
+  /// Online/offline, so screens can show an offline notice and sync again on reconnect.
+  final ConnectivityState connectivity;
+
   AppState({
     this.onLogout,
     required this.marketplace,
@@ -73,6 +77,7 @@ class AppState extends ChangeNotifier {
     required this.meetups,
     required this.theme,
     required this.power,
+    required this.connectivity,
   }) {
     // A theme change repaints the whole app, so it goes through the app-wide notifier.
     theme.addListener(notifyListeners);
@@ -247,6 +252,7 @@ class AppState extends ChangeNotifier {
     theme.dispose();
     power.removeListener(_applyPowerSaving);
     power.dispose();
+    connectivity.dispose();
     super.dispose();
   }
 

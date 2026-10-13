@@ -28,7 +28,11 @@ import 'package:flutter_front_end/Domain/use_cases/marketplace_use_cases.dart';
 import 'package:flutter_front_end/Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import 'package:flutter_front_end/Domain/use_cases/meetup_use_cases.dart';
 import 'package:flutter_front_end/Domain/use_cases/rank_meeting_points_use_case.dart';
+import 'package:flutter_front_end/Domain/repositories/connectivity_repository.dart';
+import 'package:flutter_front_end/Domain/use_cases/connectivity_use_cases.dart';
 import 'package:flutter_front_end/Presentation/Screens/home_screen.dart';
+import 'package:flutter_front_end/Presentation/Screens/search_screen.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/connectivity_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/account_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/chat_state.dart';
@@ -379,6 +383,7 @@ class _World {
   );
 
   final battery = _TestBattery();
+  final network = _TestNetwork();
 
   late final scheduleState = ScheduleState(
     getSchedule: GetScheduleUseCase(scheduleRepo),
@@ -398,7 +403,22 @@ class _World {
       savePreference: SaveThemePreferenceUseCase(_NoSavedTheme()),
     ),
     power: PowerState(watchBattery: WatchBatteryUseCase(battery)),
+    connectivity: ConnectivityState(
+      getConnectivity: GetConnectivityUseCase(network),
+      watchConnectivity: WatchConnectivityUseCase(network),
+    ),
   );
+}
+
+class _TestNetwork implements ConnectivityRepository {
+  bool online = true;
+  final controller = StreamController<bool>.broadcast();
+
+  @override
+  Future<bool> isOnline() async => online;
+
+  @override
+  Stream<bool> watch() => controller.stream;
 }
 
 class _TestBattery implements BatteryRepository {
@@ -1055,6 +1075,87 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recovered Item'), findsOneWidget);
+      world.chatState.clear();
+    });
+  });
+
+  group('Search screen offline notice', () {
+    final me = UserEntity(
+      id: _me,
+      email: 'me@uniandes.edu.co',
+      fullName: 'Maria Santos',
+      major: 'CS',
+      rating: 4.8,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+    Future<_World> pumpSearch(WidgetTester tester, {bool online = true}) async {
+      final world = _World();
+      world.network.online = online;
+      world.materials.materials = [_material(id: 'a').copyWith(title: 'Server Textbook')];
+      await tester.binding.setSurfaceSize(const Size(420, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      world.appState.login(me);
+      world.appState.connectivity.start();
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(appState: world.appState))));
+      await tester.pumpAndSettle();
+      return world;
+    }
+
+    testWidgets('no banner while online', (tester) async {
+      final world = await pumpSearch(tester);
+
+      expect(find.byKey(const Key('offline-banner-text')), findsNothing);
+      expect(find.text('Server Textbook'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('losing the network shows the banner and keeps the results usable', (tester) async {
+      final world = await pumpSearch(tester);
+
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-banner-text')), findsOneWidget);
+      expect(find.text('Server Textbook'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      world.chatState.clear();
+    });
+
+    testWidgets('starting offline shows the banner', (tester) async {
+      final world = await pumpSearch(tester, online: false);
+
+      expect(find.byKey(const Key('offline-banner-text')), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('regaining the network hides the banner and syncs the listings again', (tester) async {
+      final world = await pumpSearch(tester);
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      world.materials.materials = [
+        _material(id: 'a').copyWith(title: 'Server Textbook'),
+        _material(id: 'b').copyWith(title: 'Fresh Listing'),
+      ];
+      world.network.controller.add(true);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-banner-text')), findsNothing);
+      expect(find.text('Fresh Listing'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('the banner Retry reloads the listings while still offline', (tester) async {
+      final world = await pumpSearch(tester);
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      world.materials.materials = [_material(id: 'c').copyWith(title: 'Retried Listing')];
+      await tester.tap(find.byKey(const Key('offline-banner-retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Retried Listing'), findsOneWidget);
       world.chatState.clear();
     });
   });
