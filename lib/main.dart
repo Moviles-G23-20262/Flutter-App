@@ -151,7 +151,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.newListing:
         return NewListingScreen(appState: _appState);
       case AppScreen.newListingSmart:
-        return NewListingSmartScreen(appState: _appState);
+        return NewListingSmartScreen(appState: _appState, estimator: _deps.estimatePrice);
       case AppScreen.confirmation:
         final order = _appState.selectedExchange;
         if (order == null) return AppShell(appState: _appState);

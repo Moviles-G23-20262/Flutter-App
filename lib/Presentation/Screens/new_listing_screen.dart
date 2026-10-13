@@ -39,7 +39,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
   bool get _aiReady => _images.isNotEmpty;
 
   /// Rough fair price from the chosen category and condition (no network, no real AI).
-  double get _suggestedPrice => _estimator.execute(category: _category, condition: _condition).suggestedPrice;
+  double get _suggestedPrice => _estimator.heuristic(category: _category, condition: _condition).suggestedPrice;
 
   double? get _price => double.tryParse(_priceCtrl.text.trim().replaceAll(',', '.'));
 

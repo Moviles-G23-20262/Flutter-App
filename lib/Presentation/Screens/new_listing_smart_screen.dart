@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
+import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
 import '../../Domain/use_cases/price_estimator_use_case.dart';
@@ -13,7 +14,14 @@ import '../../Domain/use_cases/price_estimator_use_case.dart';
 class NewListingSmartScreen extends StatefulWidget {
   final AppState appState;
 
-  const NewListingSmartScreen({super.key, required this.appState});
+  /// Fair-price estimator; defaults to the offline heuristic when none is injected.
+  final PriceEstimatorUseCase estimator;
+
+  const NewListingSmartScreen({
+    super.key,
+    required this.appState,
+    this.estimator = const PriceEstimatorUseCase(),
+  });
 
   @override
   State<NewListingSmartScreen> createState() => _NewListingSmartScreenState();
@@ -21,12 +29,14 @@ class NewListingSmartScreen extends StatefulWidget {
 
 class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   final _picker = ImagePicker();
-  final _estimator = const PriceEstimatorUseCase();
+  final _priceCtrl = TextEditingController();
 
   Uint8List? _imageBytes; // Instead, we compress the image and read it directly into memory as a Uint8List ->>> line 42
   MaterialCategoryEnum _category = MaterialCategoryEnum.BOOKS;
   MaterialConditionEnum _condition = MaterialConditionEnum.GOOD;
   PriceEstimate? _estimate;
+  bool _estimating = false;
+  int _estimateRequest = 0; // lets a late answer be ignored after the user changed the item
 
 // Architecturally, we chose not to save this image to the device's physical storage to respect the user's space
 // ->>>>>>> line 26
@@ -50,23 +60,37 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   }
 
 
-// the user triggers this calculation, and the range is rendered on a card ->>>>>>> line 60
-  void _suggestPrice() {
+// The user triggers this: the estimator asks the analytics service for the p25 / median / p75 of
+// real sales and falls back to a local heuristic offline or with too few sales, so it never fails.
+  Future<void> _suggestPrice() async {
+    final request = ++_estimateRequest;
+    setState(() => _estimating = true);
+    final estimate = await widget.estimator.execute(category: _category, condition: _condition);
+    if (!mounted || request != _estimateRequest) return;
     setState(() {
-      _estimate = _estimator.execute(category: _category, condition: _condition);
+      _estimate = estimate;
+      _estimating = false;
     });
   }
 
-// The key architectural decision here is a Performance Tactic: 
-// by running this estimation locally on the client's processor, we provide
-// instant, zero-latency feedback without relying on expensive HTTP calls to the backend, 
-// preserving mobile data and battery.
-// ->>>>>>> BQ 2: analytics-back-end. In analytics/views.py, between lines 152 and 178
+  void _applySuggestion() {
+    final estimate = _estimate;
+    if (estimate == null) return;
+    setState(() => _priceCtrl.text = estimate.suggestedPrice.round().toString());
+  }
+
+  @override
+  void dispose() {
+    _priceCtrl.dispose();
+    super.dispose();
+  }
 
   void _resetEstimate(VoidCallback change) {
+    _estimateRequest++; // drop any answer still on its way
     setState(() {
       change();
       _estimate = null;
+      _estimating = false;
     });
   }
 
@@ -188,13 +212,27 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                     label: 'Suggest Fair Price',
                     fullWidth: true,
                     leadingIcon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
-                    onPressed: _suggestPrice,
+                    isLoading: _estimating,
+                    onPressed: _estimating ? null : _suggestPrice,
                   ),
 
                   if (_estimate != null) ...[
                     const SizedBox(height: 16),
-                    _EstimateCard(estimate: _estimate!),
+                    _EstimateCard(estimate: _estimate!, onApply: _applySuggestion),
                   ],
+                  const SizedBox(height: 20),
+
+                  // ── Price ────────────────────────────────────────────────
+                  Text('Your price (COP)',
+                      style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 6),
+                  AppTextField(
+                    key: const Key('smart-price-field'),
+                    placeholder: 'e.g. 35000',
+                    controller: _priceCtrl,
+                    keyboardType: TextInputType.number,
+                    prefixIcon: Icon(Icons.attach_money_rounded, color: txMuted, size: 18),
+                  ),
                 ],
               ),
             ),
@@ -209,8 +247,20 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
 
 class _EstimateCard extends StatelessWidget {
   final PriceEstimate estimate;
+  final VoidCallback onApply;
 
-  const _EstimateCard({required this.estimate});
+  const _EstimateCard({required this.estimate, required this.onApply});
+
+  String get _sourceLabel {
+    switch (estimate.source) {
+      case PriceEstimateSource.realSales:
+        return 'Based on ${estimate.sampleSize} real sale${estimate.sampleSize == 1 ? '' : 's'}';
+      case PriceEstimateSource.offlineHeuristic:
+        return 'Heuristic estimate, no connection to sales data';
+      case PriceEstimateSource.lowSampleHeuristic:
+        return 'Heuristic estimate, not enough sales yet';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -227,16 +277,34 @@ class _EstimateCard extends StatelessWidget {
           Text('Recommended price',
               style: AppTextStyles.body(onHero.withValues(alpha: 0.8), fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text('\$${estimate.suggestedPrice.toStringAsFixed(2)}',
+          Text(copPrice(estimate.suggestedPrice),
+              key: const Key('estimate-price'),
               style: AppTextStyles.mono(onHero, fontSize: AppTextStyles.sizeXl, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           Text(
-            'Historical range (p25–p75): \$${estimate.p25.toStringAsFixed(2)} – \$${estimate.p75.toStringAsFixed(2)}',
+            'Fair range (p25–p75): ${copPrice(estimate.p25)} – ${copPrice(estimate.p75)}',
+            key: const Key('estimate-range'),
             style: AppTextStyles.mono(onHero.withValues(alpha: 0.85), fontSize: AppTextStyles.sizeXs),
           ),
           const SizedBox(height: 8),
-          Text('Simulated estimate based on category and condition.',
-              style: AppTextStyles.body(onHero.withValues(alpha: 0.6), fontSize: AppTextStyles.size2xs)),
+          Row(
+            children: [
+              Icon(estimate.isHeuristic ? Icons.cloud_off_rounded : Icons.verified_rounded,
+                  size: 14, color: onHero.withValues(alpha: 0.8)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(_sourceLabel,
+                    key: const Key('estimate-source'),
+                    style: AppTextStyles.body(onHero.withValues(alpha: 0.8), fontSize: AppTextStyles.size2xs)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SecondaryButton(
+            key: const Key('apply-suggested-price'),
+            label: 'Use this price',
+            onPressed: onApply,
+          ),
         ],
       ),
     );
