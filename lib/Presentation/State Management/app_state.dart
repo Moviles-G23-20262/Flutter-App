@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
 import '../../Domain/Entities/exchange_entity.dart';
+import '../../Domain/Entities/enums.dart';
 import '../../Domain/Entities/material_entity.dart';
 import '../../Domain/use_cases/meetup_use_cases.dart';
 import '../../Domain/Entities/user_entity.dart';
@@ -11,6 +12,8 @@ import 'marketplace_state.dart';
 import 'meeting_planner_state.dart';
 import 'schedule_state.dart';
 import 'power_state.dart';
+import 'connectivity_state.dart';
+import '../../Domain/use_cases/track_event_use_case.dart';
 import 'theme_state.dart';
 
 // ─── App Navigation State ─────────────────────────────────────────────────────
@@ -28,7 +31,6 @@ enum AppScreen {
   notifications,
   sellerHub,
   newListing,
-  newListingSmart,
 
   /// "Order Placed", right after buying.
   confirmation,
@@ -64,6 +66,12 @@ class AppState extends ChangeNotifier {
   /// Battery saver; slows the chat refreshes down on a low battery.
   final PowerState power;
 
+  /// Online/offline, so screens can show an offline notice and sync again on reconnect.
+  final ConnectivityState connectivity;
+
+  /// Telemetry for LISTING_VIEW and CONTACT_SELLER; never blocks or fails.
+  final TrackEventUseCase trackEvent;
+
   AppState({
     this.onLogout,
     required this.marketplace,
@@ -73,6 +81,8 @@ class AppState extends ChangeNotifier {
     required this.meetups,
     required this.theme,
     required this.power,
+    required this.connectivity,
+    required this.trackEvent,
   }) {
     // A theme change repaints the whole app, so it goes through the app-wide notifier.
     theme.addListener(notifyListeners);
@@ -118,6 +128,10 @@ class AppState extends ChangeNotifier {
   }
 
   void openMaterialDetail(MaterialEntity material) {
+    // Opening someone else's listing is a view; looking at your own is not.
+    if (_currentUser != null && material.sellerId != _currentUser?.id) {
+      trackEvent.execute(AnalyticsEventType.LISTING_VIEW, materialId: material.id);
+    }
     _selectedMaterial = material;
     _currentScreen = AppScreen.materialDetail;
     notifyListeners();
@@ -204,6 +218,11 @@ class AppState extends ChangeNotifier {
     if (material.sellerId == _currentUser?.id) return 'This is your own listing.';
     try {
       final room = await chats.openRoomFor(material.id);
+      trackEvent.execute(
+        AnalyticsEventType.CONTACT_SELLER,
+        materialId: material.id,
+        metadata: {'chatRoomId': room.id},
+      );
       openChat(room.id);
       return null;
     } on DataException catch (e) {
@@ -247,6 +266,7 @@ class AppState extends ChangeNotifier {
     theme.dispose();
     power.removeListener(_applyPowerSaving);
     power.dispose();
+    connectivity.dispose();
     super.dispose();
   }
 

@@ -2,8 +2,21 @@ import 'package:http/http.dart' as http;
 
 import '../Data/data_sources/ambient_light_data_source.dart';
 import '../Data/data_sources/battery_data_source.dart';
+import '../Data/data_sources/connectivity_data_source.dart';
+import '../Domain/use_cases/connectivity_use_cases.dart';
 import '../Data/data_sources/analytics_remote_data_source.dart';
 import '../Data/Repositories/meeting_density_repository_impl.dart';
+import '../Data/Repositories/price_stats_repository_impl.dart';
+import '../Data/Repositories/analytics_event_repository_impl.dart';
+import '../Data/data_sources/analytics_event_remote_data_source.dart';
+import '../Domain/use_cases/track_event_use_case.dart';
+import '../Domain/use_cases/price_estimator_use_case.dart';
+import '../Presentation/ViewModels/smart_listing_view_model.dart';
+import '../Data/services/biometric_auth_service.dart';
+import '../Data/services/external_vision_service.dart';
+import '../Domain/use_cases/quick_unlock_use_cases.dart';
+import '../Data/services/image_picker_service.dart';
+import '../Domain/use_cases/classify_item_photo_use_case.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
 import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import '../Domain/use_cases/rank_meeting_points_use_case.dart';
@@ -32,6 +45,11 @@ class AppDependencies {
   final LoginUseCase login;
   final RegisterStudentUseCase registerStudent;
   final RestoreSessionUseCase restoreSession;
+
+  /// Fingerprint "Quick Unlock" of a saved session.
+  final CanQuickUnlockUseCase canQuickUnlock;
+  final QuickUnlockUseCase quickUnlock;
+  final ForgetBiometricsUseCase forgetBiometrics;
   final LogoutUseCase logout;
 
   /// Theme: ambient light sensor and the saved light/dark/auto choice.
@@ -41,6 +59,20 @@ class AppDependencies {
 
   /// Battery level and charging state, for battery saver.
   final WatchBatteryUseCase watchBattery;
+
+  /// Network state, for the offline notice.
+  /// Smart feature: fair-price estimate from real sales, with an offline heuristic.
+  final PriceEstimatorUseCase estimatePrice;
+
+  /// Smart feature: category from a photo, via the external vision service.
+  final ClassifyItemPhotoUseCase classifyItemPhoto;
+  final ImagePickerService imagePicker;
+
+  /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
+  final TrackEventUseCase trackEvent;
+
+  final GetConnectivityUseCase getConnectivity;
+  final WatchConnectivityUseCase watchConnectivity;
 
   /// Signs the app out when the server stops accepting our token.
   final ApiClient apiClient;
@@ -72,6 +104,9 @@ class AppDependencies {
     required this.login,
     required this.registerStudent,
     required this.restoreSession,
+    required this.canQuickUnlock,
+    required this.quickUnlock,
+    required this.forgetBiometrics,
     required this.logout,
     required this.apiClient,
     required this.getMaterials,
@@ -100,7 +135,21 @@ class AppDependencies {
     required this.loadThemePreference,
     required this.saveThemePreference,
     required this.watchBattery,
+    required this.estimatePrice,
+    required this.classifyItemPhoto,
+    required this.imagePicker,
+    required this.trackEvent,
+    required this.getConnectivity,
+    required this.watchConnectivity,
   });
+
+  /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
+  SmartListingViewModel createSmartListingViewModel({PublishListing? publish}) => SmartListingViewModel(
+        estimator: estimatePrice,
+        pickPhoto: imagePicker.pick,
+        classifyPhoto: classifyItemPhoto,
+        publishListing: publish,
+      );
 
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
@@ -121,8 +170,11 @@ class AppDependencies {
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
       storage: SecureSessionStorage(),
+      biometricStorage: SecureBiometricCredentialStorage(),
       apiClient: apiClient,
     );
+
+    final biometrics = BiometricAuthService();
 
     final marketplaceRemote = MarketplaceRemoteDataSourceImpl(apiClient: apiClient);
     final materials = MaterialRepositoryImpl(marketplaceRemote);
@@ -136,11 +188,15 @@ class AppDependencies {
     final scheduleRepository = ScheduleRepositoryImpl(meetupRemote);
     final locationRepository = LocationRepositoryImpl(DeviceLocationDataSource());
     final themePreferences = ThemePreferenceRepositoryImpl();
+    final connectivity = ConnectivityDataSource();
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
       registerStudent: RegisterStudentUseCase(authRepository),
       restoreSession: RestoreSessionUseCase(authRepository),
+      canQuickUnlock: CanQuickUnlockUseCase(biometrics: biometrics, auth: authRepository),
+      quickUnlock: QuickUnlockUseCase(biometrics: biometrics, auth: authRepository),
+      forgetBiometrics: ForgetBiometricsUseCase(authRepository),
       logout: LogoutUseCase(authRepository),
       apiClient: apiClient,
       getMaterials: GetMaterialsUseCase(materials),
@@ -178,6 +234,18 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
+      trackEvent: TrackEventUseCase(
+        AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
+      ),
+      classifyItemPhoto: ClassifyItemPhotoUseCase(
+        // Gemini API key, only from the run configuration (config/development.json:
+        // "VISION_API_KEY"), never in source control.
+        ExternalVisionService(client: http.Client(), apiKey: const String.fromEnvironment('VISION_API_KEY')),
+      ),
+      imagePicker: ImagePickerService(),
+      estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
+      getConnectivity: GetConnectivityUseCase(connectivity),
+      watchConnectivity: WatchConnectivityUseCase(connectivity),
     );
   }
 }

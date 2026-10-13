@@ -14,6 +14,12 @@ final class EmailAlreadyRegisteredException extends AuthException {
       : super('An account with this email already exists.');
 }
 
+/// The login form was filled in wrongly (bad email format, emojis, short password...).
+/// Raised before any request is made.
+final class InvalidLoginInputException extends AuthException {
+  const InvalidLoginInputException(super.message);
+}
+
 final class InvalidCredentialsException extends AuthException {
   const InvalidCredentialsException() : super('Incorrect email or password.');
 }

@@ -21,7 +21,22 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _queryCtrl = TextEditingController();
   String _query       = '';
-  _SearchFilters _filters = const _SearchFilters();
+  _SearchFilters _filters = _SearchFilters();
+  late bool _wasOffline = widget.appState.connectivity.isOffline;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.appState.connectivity.addListener(_onConnectivityChanged);
+  }
+
+  /// Back online after being offline: sync the listings again without the user asking.
+  void _onConnectivityChanged() {
+    final offline = widget.appState.connectivity.isOffline;
+    final restored = _wasOffline && !offline;
+    _wasOffline = offline;
+    if (restored) widget.appState.marketplace.load();
+  }
 
   List<MaterialEntity> get _results {
     var list = widget.appState.marketplace.availableMaterials.where((m) {
@@ -54,6 +69,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    widget.appState.connectivity.removeListener(_onConnectivityChanged);
     _queryCtrl.dispose();
     super.dispose();
   }
@@ -61,7 +77,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.appState.marketplace,
+      listenable: Listenable.merge([widget.appState.marketplace, widget.appState.connectivity]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -78,6 +94,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Column(
       children: [
+        // ── Offline notice ──────────────────────────────────────────────────
+        if (widget.appState.connectivity.isOffline)
+          _OfflineBanner(onRetry: market.isLoading ? null : market.load),
+
         // ── Header ─────────────────────────────────────────────────────────
         Container(
           color: surface,
@@ -99,11 +119,6 @@ class _SearchScreenState extends State<SearchScreen> {
                       onChanged: (v) => setState(() => _query = v),
                       prefixIcon: Icon(Icons.search_rounded, color: txMuted, size: 18),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  AppIconButton(
-                    icon: Icon(Icons.photo_camera_outlined, color: txSecondary, size: 18),
-                    onTap: () => widget.appState.navigateTo(AppScreen.newListingSmart),
                   ),
                   const SizedBox(width: 8),
                   AppIconButton(
@@ -159,6 +174,50 @@ class _SearchScreenState extends State<SearchScreen> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Slim notice shown while the device has no network: search keeps working on the listings
+/// already loaded. Disappears by itself when the connection returns.
+class _OfflineBanner extends StatelessWidget {
+  final Future<void> Function()? onRetry;
+
+  const _OfflineBanner({this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final warning = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.darkWarning
+        : AppColors.lightWarning;
+    return Material(
+      color: warning.withValues(alpha: 0.15),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: warning, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                "You're offline. Showing saved results.",
+                key: const Key('offline-banner-text'),
+                style: AppTextStyles.body(warning, fontSize: AppTextStyles.sizeXs),
+              ),
+            ),
+            TextButton(
+              key: const Key('offline-banner-retry'),
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 28),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                foregroundColor: warning,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Applied search filters (null category/condition means "All").
 class _SearchFilters {
   /// Prices are in COP. The slider's top value means "any price", so nothing is hidden by default.
@@ -171,12 +230,12 @@ class _SearchFilters {
   final double maxPrice;
   final SortStrategy sort;
 
-  const _SearchFilters({
+  _SearchFilters({
     this.category,
     this.condition,
     this.maxPrice = defaultMaxPrice,
-    this.sort = const RelevanceSortStrategy(),
-  });
+    SortStrategy? sort,
+  }) : sort = sort ?? SortStrategyFactory.create(SortStrategyFactory.defaultKind);
 
   bool get hasPriceLimit => maxPrice < defaultMaxPrice;
 
@@ -184,7 +243,7 @@ class _SearchFilters {
       category != null ||
       condition != null ||
       hasPriceLimit ||
-      sort.id != const RelevanceSortStrategy().id;
+      sort.id != SortStrategyFactory.create(SortStrategyFactory.defaultKind).id;
 }
 
 // ─── Filter bottom sheet (View 06) ───────────────────────────────────────────
@@ -208,7 +267,7 @@ class _FilterSheetState extends State<_FilterSheet> {
         _category = null;
         _condition = null;
         _maxPrice = _SearchFilters.defaultMaxPrice;
-        _sort = kSortStrategies.first;
+        _sort = SortStrategyFactory.create(SortStrategyFactory.defaultKind);
       });
 
   void _apply() => Navigator.of(context).pop(_SearchFilters(
@@ -311,7 +370,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final s in kSortStrategies)
+                  for (final s in SortStrategyFactory.all)
                     PillChip(label: s.label, active: _sort.id == s.id, onTap: () => setState(() => _sort = s)),
                 ],
               ),
