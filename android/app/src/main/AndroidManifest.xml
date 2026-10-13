@@ -4,6 +4,8 @@
     <!-- Walking time to campus meeting points -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Smart Listing: photo of the item taken with the camera -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="flutter_front_end"
         android:name="${applicationName}"

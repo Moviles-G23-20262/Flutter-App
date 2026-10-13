@@ -122,11 +122,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(width: 8),
                   AppIconButton(
-                    icon: Icon(Icons.photo_camera_outlined, color: txSecondary, size: 18),
-                    onTap: () => widget.appState.navigateTo(AppScreen.newListingSmart),
-                  ),
-                  const SizedBox(width: 8),
-                  AppIconButton(
                     icon: Icon(Icons.filter_alt_rounded,
                         color: _filters.isActive ? Colors.white : txSecondary, size: 18),
                     active: _filters.isActive,

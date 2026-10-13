@@ -17,7 +17,6 @@ import 'Presentation/Screens/material_detail_screen.dart';
 import 'Presentation/Screens/messages_screen.dart';
 import 'Presentation/Screens/profile_screen.dart';
 import 'Presentation/Screens/seller_hub_screen.dart';
-import 'Presentation/Screens/new_listing_screen.dart';
 import 'Presentation/Screens/new_listing_smart_screen.dart';
 import 'Presentation/Screens/complete_exchange_screen.dart';
 import 'Presentation/Screens/confirmation_screen.dart';
@@ -150,11 +149,11 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.sellerHub:
         return SellerHubScreen(appState: _appState);
       case AppScreen.newListing:
-        return NewListingScreen(appState: _appState);
-      case AppScreen.newListingSmart:
         return NewListingSmartScreen(
           appState: _appState,
-          viewModelFactory: _deps.createSmartListingViewModel,
+          viewModelFactory: () => _deps.createSmartListingViewModel(
+            publish: _appState.marketplace.publish,
+          ),
         );
       case AppScreen.confirmation:
         final order = _appState.selectedExchange;

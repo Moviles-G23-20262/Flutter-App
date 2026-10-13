@@ -12,6 +12,9 @@ import '../Data/data_sources/analytics_event_remote_data_source.dart';
 import '../Domain/use_cases/track_event_use_case.dart';
 import '../Domain/use_cases/price_estimator_use_case.dart';
 import '../Presentation/ViewModels/smart_listing_view_model.dart';
+import '../Data/services/external_vision_service.dart';
+import '../Data/services/image_picker_service.dart';
+import '../Domain/use_cases/classify_item_photo_use_case.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
 import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import '../Domain/use_cases/rank_meeting_points_use_case.dart';
@@ -53,6 +56,10 @@ class AppDependencies {
   /// Network state, for the offline notice.
   /// Smart feature: fair-price estimate from real sales, with an offline heuristic.
   final PriceEstimatorUseCase estimatePrice;
+
+  /// Smart feature: category from a photo, via the external vision service.
+  final ClassifyItemPhotoUseCase classifyItemPhoto;
+  final ImagePickerService imagePicker;
 
   /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
   final TrackEventUseCase trackEvent;
@@ -119,13 +126,20 @@ class AppDependencies {
     required this.saveThemePreference,
     required this.watchBattery,
     required this.estimatePrice,
+    required this.classifyItemPhoto,
+    required this.imagePicker,
     required this.trackEvent,
     required this.getConnectivity,
     required this.watchConnectivity,
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
-  SmartListingViewModel createSmartListingViewModel() => SmartListingViewModel(estimator: estimatePrice);
+  SmartListingViewModel createSmartListingViewModel({PublishListing? publish}) => SmartListingViewModel(
+        estimator: estimatePrice,
+        pickPhoto: imagePicker.pick,
+        classifyPhoto: classifyItemPhoto,
+        publishListing: publish,
+      );
 
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
@@ -207,6 +221,11 @@ class AppDependencies {
       trackEvent: TrackEventUseCase(
         AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
       ),
+      classifyItemPhoto: ClassifyItemPhotoUseCase(
+        // Optional Hugging Face token: --dart-define=HF_API_TOKEN=...
+        ExternalVisionService(client: http.Client(), apiToken: const String.fromEnvironment('HF_API_TOKEN')),
+      ),
+      imagePicker: ImagePickerService(),
       estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
       getConnectivity: GetConnectivityUseCase(connectivity),
       watchConnectivity: WatchConnectivityUseCase(connectivity),

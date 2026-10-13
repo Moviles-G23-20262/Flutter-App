@@ -1166,6 +1166,14 @@ void main() {
       return world;
     }
 
+    testWidgets('the search bar only searches: no camera shortcut to the sell flow', (tester) async {
+      final world = await pumpSearch(tester);
+
+      expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
+      expect(find.byIcon(Icons.filter_alt_rounded), findsOneWidget);
+      world.chatState.clear();
+    });
+
     testWidgets('no banner while online', (tester) async {
       final world = await pumpSearch(tester);
 
