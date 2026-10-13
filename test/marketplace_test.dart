@@ -6,7 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_front_end/Data/Models/marketplace_models.dart';
 import 'package:flutter_front_end/Data/Repositories/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/Data/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/Domain/Entities/analytics_event.dart';
 import 'package:flutter_front_end/Domain/Entities/chat_room_entity.dart';
+import 'package:flutter_front_end/Domain/Entities/enums.dart';
+import 'package:flutter_front_end/Domain/repositories/analytics_event_repository.dart';
+import 'package:flutter_front_end/Domain/use_cases/track_event_use_case.dart';
 import 'package:flutter_front_end/Domain/Entities/conversation_insight.dart';
 import 'package:flutter_front_end/Domain/Entities/exchange_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
@@ -384,6 +388,7 @@ class _World {
 
   final battery = _TestBattery();
   final network = _TestNetwork();
+  final tracker = _FakeTracker();
 
   late final scheduleState = ScheduleState(
     getSchedule: GetScheduleUseCase(scheduleRepo),
@@ -403,11 +408,19 @@ class _World {
       savePreference: SaveThemePreferenceUseCase(_NoSavedTheme()),
     ),
     power: PowerState(watchBattery: WatchBatteryUseCase(battery)),
+    trackEvent: TrackEventUseCase(tracker),
     connectivity: ConnectivityState(
       getConnectivity: GetConnectivityUseCase(network),
       watchConnectivity: WatchConnectivityUseCase(network),
     ),
   );
+}
+
+class _FakeTracker implements AnalyticsEventRepository {
+  final events = <AnalyticsEvent>[];
+
+  @override
+  Future<void> track(AnalyticsEvent event) async => events.add(event);
 }
 
 class _TestNetwork implements ConnectivityRepository {
@@ -699,6 +712,57 @@ void main() {
       expect(world.accountState.swapCountOf(_me), 1);
       expect(world.accountState.earnedThisMonth(_me, now: DateTime(2026, 9, 20)), 18);
       expect(world.accountState.pendingOrderFor('m1', _other)?.id, 'p');
+    });
+  });
+
+  group('Telemetry wiring', () {
+    test("opening someone else's listing records LISTING_VIEW for it", () {
+      final world = _World();
+      world.appState.login(_user());
+
+      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _other));
+
+      expect(world.tracker.events.map((e) => e.type), [AnalyticsEventType.LISTING_VIEW]);
+      expect(world.tracker.events.single.materialId, 'm5');
+      expect(world.appState.currentScreen, AppScreen.materialDetail);
+      world.chatState.clear();
+    });
+
+    test('looking at your own listing is not a view', () {
+      final world = _World();
+      world.appState.login(_user());
+
+      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _me));
+
+      expect(world.tracker.events, isEmpty);
+      world.chatState.clear();
+    });
+
+    test('messaging the seller records CONTACT_SELLER with the chat room', () async {
+      final world = _World();
+      world.chats.rooms = [
+        ChatRoomEntity(id: 'r1', materialId: 'm5', buyerId: _me, sellerId: _other, createdAt: DateTime(2026, 9, 1)),
+      ];
+      world.appState.login(_user());
+
+      final error = await world.appState.messageSeller(_material(id: 'm5', sellerId: _other));
+
+      expect(error, isNull);
+      final event = world.tracker.events.single;
+      expect(event.type, AnalyticsEventType.CONTACT_SELLER);
+      expect(event.materialId, 'm5');
+      expect(event.metadata, {'chatRoomId': 'r1'});
+      world.chatState.clear();
+    });
+
+    test('messaging your own listing records nothing', () async {
+      final world = _World();
+      world.appState.login(_user());
+
+      await world.appState.messageSeller(_material(id: 'm5', sellerId: _me));
+
+      expect(world.tracker.events, isEmpty);
+      world.chatState.clear();
     });
   });
 

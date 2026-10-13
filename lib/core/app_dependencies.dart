@@ -7,6 +7,9 @@ import '../Domain/use_cases/connectivity_use_cases.dart';
 import '../Data/data_sources/analytics_remote_data_source.dart';
 import '../Data/Repositories/meeting_density_repository_impl.dart';
 import '../Data/Repositories/price_stats_repository_impl.dart';
+import '../Data/Repositories/analytics_event_repository_impl.dart';
+import '../Data/data_sources/analytics_event_remote_data_source.dart';
+import '../Domain/use_cases/track_event_use_case.dart';
 import '../Domain/use_cases/price_estimator_use_case.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
 import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
@@ -49,6 +52,9 @@ class AppDependencies {
   /// Network state, for the offline notice.
   /// Smart feature: fair-price estimate from real sales, with an offline heuristic.
   final PriceEstimatorUseCase estimatePrice;
+
+  /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
+  final TrackEventUseCase trackEvent;
 
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
@@ -112,6 +118,7 @@ class AppDependencies {
     required this.saveThemePreference,
     required this.watchBattery,
     required this.estimatePrice,
+    required this.trackEvent,
     required this.getConnectivity,
     required this.watchConnectivity,
   });
@@ -193,6 +200,9 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
+      trackEvent: TrackEventUseCase(
+        AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
+      ),
       estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
       getConnectivity: GetConnectivityUseCase(connectivity),
       watchConnectivity: WatchConnectivityUseCase(connectivity),
