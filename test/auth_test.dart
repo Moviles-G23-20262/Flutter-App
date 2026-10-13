@@ -32,12 +32,16 @@ const _registration = RegistrationData(
 
 class _MemoryStorage implements SessionStorage {
   String? token;
+  bool failToSave = false;
 
   @override
   Future<String?> readToken() async => token;
 
   @override
-  Future<void> saveToken(String value) async => token = value;
+  Future<void> saveToken(String value) async {
+    if (failToSave) throw StateError('secure storage unavailable');
+    token = value;
+  }
 
   @override
   Future<void> clear() async => token = null;
@@ -90,7 +94,7 @@ void main() {
     test('normalizes the email and accepts non-institutional domains', () async {
       final repository = _RecordingRepository();
 
-      await LoginUseCase(repository).execute(email: '  Maria@University.EDU ', password: 'pw');
+      await LoginUseCase(repository).execute(email: '  Maria@University.EDU ', password: 'password1');
 
       expect(repository.received?.email, 'maria@university.edu');
     });
@@ -99,9 +103,35 @@ void main() {
       final repository = _RecordingRepository();
 
       await expectLater(
-        LoginUseCase(repository).execute(email: '', password: 'pw'),
-        throwsA(isA<InvalidCredentialsException>()),
+        LoginUseCase(repository).execute(email: '', password: 'password1'),
+        throwsA(isA<InvalidLoginInputException>()),
       );
+      await expectLater(
+        LoginUseCase(repository).execute(email: 'a@b.co', password: ''),
+        throwsA(isA<InvalidLoginInputException>()),
+      );
+      expect(repository.received, isNull);
+    });
+
+    test('rejects malformed emails, emojis and weak passwords without calling the repository', () async {
+      final repository = _RecordingRepository();
+      final useCase = LoginUseCase(repository);
+      const bad = [
+        ('not-an-email', 'password1'),
+        ('a@b', 'password1'),
+        ('a b@c.co', 'password1'),
+        ('ana😀@uniandes.edu.co', 'password1'),
+        ('ana@uniandes.edu.co', '        '),
+        ('ana@uniandes.edu.co', 'pass😀word1'),
+        ('ana@uniandes.edu.co', 'short'),
+      ];
+      for (final (email, password) in bad) {
+        await expectLater(
+          useCase.execute(email: email, password: password),
+          throwsA(isA<InvalidLoginInputException>()),
+          reason: '$email / $password',
+        );
+      }
       expect(repository.received, isNull);
     });
   });
@@ -128,6 +158,16 @@ void main() {
       expect(user.id, 'user-1');
       expect(storage.token, 'jwt-token');
       expect(apiClient.authToken, 'jwt-token');
+    });
+
+    test('login still succeeds when the token cannot be saved on the device', () async {
+      storage.failToSave = true;
+
+      final user = await repository.login(email: 'a@b.co', password: 'pw');
+
+      expect(user.id, 'user-1');
+      expect(apiClient.authToken, 'jwt-token', reason: 'the current session works');
+      expect(storage.token, isNull, reason: 'it just will not survive a restart');
     });
 
     test('register signs the user in too', () async {
