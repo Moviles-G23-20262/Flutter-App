@@ -79,6 +79,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       savePreference: _deps.saveThemePreference,
     ),
     power: PowerState(watchBattery: _deps.watchBattery),
+    trackEvent: _deps.trackEvent,
     connectivity: ConnectivityState(
       getConnectivity: _deps.getConnectivity,
       watchConnectivity: _deps.watchConnectivity,
