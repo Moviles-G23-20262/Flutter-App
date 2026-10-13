@@ -8,6 +8,7 @@ import 'package:flutter_front_end/Domain/repositories/price_stats_repository.dar
 import 'package:flutter_front_end/Domain/use_cases/price_estimator_use_case.dart';
 import 'package:flutter_front_end/Presentation/Screens/new_listing_smart_screen.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
+import 'package:flutter_front_end/Presentation/ViewModels/smart_listing_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeStats implements PriceStatsRepository {
@@ -171,16 +172,25 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: NewListingSmartScreen(
           appState: _NoApp(),
-          estimator: PriceEstimatorUseCase(repository: repo),
+          viewModelFactory: () => SmartListingViewModel(
+            estimator: PriceEstimatorUseCase(repository: repo),
+          ),
         ),
       ));
       return repo;
+    }
+
+    Future<void> choose(WidgetTester tester) async {
+      await tester.tap(find.text(MaterialCategoryEnum.BOOKS.displayName));
+      await tester.tap(find.text(MaterialConditionEnum.GOOD.displayName));
+      await tester.pump();
     }
 
     testWidgets('shows the real-sales estimate and applies it with one tap', (tester) async {
       final repo = await pump(tester);
       repo.stats = const PriceStats(sampleSize: 9, p25: 20000, median: 30000, p75: 42000);
 
+      await choose(tester);
       await tester.tap(find.text('Suggest Fair Price'));
       await tester.pumpAndSettle();
 
@@ -204,6 +214,7 @@ void main() {
       final repo = await pump(tester);
       repo.error = Exception('no connection');
 
+      await choose(tester);
       await tester.tap(find.text('Suggest Fair Price'));
       await tester.pumpAndSettle();
 
@@ -212,9 +223,19 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('the button needs a category and a condition', (tester) async {
+      await pump(tester);
+
+      await tester.tap(find.text('Suggest Fair Price'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('estimate-price')), findsNothing);
+    });
+
     testWidgets('changing the condition clears the estimate', (tester) async {
       final repo = await pump(tester);
       repo.stats = const PriceStats(sampleSize: 9, p25: 20000, median: 30000, p75: 42000);
+      await choose(tester);
       await tester.tap(find.text('Suggest Fair Price'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('estimate-price')), findsOneWidget);
