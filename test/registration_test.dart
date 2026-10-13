@@ -31,6 +31,18 @@ class _FakeAuthRepository implements AuthRepository {
   Future<UserEntity?> restoreSession() async => null;
 
   @override
+  Future<bool> hasEnrolledBiometricCredential() async => false;
+
+  @override
+  Future<String?> enrolledEmail() async => null;
+
+  @override
+  Future<UserEntity?> restoreWithBiometricCredential() async => null;
+
+  @override
+  Future<void> forgetBiometrics() async {}
+
+  @override
   Future<void> logout() async {}
 }
 

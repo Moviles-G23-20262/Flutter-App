@@ -1,16 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/common_widgets.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/exceptions/auth_exceptions.dart';
+import '../../Domain/rules/login_rules.dart';
 import '../../Domain/use_cases/login_use_case.dart';
+import '../../Domain/use_cases/quick_unlock_use_cases.dart';
 
 /// Login / welcome screen for Campus Swap.
 class LoginScreen extends StatefulWidget {
   final AppState appState;
   final LoginUseCase login;
 
-  const LoginScreen({super.key, required this.appState, required this.login});
+  /// Fingerprint Quick Unlock; without them the screen is just email and password.
+  final CanQuickUnlockUseCase? canQuickUnlock;
+  final QuickUnlockUseCase? quickUnlock;
+  final ForgetBiometricsUseCase? forgetBiometrics;
+
+  const LoginScreen({
+    super.key,
+    required this.appState,
+    required this.login,
+    this.canQuickUnlock,
+    this.quickUnlock,
+    this.forgetBiometrics,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -22,13 +37,96 @@ class _LoginScreenState extends State<LoginScreen> {
   String _errorMsg  = '';
   bool   _loading   = false;
   bool   _obscure   = true;
+  bool   _submitted = false; // the user already tried to log in, so every problem is shown
+  QuickUnlockOffer? _offer; // the enrolled account, when Quick Unlock can be offered
+
+  @override
+  void initState() {
+    super.initState();
+    _checkQuickUnlock();
+  }
+
+  Future<void> _checkQuickUnlock() async {
+    final offer = await widget.canQuickUnlock?.execute();
+    if (!mounted) return;
+    setState(() => _offer = offer);
+  }
+
+  /// Fingerprint, then the saved session: no email or password to retype.
+  Future<void> _handleQuickUnlock() async {
+    final quickUnlock = widget.quickUnlock;
+    if (_loading || quickUnlock == null) return;
+    FocusScope.of(context).unfocus();
+    setState(() { _loading = true; _errorMsg = ''; });
+
+    final result = await quickUnlock.execute();
+    if (!mounted) return;
+    switch (result.outcome) {
+      case QuickUnlockOutcome.unlocked:
+        // AppState switches to Home; this screen is replaced, so keep _loading as is.
+        widget.appState.login(result.user!);
+      case QuickUnlockOutcome.notVerified:
+        setState(() {
+          _loading = false;
+          _errorMsg = 'Fingerprint not verified. Try again or log in with your password.';
+        });
+      case QuickUnlockOutcome.credentialRejected:
+        setState(() {
+          _loading = false;
+          _offer = null; // the repository forgot the rejected credential
+          _errorMsg = 'Your saved sign-in is no longer valid. Log in with your email and password.';
+        });
+      case QuickUnlockOutcome.unreachable:
+        setState(() {
+          _loading = false;
+          _errorMsg = result.message ?? 'Could not sign you in. Please try again.';
+        });
+    }
+  }
+
+  /// "Sign in with a different account": forget the fingerprint account and start from scratch.
+  Future<void> _handleForgetBiometrics() async {
+    if (_loading) return;
+    try {
+      await widget.forgetBiometrics?.execute();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() { _offer = null; _errorMsg = ''; });
+  }
+
+  // Emojis never get into either field; an email has no spaces at all, so a pasted
+  // " ana@uniandes.edu.co " is cleaned up while it is typed.
+  static final _emailFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.deny(LoginRules.emoji),
+    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+  ];
+  static final _passwordFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.deny(LoginRules.emoji),
+  ];
+
+  /// Email problems show as soon as something is typed; an empty field waits for the submit.
+  String? get _emailError {
+    final text = _emailController.text;
+    if (text.isEmpty && !_submitted) return null;
+    return LoginRules.validateEmail(text);
+  }
+
+  /// The length rule waits for the submit (it would nag while typing); spaces-only shows at once.
+  String? get _passwordError {
+    final text = _passwordController.text;
+    final error = LoginRules.validatePassword(text);
+    if (error == null) return null;
+    if (_submitted) return error;
+    return (text.isNotEmpty && text.trim().isEmpty) ? error : null;
+  }
 
   Future<void> _handleLogin() async {
     if (_loading) return;
     FocusScope.of(context).unfocus();
 
-    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
-      setState(() => _errorMsg = 'Please enter your email and password.');
+    setState(() => _submitted = true);
+    if (_emailError != null || _passwordError != null) {
+      setState(() => _errorMsg = '');
       return;
     }
 
@@ -107,9 +205,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 6),
                     AppTextField(
+                      key: const Key('login-email'),
                       placeholder: 'Enter your email',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      inputFormatters: _emailFormatters,
+                      errorText: _emailError,
+                      enabled: !_loading,
                       onChanged: (_) => setState(() => _errorMsg = ''),
                       textInputAction: TextInputAction.next,
                     ),
@@ -120,12 +222,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 6),
                     AppTextField(
+                      key: const Key('login-password'),
                       placeholder: 'Enter your password',
                       controller: _passwordController,
                       obscureText: _obscure,
+                      keyboardType: TextInputType.visiblePassword,
+                      inputFormatters: _passwordFormatters,
+                      errorText: _passwordError,
+                      enabled: !_loading,
                       textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _handleLogin(),
                       onChanged: (_) => setState(() => _errorMsg = ''),
                       suffixIcon: GestureDetector(
+                        key: const Key('toggle-password'),
+                        behavior: HitTestBehavior.opaque,
                         onTap: () => setState(() => _obscure = !_obscure),
                         child: Icon(
                           _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
@@ -146,6 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: Border.all(color: borderSubtle),
                         ),
                         child: Text(_errorMsg,
+                            key: const Key('login-error'),
                             style: AppTextStyles.body(errorColor, fontSize: AppTextStyles.sizeXs)),
                       ),
                     ],
@@ -153,6 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Login button
                     PrimaryButton(
+                      key: const Key('login-button'),
                       label: _loading ? 'Logging in…' : 'Log In',
                       onPressed: _loading ? null : _handleLogin,
                       leadingIcon: _loading
@@ -161,6 +273,37 @@ class _LoginScreenState extends State<LoginScreen> {
                       fullWidth: true,
                       isLoading: _loading,
                     ),
+                    if (_offer != null) ...[
+                      const SizedBox(height: 10),
+                      SecondaryButton(
+                        key: const Key('quick-unlock'),
+                        label: 'Quick Unlock with Fingerprint',
+                        leadingIcon: Icon(Icons.fingerprint_rounded, color: accentHi, size: 20),
+                        fullWidth: true,
+                        onPressed: _loading ? null : _handleQuickUnlock,
+                      ),
+                      if (_offer!.email != null) ...[
+                        const SizedBox(height: 6),
+                        Center(
+                          child: Text(_offer!.email!,
+                              key: const Key('enrolled-email'),
+                              style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+                        ),
+                      ],
+                      Center(
+                        child: TextButton(
+                          key: const Key('forget-biometrics'),
+                          onPressed: _loading ? null : _handleForgetBiometrics,
+                          style: TextButton.styleFrom(
+                            foregroundColor: accentHi,
+                            minimumSize: const Size(0, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text('Sign in with a different account',
+                              style: AppTextStyles.body(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
 
                     // Sign up link

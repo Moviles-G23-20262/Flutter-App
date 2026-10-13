@@ -6,7 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_front_end/Data/Models/marketplace_models.dart';
 import 'package:flutter_front_end/Data/Repositories/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/Data/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/Domain/Entities/analytics_event.dart';
 import 'package:flutter_front_end/Domain/Entities/chat_room_entity.dart';
+import 'package:flutter_front_end/Domain/Entities/enums.dart';
+import 'package:flutter_front_end/Domain/repositories/analytics_event_repository.dart';
+import 'package:flutter_front_end/Domain/use_cases/track_event_use_case.dart';
 import 'package:flutter_front_end/Domain/Entities/conversation_insight.dart';
 import 'package:flutter_front_end/Domain/Entities/exchange_entity.dart';
 import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
@@ -28,7 +32,11 @@ import 'package:flutter_front_end/Domain/use_cases/marketplace_use_cases.dart';
 import 'package:flutter_front_end/Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import 'package:flutter_front_end/Domain/use_cases/meetup_use_cases.dart';
 import 'package:flutter_front_end/Domain/use_cases/rank_meeting_points_use_case.dart';
+import 'package:flutter_front_end/Domain/repositories/connectivity_repository.dart';
+import 'package:flutter_front_end/Domain/use_cases/connectivity_use_cases.dart';
 import 'package:flutter_front_end/Presentation/Screens/home_screen.dart';
+import 'package:flutter_front_end/Presentation/Screens/search_screen.dart';
+import 'package:flutter_front_end/Presentation/State%20Management/connectivity_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/account_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
 import 'package:flutter_front_end/Presentation/State%20Management/chat_state.dart';
@@ -379,6 +387,8 @@ class _World {
   );
 
   final battery = _TestBattery();
+  final network = _TestNetwork();
+  final tracker = _FakeTracker();
 
   late final scheduleState = ScheduleState(
     getSchedule: GetScheduleUseCase(scheduleRepo),
@@ -398,7 +408,30 @@ class _World {
       savePreference: SaveThemePreferenceUseCase(_NoSavedTheme()),
     ),
     power: PowerState(watchBattery: WatchBatteryUseCase(battery)),
+    trackEvent: TrackEventUseCase(tracker),
+    connectivity: ConnectivityState(
+      getConnectivity: GetConnectivityUseCase(network),
+      watchConnectivity: WatchConnectivityUseCase(network),
+    ),
   );
+}
+
+class _FakeTracker implements AnalyticsEventRepository {
+  final events = <AnalyticsEvent>[];
+
+  @override
+  Future<void> track(AnalyticsEvent event) async => events.add(event);
+}
+
+class _TestNetwork implements ConnectivityRepository {
+  bool online = true;
+  final controller = StreamController<bool>.broadcast();
+
+  @override
+  Future<bool> isOnline() async => online;
+
+  @override
+  Stream<bool> watch() => controller.stream;
 }
 
 class _TestBattery implements BatteryRepository {
@@ -679,6 +712,57 @@ void main() {
       expect(world.accountState.swapCountOf(_me), 1);
       expect(world.accountState.earnedThisMonth(_me, now: DateTime(2026, 9, 20)), 18);
       expect(world.accountState.pendingOrderFor('m1', _other)?.id, 'p');
+    });
+  });
+
+  group('Telemetry wiring', () {
+    test("opening someone else's listing records LISTING_VIEW for it", () {
+      final world = _World();
+      world.appState.login(_user());
+
+      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _other));
+
+      expect(world.tracker.events.map((e) => e.type), [AnalyticsEventType.LISTING_VIEW]);
+      expect(world.tracker.events.single.materialId, 'm5');
+      expect(world.appState.currentScreen, AppScreen.materialDetail);
+      world.chatState.clear();
+    });
+
+    test('looking at your own listing is not a view', () {
+      final world = _World();
+      world.appState.login(_user());
+
+      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _me));
+
+      expect(world.tracker.events, isEmpty);
+      world.chatState.clear();
+    });
+
+    test('messaging the seller records CONTACT_SELLER with the chat room', () async {
+      final world = _World();
+      world.chats.rooms = [
+        ChatRoomEntity(id: 'r1', materialId: 'm5', buyerId: _me, sellerId: _other, createdAt: DateTime(2026, 9, 1)),
+      ];
+      world.appState.login(_user());
+
+      final error = await world.appState.messageSeller(_material(id: 'm5', sellerId: _other));
+
+      expect(error, isNull);
+      final event = world.tracker.events.single;
+      expect(event.type, AnalyticsEventType.CONTACT_SELLER);
+      expect(event.materialId, 'm5');
+      expect(event.metadata, {'chatRoomId': 'r1'});
+      world.chatState.clear();
+    });
+
+    test('messaging your own listing records nothing', () async {
+      final world = _World();
+      world.appState.login(_user());
+
+      await world.appState.messageSeller(_material(id: 'm5', sellerId: _me));
+
+      expect(world.tracker.events, isEmpty);
+      world.chatState.clear();
     });
   });
 
@@ -1055,6 +1139,95 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recovered Item'), findsOneWidget);
+      world.chatState.clear();
+    });
+  });
+
+  group('Search screen offline notice', () {
+    final me = UserEntity(
+      id: _me,
+      email: 'me@uniandes.edu.co',
+      fullName: 'Maria Santos',
+      major: 'CS',
+      rating: 4.8,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+    Future<_World> pumpSearch(WidgetTester tester, {bool online = true}) async {
+      final world = _World();
+      world.network.online = online;
+      world.materials.materials = [_material(id: 'a').copyWith(title: 'Server Textbook')];
+      await tester.binding.setSurfaceSize(const Size(420, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      world.appState.login(me);
+      world.appState.connectivity.start();
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(appState: world.appState))));
+      await tester.pumpAndSettle();
+      return world;
+    }
+
+    testWidgets('the search bar only searches: no camera shortcut to the sell flow', (tester) async {
+      final world = await pumpSearch(tester);
+
+      expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
+      expect(find.byIcon(Icons.filter_alt_rounded), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('no banner while online', (tester) async {
+      final world = await pumpSearch(tester);
+
+      expect(find.byKey(const Key('offline-banner-text')), findsNothing);
+      expect(find.text('Server Textbook'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('losing the network shows the banner and keeps the results usable', (tester) async {
+      final world = await pumpSearch(tester);
+
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-banner-text')), findsOneWidget);
+      expect(find.text('Server Textbook'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      world.chatState.clear();
+    });
+
+    testWidgets('starting offline shows the banner', (tester) async {
+      final world = await pumpSearch(tester, online: false);
+
+      expect(find.byKey(const Key('offline-banner-text')), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('regaining the network hides the banner and syncs the listings again', (tester) async {
+      final world = await pumpSearch(tester);
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      world.materials.materials = [
+        _material(id: 'a').copyWith(title: 'Server Textbook'),
+        _material(id: 'b').copyWith(title: 'Fresh Listing'),
+      ];
+      world.network.controller.add(true);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('offline-banner-text')), findsNothing);
+      expect(find.text('Fresh Listing'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('the banner Retry reloads the listings while still offline', (tester) async {
+      final world = await pumpSearch(tester);
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      world.materials.materials = [_material(id: 'c').copyWith(title: 'Retried Listing')];
+      await tester.tap(find.byKey(const Key('offline-banner-retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Retried Listing'), findsOneWidget);
       world.chatState.clear();
     });
   });

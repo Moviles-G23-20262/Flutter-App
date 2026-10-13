@@ -108,11 +108,43 @@ class SellerRatingSortStrategy extends SortStrategy {
   }
 }
 
-/// All strategies offered in the sort panel, in display order.
-const List<SortStrategy> kSortStrategies = [
-  RelevanceSortStrategy(),
-  PriceAscSortStrategy(),
-  PriceDescSortStrategy(),
-  SellerRatingSortStrategy(),
-  NewestSortStrategy(),
-];
+/// Kinds of ordering offered to the user, in display order.
+enum SortKind { relevance, priceAsc, priceDesc, sellerRating, newest }
+
+/// Factory Method: the single place that maps a [SortKind] (or a strategy id)
+/// to its concrete [SortStrategy], so the UI never references concrete classes.
+class SortStrategyFactory {
+  const SortStrategyFactory._();
+
+  /// Default strategy (original relevance order).
+  static const SortKind defaultKind = SortKind.relevance;
+
+  /// Creates the strategy that corresponds to [kind].
+  static SortStrategy create(SortKind kind) {
+    switch (kind) {
+      case SortKind.relevance:
+        return const RelevanceSortStrategy();
+      case SortKind.priceAsc:
+        return const PriceAscSortStrategy();
+      case SortKind.priceDesc:
+        return const PriceDescSortStrategy();
+      case SortKind.sellerRating:
+        return const SellerRatingSortStrategy();
+      case SortKind.newest:
+        return const NewestSortStrategy();
+    }
+  }
+
+  /// Creates a strategy from its [SortStrategy.id]; falls back to the default
+  /// (relevance) when the id is unknown.
+  static SortStrategy fromId(String id) {
+    for (final strategy in all) {
+      if (strategy.id == id) return strategy;
+    }
+    return create(defaultKind);
+  }
+
+  /// All strategies offered in the sort panel, in display order.
+  static List<SortStrategy> get all =>
+      [for (final kind in SortKind.values) create(kind)];
+}

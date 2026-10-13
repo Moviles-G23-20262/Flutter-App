@@ -32,15 +32,44 @@ const _registration = RegistrationData(
 
 class _MemoryStorage implements SessionStorage {
   String? token;
+  bool failToSave = false;
 
   @override
   Future<String?> readToken() async => token;
 
   @override
-  Future<void> saveToken(String value) async => token = value;
+  Future<void> saveToken(String value) async {
+    if (failToSave) throw StateError('secure storage unavailable');
+    token = value;
+  }
 
   @override
   Future<void> clear() async => token = null;
+}
+
+class _MemoryBiometricStorage implements BiometricCredentialStorage {
+  String? token;
+  String? email;
+  bool failToSave = false;
+
+  @override
+  Future<String?> readToken() async => token;
+
+  @override
+  Future<String?> readEmail() async => email;
+
+  @override
+  Future<void> save({required String token, required String email}) async {
+    if (failToSave) throw StateError('secure storage unavailable');
+    this.token = token;
+    this.email = email;
+  }
+
+  @override
+  Future<void> clear() async {
+    token = null;
+    email = null;
+  }
 }
 
 /// Returns canned values, or throws [error] when it is set.
@@ -82,6 +111,18 @@ class _RecordingRepository implements AuthRepository {
   Future<UserEntity?> restoreSession() => throw UnimplementedError();
 
   @override
+  Future<bool> hasEnrolledBiometricCredential() async => false;
+
+  @override
+  Future<String?> enrolledEmail() async => null;
+
+  @override
+  Future<UserEntity?> restoreWithBiometricCredential() async => null;
+
+  @override
+  Future<void> forgetBiometrics() async {}
+
+  @override
   Future<void> logout() => throw UnimplementedError();
 }
 
@@ -90,7 +131,7 @@ void main() {
     test('normalizes the email and accepts non-institutional domains', () async {
       final repository = _RecordingRepository();
 
-      await LoginUseCase(repository).execute(email: '  Maria@University.EDU ', password: 'pw');
+      await LoginUseCase(repository).execute(email: '  Maria@University.EDU ', password: 'password1');
 
       expect(repository.received?.email, 'maria@university.edu');
     });
@@ -99,9 +140,35 @@ void main() {
       final repository = _RecordingRepository();
 
       await expectLater(
-        LoginUseCase(repository).execute(email: '', password: 'pw'),
-        throwsA(isA<InvalidCredentialsException>()),
+        LoginUseCase(repository).execute(email: '', password: 'password1'),
+        throwsA(isA<InvalidLoginInputException>()),
       );
+      await expectLater(
+        LoginUseCase(repository).execute(email: 'a@b.co', password: ''),
+        throwsA(isA<InvalidLoginInputException>()),
+      );
+      expect(repository.received, isNull);
+    });
+
+    test('rejects malformed emails, emojis and weak passwords without calling the repository', () async {
+      final repository = _RecordingRepository();
+      final useCase = LoginUseCase(repository);
+      const bad = [
+        ('not-an-email', 'password1'),
+        ('a@b', 'password1'),
+        ('a b@c.co', 'password1'),
+        ('ana😀@uniandes.edu.co', 'password1'),
+        ('ana@uniandes.edu.co', '        '),
+        ('ana@uniandes.edu.co', 'pass😀word1'),
+        ('ana@uniandes.edu.co', 'short'),
+      ];
+      for (final (email, password) in bad) {
+        await expectLater(
+          useCase.execute(email: email, password: password),
+          throwsA(isA<InvalidLoginInputException>()),
+          reason: '$email / $password',
+        );
+      }
       expect(repository.received, isNull);
     });
   });
@@ -109,17 +176,24 @@ void main() {
   group('AuthRepositoryImpl', () {
     late _FakeRemote remote;
     late _MemoryStorage storage;
+    late _MemoryBiometricStorage biometric;
     late ApiClient apiClient;
     late AuthRepositoryImpl repository;
 
     setUp(() {
       remote = _FakeRemote();
       storage = _MemoryStorage();
+      biometric = _MemoryBiometricStorage();
       apiClient = ApiClient(
         baseUrl: 'https://api.test',
         client: MockClient((_) async => http.Response('', 200)),
       );
-      repository = AuthRepositoryImpl(remote: remote, storage: storage, apiClient: apiClient);
+      repository = AuthRepositoryImpl(
+        remote: remote,
+        storage: storage,
+        biometricStorage: biometric,
+        apiClient: apiClient,
+      );
     });
 
     test('login stores the token and arms the api client', () async {
@@ -128,6 +202,35 @@ void main() {
       expect(user.id, 'user-1');
       expect(storage.token, 'jwt-token');
       expect(apiClient.authToken, 'jwt-token');
+    });
+
+    test('login still succeeds when the token cannot be saved on the device', () async {
+      storage.failToSave = true;
+
+      final user = await repository.login(email: 'a@b.co', password: 'pw');
+
+      expect(user.id, 'user-1');
+      expect(apiClient.authToken, 'jwt-token', reason: 'the current session works');
+      expect(storage.token, isNull, reason: 'it just will not survive a restart');
+    });
+
+    test('login enrolls the account for Quick Unlock, apart from the session token', () async {
+      await repository.login(email: 'a@b.co', password: 'pw');
+
+      expect(biometric.token, 'jwt-token');
+      expect(biometric.email, 'ana@uniandes.edu.co');
+      expect(await repository.hasEnrolledBiometricCredential(), isTrue);
+      expect(await repository.enrolledEmail(), 'ana@uniandes.edu.co');
+    });
+
+    test('a biometric storage failure does not break signing in', () async {
+      biometric.failToSave = true;
+
+      final user = await repository.login(email: 'a@b.co', password: 'pw');
+
+      expect(user.id, 'user-1');
+      expect(storage.token, 'jwt-token');
+      expect(await repository.hasEnrolledBiometricCredential(), isFalse);
     });
 
     test('register signs the user in too', () async {
@@ -187,6 +290,94 @@ void main() {
       expect(await repository.restoreSession(), isNull);
       expect(storage.token, isNull);
       expect(apiClient.authToken, isNull);
+    });
+
+    test('sign out ends the session but keeps the fingerprint account', () async {
+      await repository.login(email: 'a@b.co', password: 'pw');
+
+      await repository.logout();
+
+      expect(apiClient.authToken, isNull);
+      expect(storage.token, isNull);
+      expect(await repository.hasEnrolledBiometricCredential(), isTrue);
+      expect(await repository.enrolledEmail(), 'ana@uniandes.edu.co');
+      expect(await repository.restoreSession(), isNull, reason: 'no session without the fingerprint');
+    });
+
+    test('Login -> Sign Out -> Quick Unlock brings the account back', () async {
+      await repository.login(email: 'a@b.co', password: 'pw');
+      await repository.logout();
+      expect(apiClient.authToken, isNull);
+
+      final user = await repository.restoreWithBiometricCredential();
+
+      expect(user?.id, 'user-1');
+      expect(apiClient.authToken, 'jwt-token', reason: 'the stored credential is armed again');
+      expect(storage.token, 'jwt-token', reason: 'and the session survives a restart again');
+      expect(await repository.hasEnrolledBiometricCredential(), isTrue);
+    });
+
+    test('without an enrolled account there is nothing to restore', () async {
+      expect(await repository.restoreWithBiometricCredential(), isNull);
+      expect(apiClient.authToken, isNull);
+    });
+
+    test('a rejected credential is forgotten', () async {
+      biometric.token = 'old-jwt';
+      biometric.email = 'ana@uniandes.edu.co';
+      remote.error = const ApiException(401, 'Unauthorized');
+
+      expect(await repository.restoreWithBiometricCredential(), isNull);
+
+      expect(apiClient.authToken, isNull);
+      expect(await repository.hasEnrolledBiometricCredential(), isFalse);
+    });
+
+    test('being offline or a server failure keeps the credential and says so', () async {
+      biometric.token = 'jwt';
+      biometric.email = 'ana@uniandes.edu.co';
+
+      remote.error = const NetworkException('offline');
+      await expectLater(repository.restoreWithBiometricCredential(), throwsA(isA<AuthNetworkException>()));
+
+      remote.error = const ApiException(503, 'down');
+      await expectLater(repository.restoreWithBiometricCredential(), throwsA(isA<AuthServerException>()));
+
+      expect(apiClient.authToken, isNull);
+      expect(await repository.hasEnrolledBiometricCredential(), isTrue);
+    });
+
+    test('forgetBiometrics removes the enrolled account', () async {
+      await repository.login(email: 'a@b.co', password: 'pw');
+      await repository.logout();
+
+      await repository.forgetBiometrics();
+
+      expect(await repository.hasEnrolledBiometricCredential(), isFalse);
+      expect(await repository.enrolledEmail(), isNull);
+      expect(await repository.restoreWithBiometricCredential(), isNull);
+    });
+
+    test('logging in as someone else replaces the enrolled account', () async {
+      biometric.token = 'someone-elses-jwt';
+      biometric.email = 'other@uniandes.edu.co';
+
+      await repository.login(email: 'a@b.co', password: 'pw');
+
+      expect(biometric.token, 'jwt-token');
+      expect(biometric.email, 'ana@uniandes.edu.co');
+    });
+
+    test('an expired session token also discards the enrolled credential', () async {
+      storage.token = 'expired';
+      biometric.token = 'expired';
+      biometric.email = 'ana@uniandes.edu.co';
+      remote.error = const ApiException(401, 'Unauthorized');
+
+      expect(await repository.restoreSession(), isNull);
+
+      expect(storage.token, isNull);
+      expect(await repository.hasEnrolledBiometricCredential(), isFalse);
     });
 
     test('logout clears the stored session', () async {

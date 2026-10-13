@@ -6,6 +6,7 @@ import 'Presentation/State Management/chat_state.dart';
 import 'Presentation/State Management/marketplace_state.dart';
 import 'Presentation/State Management/schedule_state.dart';
 import 'Presentation/State Management/power_state.dart';
+import 'Presentation/State Management/connectivity_state.dart';
 import 'Presentation/State Management/theme_state.dart';
 import 'theme/app_theme.dart';
 import 'Presentation/Screens/login_screen.dart';
@@ -16,7 +17,6 @@ import 'Presentation/Screens/material_detail_screen.dart';
 import 'Presentation/Screens/messages_screen.dart';
 import 'Presentation/Screens/profile_screen.dart';
 import 'Presentation/Screens/seller_hub_screen.dart';
-import 'Presentation/Screens/new_listing_screen.dart';
 import 'Presentation/Screens/new_listing_smart_screen.dart';
 import 'Presentation/Screens/complete_exchange_screen.dart';
 import 'Presentation/Screens/confirmation_screen.dart';
@@ -78,6 +78,11 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       savePreference: _deps.saveThemePreference,
     ),
     power: PowerState(watchBattery: _deps.watchBattery),
+    trackEvent: _deps.trackEvent,
+    connectivity: ConnectivityState(
+      getConnectivity: _deps.getConnectivity,
+      watchConnectivity: _deps.watchConnectivity,
+    ),
   );
 
   @override
@@ -85,11 +90,15 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
     super.initState();
     _appState.theme.start();
     _appState.power.start();
+    _appState.connectivity.start();
     _restoreSession();
   }
 
   Future<void> _restoreSession() async {
-    final user = await _deps.restoreSession.execute();
+    // With a fingerprint enrolled and an account enrolled for it, the session is not restored by
+    // itself: the login screen offers "Quick Unlock", which signs in after the sensor verifies the user.
+    final lockedBehindFingerprint = await _deps.canQuickUnlock.execute() != null;
+    final user = lockedBehindFingerprint ? null : await _deps.restoreSession.execute();
     if (!mounted) return;
     // From here on a rejected token means the session expired mid-use: sign out.
     _deps.apiClient.onUnauthorized = _appState.logout;
@@ -128,7 +137,13 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
 
     switch (_appState.currentScreen) {
       case AppScreen.login:
-        return LoginScreen(appState: _appState, login: _deps.login);
+        return LoginScreen(
+          appState: _appState,
+          login: _deps.login,
+          canQuickUnlock: _deps.canQuickUnlock,
+          quickUnlock: _deps.quickUnlock,
+          forgetBiometrics: _deps.forgetBiometrics,
+        );
       case AppScreen.register:
         return RegisterScreen(appState: _appState, registerStudent: _deps.registerStudent);
       case AppScreen.materialDetail:
@@ -143,9 +158,12 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.sellerHub:
         return SellerHubScreen(appState: _appState);
       case AppScreen.newListing:
-        return NewListingScreen(appState: _appState);
-      case AppScreen.newListingSmart:
-        return NewListingSmartScreen(appState: _appState);
+        return NewListingSmartScreen(
+          appState: _appState,
+          viewModelFactory: () => _deps.createSmartListingViewModel(
+            publish: _appState.marketplace.publish,
+          ),
+        );
       case AppScreen.confirmation:
         final order = _appState.selectedExchange;
         if (order == null) return AppShell(appState: _appState);

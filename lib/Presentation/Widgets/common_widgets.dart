@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import '../../theme/app_theme.dart';
 
 // ─── Reusable Widgets ─────────────────────────────────────────────────────────
@@ -253,7 +254,11 @@ class SecondaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (leadingIcon != null) ...[leadingIcon!, const SizedBox(width: 6)],
-            Text(label, style: AppTextStyles.body(textColor, fontSize: AppTextStyles.sizeSm, fontWeight: FontWeight.w600)),
+            Flexible(
+              child: Text(label,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(textColor, fontSize: AppTextStyles.sizeSm, fontWeight: FontWeight.w600)),
+            ),
           ],
         ),
       ),
@@ -279,6 +284,8 @@ class AppTextField extends StatelessWidget {
   final TextInputAction textInputAction;
   final bool enabled;
   final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onSubmitted;
 
   const AppTextField({
     super.key,
@@ -296,6 +303,8 @@ class AppTextField extends StatelessWidget {
     this.textInputAction = TextInputAction.next,
     this.enabled = true,
     this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
+    this.onSubmitted,
   });
 
   @override
@@ -313,6 +322,8 @@ class AppTextField extends StatelessWidget {
       obscureText: obscureText,
       keyboardType: keyboardType,
       onChanged: onChanged,
+      onSubmitted: onSubmitted,
+      inputFormatters: inputFormatters,
       onTap: onTap,
       readOnly: readOnly,
       maxLines: maxLines,
