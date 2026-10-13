@@ -21,7 +21,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _queryCtrl = TextEditingController();
   String _query       = '';
-  _SearchFilters _filters = const _SearchFilters();
+  _SearchFilters _filters = _SearchFilters();
 
   List<MaterialEntity> get _results {
     var list = widget.appState.marketplace.availableMaterials.where((m) {
@@ -171,12 +171,12 @@ class _SearchFilters {
   final double maxPrice;
   final SortStrategy sort;
 
-  const _SearchFilters({
+  _SearchFilters({
     this.category,
     this.condition,
     this.maxPrice = defaultMaxPrice,
-    this.sort = const RelevanceSortStrategy(),
-  });
+    SortStrategy? sort,
+  }) : sort = sort ?? SortStrategyFactory.create(SortStrategyFactory.defaultKind);
 
   bool get hasPriceLimit => maxPrice < defaultMaxPrice;
 
@@ -184,7 +184,7 @@ class _SearchFilters {
       category != null ||
       condition != null ||
       hasPriceLimit ||
-      sort.id != const RelevanceSortStrategy().id;
+      sort.id != SortStrategyFactory.create(SortStrategyFactory.defaultKind).id;
 }
 
 // ─── Filter bottom sheet (View 06) ───────────────────────────────────────────
@@ -208,7 +208,7 @@ class _FilterSheetState extends State<_FilterSheet> {
         _category = null;
         _condition = null;
         _maxPrice = _SearchFilters.defaultMaxPrice;
-        _sort = kSortStrategies.first;
+        _sort = SortStrategyFactory.create(SortStrategyFactory.defaultKind);
       });
 
   void _apply() => Navigator.of(context).pop(_SearchFilters(
@@ -311,7 +311,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final s in kSortStrategies)
+                  for (final s in SortStrategyFactory.all)
                     PillChip(label: s.label, active: _sort.id == s.id, onTap: () => setState(() => _sort = s)),
                 ],
               ),
