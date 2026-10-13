@@ -67,8 +67,12 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<UserEntity> _startSession(AuthSessionModel session) async {
-    await storage.saveToken(session.accessToken);
+    // The server accepted the credentials: the user is in, even if the token cannot be kept
+    // on this device (secure storage unavailable). The session then just won't survive a restart.
     apiClient.authToken = session.accessToken;
+    try {
+      await storage.saveToken(session.accessToken);
+    } catch (_) {}
     return session.user;
   }
 
