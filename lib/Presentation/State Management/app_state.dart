@@ -31,7 +31,6 @@ enum AppScreen {
   notifications,
   sellerHub,
   newListing,
-  newListingSmart,
 
   /// "Order Placed", right after buying.
   confirmation,
