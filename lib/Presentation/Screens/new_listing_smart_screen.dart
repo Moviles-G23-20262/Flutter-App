@@ -7,20 +7,22 @@ import '../Widgets/common_widgets.dart';
 import '../Widgets/formatters.dart';
 import '../State Management/app_state.dart';
 import '../../Domain/Entities/material_entity.dart';
-import '../../Domain/use_cases/price_estimator_use_case.dart';
+import '../../Domain/use_cases/price_estimator_use_case.dart' show PriceEstimateSource;
+import '../ViewModels/smart_listing_view_model.dart';
 
 // ─── Smart New Listing Screen (camera + fair price estimate) ─────────────────
 
 class NewListingSmartScreen extends StatefulWidget {
   final AppState appState;
 
-  /// Fair-price estimator; defaults to the offline heuristic when none is injected.
-  final PriceEstimatorUseCase estimator;
+  /// Creates the ViewModel this screen owns (and disposes). Injected so the View never
+  /// touches use cases or repositories.
+  final SmartListingViewModel Function() viewModelFactory;
 
   const NewListingSmartScreen({
     super.key,
     required this.appState,
-    this.estimator = const PriceEstimatorUseCase(),
+    required this.viewModelFactory,
   });
 
   @override
@@ -30,13 +32,9 @@ class NewListingSmartScreen extends StatefulWidget {
 class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   final _picker = ImagePicker();
   final _priceCtrl = TextEditingController();
+  late final SmartListingViewModel _viewModel = widget.viewModelFactory();
 
   Uint8List? _imageBytes; // Instead, we compress the image and read it directly into memory as a Uint8List ->>> line 42
-  MaterialCategoryEnum _category = MaterialCategoryEnum.BOOKS;
-  MaterialConditionEnum _condition = MaterialConditionEnum.GOOD;
-  PriceEstimate? _estimate;
-  bool _estimating = false;
-  int _estimateRequest = 0; // lets a late answer be ignored after the user changed the item
 
 // Architecturally, we chose not to save this image to the device's physical storage to respect the user's space
 // ->>>>>>> line 26
@@ -60,42 +58,29 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   }
 
 
-// The user triggers this: the estimator asks the analytics service for the p25 / median / p75 of
-// real sales and falls back to a local heuristic offline or with too few sales, so it never fails.
-  Future<void> _suggestPrice() async {
-    final request = ++_estimateRequest;
-    setState(() => _estimating = true);
-    final estimate = await widget.estimator.execute(category: _category, condition: _condition);
-    if (!mounted || request != _estimateRequest) return;
-    setState(() {
-      _estimate = estimate;
-      _estimating = false;
-    });
-  }
-
+  /// One tap copies the ViewModel's suggested price into the price field.
   void _applySuggestion() {
-    final estimate = _estimate;
-    if (estimate == null) return;
-    setState(() => _priceCtrl.text = estimate.suggestedPrice.round().toString());
+    final price = _viewModel.suggestedPrice;
+    if (price == null) return;
+    _priceCtrl.text = price.round().toString();
   }
 
   @override
   void dispose() {
     _priceCtrl.dispose();
+    _viewModel.dispose();
     super.dispose();
-  }
-
-  void _resetEstimate(VoidCallback change) {
-    _estimateRequest++; // drop any answer still on its way
-    setState(() {
-      change();
-      _estimate = null;
-      _estimating = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) => _buildBody(context, _viewModel),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, SmartListingViewModel vm) {
     final brightness  = Theme.of(context).brightness;
     final isDark      = brightness == Brightness.dark;
     final bg          = isDark ? AppColors.darkBg            : AppColors.lightBg;
@@ -183,8 +168,8 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                       for (final c in MaterialCategoryEnum.values)
                         PillChip(
                           label: c.displayName,
-                          active: _category == c,
-                          onTap: () => _resetEstimate(() => _category = c),
+                          active: vm.selectedCategory == c.name,
+                          onTap: () => vm.setCategory(c.name),
                         ),
                     ],
                   ),
@@ -201,8 +186,8 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                       for (final c in MaterialConditionEnum.values)
                         PillChip(
                           label: c.displayName,
-                          active: _condition == c,
-                          onTap: () => _resetEstimate(() => _condition = c),
+                          active: vm.selectedCondition == c.name,
+                          onTap: () => vm.setCondition(c.name),
                         ),
                     ],
                   ),
@@ -212,13 +197,20 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                     label: 'Suggest Fair Price',
                     fullWidth: true,
                     leadingIcon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
-                    isLoading: _estimating,
-                    onPressed: _estimating ? null : _suggestPrice,
+                    isLoading: vm.isLoading,
+                    onPressed: vm.canEstimate ? vm.estimatePrice : null,
                   ),
 
-                  if (_estimate != null) ...[
+                  if (vm.errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(vm.errorMessage!,
+                        key: const Key('estimate-error'),
+                        style: AppTextStyles.body(isDark ? AppColors.darkError : AppColors.lightError, fontSize: AppTextStyles.sizeXs)),
+                  ],
+
+                  if (vm.hasEstimate) ...[
                     const SizedBox(height: 16),
-                    _EstimateCard(estimate: _estimate!, onApply: _applySuggestion),
+                    _EstimateCard(viewModel: vm, onApply: _applySuggestion),
                   ],
                   const SizedBox(height: 20),
 
@@ -246,19 +238,21 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _EstimateCard extends StatelessWidget {
-  final PriceEstimate estimate;
+  final SmartListingViewModel viewModel;
   final VoidCallback onApply;
 
-  const _EstimateCard({required this.estimate, required this.onApply});
+  const _EstimateCard({required this.viewModel, required this.onApply});
 
   String get _sourceLabel {
-    switch (estimate.source) {
+    switch (viewModel.source) {
       case PriceEstimateSource.realSales:
-        return 'Based on ${estimate.sampleSize} real sale${estimate.sampleSize == 1 ? '' : 's'}';
-      case PriceEstimateSource.offlineHeuristic:
-        return 'Heuristic estimate, no connection to sales data';
+        final n = viewModel.sampleSize;
+        return 'Based on $n real sale${n == 1 ? '' : 's'}';
       case PriceEstimateSource.lowSampleHeuristic:
         return 'Heuristic estimate, not enough sales yet';
+      case PriceEstimateSource.offlineHeuristic:
+      case null:
+        return 'Heuristic estimate, no connection to sales data';
     }
   }
 
@@ -277,19 +271,19 @@ class _EstimateCard extends StatelessWidget {
           Text('Recommended price',
               style: AppTextStyles.body(onHero.withValues(alpha: 0.8), fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text(copPrice(estimate.suggestedPrice),
+          Text(copPrice(viewModel.suggestedPrice ?? 0),
               key: const Key('estimate-price'),
               style: AppTextStyles.mono(onHero, fontSize: AppTextStyles.sizeXl, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           Text(
-            'Fair range (p25–p75): ${copPrice(estimate.p25)} – ${copPrice(estimate.p75)}',
+            'Fair range (p25–p75): ${copPrice(viewModel.p25 ?? 0)} – ${copPrice(viewModel.p75 ?? 0)}',
             key: const Key('estimate-range'),
             style: AppTextStyles.mono(onHero.withValues(alpha: 0.85), fontSize: AppTextStyles.sizeXs),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(estimate.isHeuristic ? Icons.cloud_off_rounded : Icons.verified_rounded,
+              Icon(viewModel.isFallback ? Icons.cloud_off_rounded : Icons.verified_rounded,
                   size: 14, color: onHero.withValues(alpha: 0.8)),
               const SizedBox(width: 6),
               Expanded(

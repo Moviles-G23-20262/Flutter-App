@@ -11,6 +11,7 @@ import '../Data/Repositories/analytics_event_repository_impl.dart';
 import '../Data/data_sources/analytics_event_remote_data_source.dart';
 import '../Domain/use_cases/track_event_use_case.dart';
 import '../Domain/use_cases/price_estimator_use_case.dart';
+import '../Presentation/ViewModels/smart_listing_view_model.dart';
 import '../Domain/use_cases/get_meeting_point_density_use_case.dart';
 import '../Domain/use_cases/meeting_point_recommendation_use_case.dart';
 import '../Domain/use_cases/rank_meeting_points_use_case.dart';
@@ -122,6 +123,9 @@ class AppDependencies {
     required this.getConnectivity,
     required this.watchConnectivity,
   });
+
+  /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
+  SmartListingViewModel createSmartListingViewModel() => SmartListingViewModel(estimator: estimatePrice);
 
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
