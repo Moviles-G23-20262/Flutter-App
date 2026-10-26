@@ -1,4 +1,4 @@
-import 'package:flutter_front_end/Domain/rules/login_rules.dart';
+import 'package:flutter_front_end/model/rules/login_rules.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

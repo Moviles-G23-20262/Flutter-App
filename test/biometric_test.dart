@@ -2,21 +2,22 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_front_end/Data/Repositories/auth_repository_impl.dart';
-import 'package:flutter_front_end/Data/data_sources/auth_remote_data_source.dart';
-import 'package:flutter_front_end/Data/data_sources/session_storage.dart';
-import 'package:flutter_front_end/Data/services/biometric_auth_service.dart';
-import 'package:flutter_front_end/Domain/Entities/registration_data.dart';
-import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
-import 'package:flutter_front_end/Domain/exceptions/auth_exceptions.dart';
-import 'package:flutter_front_end/Domain/repositories/auth_repository.dart';
-import 'package:flutter_front_end/Domain/repositories/biometric_authenticator.dart';
-import 'package:flutter_front_end/Domain/use_cases/login_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/logout_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/quick_unlock_use_cases.dart';
-import 'package:flutter_front_end/Presentation/Screens/login_screen.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
-import 'package:flutter_front_end/core/network/api_client.dart';
+import 'package:flutter_front_end/view_model/login_view_model.dart';
+import 'package:flutter_front_end/model/repositories/impl/auth_repository_impl.dart';
+import 'package:flutter_front_end/model/data_sources/auth_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/session_storage.dart';
+import 'package:flutter_front_end/model/services/biometric_auth_service.dart';
+import 'package:flutter_front_end/model/entities/registration_data.dart';
+import 'package:flutter_front_end/model/entities/user_entity.dart';
+import 'package:flutter_front_end/model/exceptions/auth_exceptions.dart';
+import 'package:flutter_front_end/model/repositories/auth_repository.dart';
+import 'package:flutter_front_end/model/repositories/biometric_authenticator.dart';
+import 'package:flutter_front_end/model/use_cases/login_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/logout_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/quick_unlock_use_cases.dart';
+import 'package:flutter_front_end/view/screens/login_screen.dart';
+import 'package:flutter_front_end/view_model/app_view_model.dart';
+import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -128,7 +129,7 @@ class _FakeAuth implements AuthRepository {
   Future<void> logout() => throw UnimplementedError();
 }
 
-class _NoApp implements AppState {
+class _NoApp implements AppViewModel {
   final loggedIn = <UserEntity>[];
 
   @override
@@ -460,10 +461,13 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: LoginScreen(
           appState: app,
-          login: LoginUseCase(stack.repository),
-          canQuickUnlock: CanQuickUnlockUseCase(biometrics: bio, auth: stack.repository),
-          quickUnlock: QuickUnlockUseCase(biometrics: bio, auth: stack.repository),
-          forgetBiometrics: ForgetBiometricsUseCase(stack.repository),
+          createViewModel: () => LoginViewModel(
+            login: LoginUseCase(stack.repository),
+            canQuickUnlock: CanQuickUnlockUseCase(biometrics: bio, auth: stack.repository),
+            quickUnlock: QuickUnlockUseCase(biometrics: bio, auth: stack.repository),
+            forgetBiometrics: ForgetBiometricsUseCase(stack.repository),
+            onSignedIn: app.login,
+          ),
         ),
       ));
       await tester.pump();
@@ -490,10 +494,13 @@ void main() {
     Widget screen({bool withForget = true}) => MaterialApp(
           home: LoginScreen(
             appState: app,
-            login: LoginUseCase(auth),
-            canQuickUnlock: CanQuickUnlockUseCase(biometrics: bio, auth: auth),
-            quickUnlock: QuickUnlockUseCase(biometrics: bio, auth: auth),
-            forgetBiometrics: withForget ? ForgetBiometricsUseCase(auth) : null,
+            createViewModel: () => LoginViewModel(
+              login: LoginUseCase(auth),
+              canQuickUnlock: CanQuickUnlockUseCase(biometrics: bio, auth: auth),
+              quickUnlock: QuickUnlockUseCase(biometrics: bio, auth: auth),
+              forgetBiometrics: withForget ? ForgetBiometricsUseCase(auth) : null,
+              onSignedIn: app.login,
+            ),
           ),
         );
 
@@ -537,7 +544,8 @@ void main() {
     });
 
     testWidgets('the plain login screen has no fingerprint button', (tester) async {
-      await tester.pumpWidget(MaterialApp(home: LoginScreen(appState: _NoApp(), login: LoginUseCase(_FakeAuth()))));
+      final noApp = _NoApp();
+      await tester.pumpWidget(MaterialApp(home: LoginScreen(appState: noApp, createViewModel: () => LoginViewModel(login: LoginUseCase(_FakeAuth()), onSignedIn: noApp.login))));
       await tester.pump();
 
       expect(find.byKey(const Key('quick-unlock')), findsNothing);

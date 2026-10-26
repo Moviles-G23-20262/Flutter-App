@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:flutter_front_end/Data/Repositories/analytics_event_repository_impl.dart';
-import 'package:flutter_front_end/Data/data_sources/analytics_event_remote_data_source.dart';
-import 'package:flutter_front_end/Domain/Entities/analytics_event.dart';
-import 'package:flutter_front_end/Domain/Entities/enums.dart';
-import 'package:flutter_front_end/Domain/repositories/analytics_event_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/track_event_use_case.dart';
-import 'package:flutter_front_end/core/network/api_client.dart';
+import 'package:flutter_front_end/model/repositories/impl/analytics_event_repository_impl.dart';
+import 'package:flutter_front_end/model/data_sources/analytics_event_remote_data_source.dart';
+import 'package:flutter_front_end/model/entities/analytics_event.dart';
+import 'package:flutter_front_end/model/entities/enums.dart';
+import 'package:flutter_front_end/model/repositories/analytics_event_repository.dart';
+import 'package:flutter_front_end/model/use_cases/track_event_use_case.dart';
+import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

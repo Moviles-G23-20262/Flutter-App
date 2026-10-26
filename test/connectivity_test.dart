@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter_front_end/Domain/repositories/connectivity_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/connectivity_use_cases.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/connectivity_state.dart';
+import 'package:flutter_front_end/model/repositories/connectivity_repository.dart';
+import 'package:flutter_front_end/model/use_cases/connectivity_use_cases.dart';
+import 'package:flutter_front_end/view_model/connectivity_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeNetwork implements ConnectivityRepository {
@@ -20,13 +20,13 @@ class _FakeNetwork implements ConnectivityRepository {
   Stream<bool> watch() => controller.stream;
 }
 
-ConnectivityState _state(_FakeNetwork network) => ConnectivityState(
+ConnectivityViewModel _state(_FakeNetwork network) => ConnectivityViewModel(
       getConnectivity: GetConnectivityUseCase(network),
       watchConnectivity: WatchConnectivityUseCase(network),
     );
 
 void main() {
-  group('ConnectivityState', () {
+  group('ConnectivityViewModel', () {
     test('is online until told otherwise', () {
       final state = _state(_FakeNetwork());
       expect(state.isOnline, isTrue);

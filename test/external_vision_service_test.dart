@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter_front_end/Data/services/external_vision_service.dart';
-import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
-import 'package:flutter_front_end/Domain/repositories/item_photo_classifier.dart';
-import 'package:flutter_front_end/Domain/use_cases/classify_item_photo_use_case.dart';
+import 'package:flutter_front_end/model/services/external_vision_service.dart';
+import 'package:flutter_front_end/model/entities/material_entity.dart';
+import 'package:flutter_front_end/model/repositories/item_photo_classifier.dart';
+import 'package:flutter_front_end/model/use_cases/classify_item_photo_use_case.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

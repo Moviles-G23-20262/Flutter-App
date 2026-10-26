@@ -1,0 +1,415 @@
+import 'package:flutter/material.dart';
+
+import '../../app/theme/app_theme.dart';
+import '../../view_model/app_view_model.dart';
+import '../../view_model/register_view_model.dart';
+import '../widgets/common_widgets.dart';
+
+const List<String> _faculties = [
+  'Faculty of Administration',
+  'Faculty of Architecture and Design',
+  'Faculty of Arts and Humanities',
+  'Faculty of Economics',
+  'Faculty of Education',
+  'Faculty of Engineering',
+  'Faculty of Law',
+  'Faculty of Medicine',
+  'Faculty of Sciences',
+  'Faculty of Social Sciences',
+];
+
+const String _noFaculty = '';
+
+/// Sign-up screen. Only draws [RegisterViewModel] and forwards input.
+class RegisterScreen extends StatefulWidget {
+  final AppViewModel appState;
+
+  /// Builds this screen's view-model; called once, and the screen disposes it.
+  final RegisterViewModel Function() createViewModel;
+
+  const RegisterScreen({super.key, required this.appState, required this.createViewModel});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  late final RegisterViewModel _vm = widget.createViewModel();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _facultyCtrl = TextEditingController();
+  final _majorCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _vm.dispose();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _facultyCtrl.dispose();
+    _majorCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    _vm.submit();
+  }
+
+  Future<void> _pickFaculty() async {
+    FocusScope.of(context).unfocus();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.darkSurface
+          : AppColors.lightSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _FacultySheet(selected: _vm.faculty),
+    );
+    if (selected == null || !mounted) return;
+    _vm.setFaculty(selected == _noFaculty ? null : selected);
+    _facultyCtrl.text = _vm.faculty ?? '';
+  }
+
+  void _goToLogin() {
+    if (_vm.isLoading) return;
+    widget.appState.navigateTo(AppScreen.login);
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: _vm, builder: (context, _) => _buildView(context));
+  }
+
+  Widget _buildView(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bg = dark ? AppColors.darkBg : AppColors.lightBg;
+    final txPrimary = dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final txMuted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+    final accentHi = dark ? AppColors.darkAccentHi : AppColors.lightAccentHi;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goToLogin();
+      },
+      child: Scaffold(
+        backgroundColor: bg,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    tooltip: 'Back to log in',
+                    onPressed: _vm.isLoading ? null : _goToLogin,
+                    icon: Icon(Icons.arrow_back_rounded, color: txMuted),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const CampusSwapLogo(size: 56),
+                const SizedBox(height: 14),
+                Text(
+                  'Create your account',
+                  style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeLg),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Only verified Uniandes students can join.',
+                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 28),
+                AppCard(child: _buildForm()),
+                const SizedBox(height: 8),
+                Center(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _goToLogin,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      child: RichText(
+                        text: TextSpan(
+                          text: 'Already have an account? ',
+                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                          children: [
+                            TextSpan(
+                              text: 'Log in',
+                              style: AppTextStyles.body(
+                                accentHi,
+                                fontSize: AppTextStyles.sizeXs,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _LabeledField(
+          label: 'Full name',
+          child: AppTextField(
+            placeholder: 'Ana Gomez',
+            controller: _nameCtrl,
+            enabled: !_vm.isLoading,
+            textCapitalization: TextCapitalization.words,
+            errorText: _vm.errorFor(RegisterField.name),
+            onChanged: (v) => _vm.update(RegisterField.name, v),
+          ),
+        ),
+        _LabeledField(
+          label: 'Institutional email',
+          child: AppTextField(
+            placeholder: 'name${RegisterViewModel.institutionalDomain}',
+            controller: _emailCtrl,
+            enabled: !_vm.isLoading,
+            keyboardType: TextInputType.emailAddress,
+            errorText: _vm.errorFor(RegisterField.email),
+            onChanged: (v) => _vm.update(RegisterField.email, v),
+          ),
+        ),
+        _LabeledField(
+          label: 'Faculty (optional)',
+          child: AppTextField(
+            placeholder: 'Select your faculty',
+            controller: _facultyCtrl,
+            readOnly: true,
+            enabled: !_vm.isLoading,
+            onTap: _pickFaculty,
+            suffixIcon: const Icon(Icons.expand_more_rounded, size: 22),
+          ),
+        ),
+        _LabeledField(
+          label: 'Major',
+          child: AppTextField(
+            placeholder: 'Computer Science',
+            controller: _majorCtrl,
+            enabled: !_vm.isLoading,
+            textCapitalization: TextCapitalization.words,
+            errorText: _vm.errorFor(RegisterField.major),
+            onChanged: (v) => _vm.update(RegisterField.major, v),
+          ),
+        ),
+        _LabeledField(
+          label: 'Password',
+          child: AppTextField(
+            placeholder: 'Create a password',
+            controller: _passwordCtrl,
+            enabled: !_vm.isLoading,
+            obscureText: _vm.obscurePassword,
+            errorText: _vm.errorFor(RegisterField.password),
+            onChanged: (v) => _vm.update(RegisterField.password, v),
+            suffixIcon: IconButton(
+              tooltip: _vm.obscurePassword ? 'Show password' : 'Hide password',
+              onPressed: _vm.togglePasswordVisibility,
+              icon: Icon(
+                _vm.obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                size: 20,
+              ),
+            ),
+          ),
+          footer: _PasswordHint(length: _passwordCtrl.text.length),
+        ),
+        _LabeledField(
+          label: 'Confirm password',
+          child: AppTextField(
+            placeholder: 'Repeat your password',
+            controller: _confirmCtrl,
+            enabled: !_vm.isLoading,
+            obscureText: _vm.obscurePassword,
+            textInputAction: TextInputAction.done,
+            errorText: _vm.errorFor(RegisterField.confirm),
+            onChanged: (v) => _vm.update(RegisterField.confirm, v),
+          ),
+        ),
+        if (_vm.bannerError.isNotEmpty) ...[
+          _ErrorBanner(message: _vm.bannerError),
+          const SizedBox(height: 14),
+        ],
+        const SizedBox(height: 4),
+        PrimaryButton(
+          label: _vm.isLoading ? 'Creating account…' : 'Create account',
+          onPressed: _vm.isLoading ? null : _submit,
+          leadingIcon: _vm.isLoading
+              ? null
+              : const Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 16),
+          fullWidth: true,
+          isLoading: _vm.isLoading,
+        ),
+      ],
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  final String label;
+  final Widget child;
+  final Widget? footer;
+
+  const _LabeledField({required this.label, required this.child, this.footer});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final txMuted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          child,
+          if (footer != null) ...[
+            const SizedBox(height: 6),
+            footer!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordHint extends StatelessWidget {
+  final int length;
+
+  const _PasswordHint({required this.length});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ok = length >= RegisterViewModel.minPasswordLength;
+    final color = ok
+        ? (dark ? AppColors.darkSuccess : AppColors.lightSuccess)
+        : (dark ? AppColors.darkTextMuted : AppColors.lightTextMuted);
+
+    return Row(
+      children: [
+        Icon(ok ? Icons.check_circle_rounded : Icons.circle_outlined, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(
+          'At least ${RegisterViewModel.minPasswordLength} characters',
+          style: AppTextStyles.body(color, fontSize: AppTextStyles.sizeXs),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final elevated = dark ? AppColors.darkElevated : AppColors.lightElevated;
+    final borderSubtle = dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
+    final errorColor = dark ? AppColors.darkError : AppColors.lightError;
+
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: elevated,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderSubtle),
+        ),
+        child: Text(message, style: AppTextStyles.body(errorColor, fontSize: AppTextStyles.sizeXs)),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet with the list of faculties.
+class _FacultySheet extends StatelessWidget {
+  final String? selected;
+
+  const _FacultySheet({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final txPrimary = dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final txMuted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+    final accent = dark ? AppColors.darkAccentHi : AppColors.lightAccentHi;
+
+    Widget option(String value, String label, {bool muted = false}) {
+      final isSelected = value == selected;
+      return ListTile(
+        minVerticalPadding: 14,
+        title: Text(
+          label,
+          style: AppTextStyles.body(
+            muted ? txMuted : (isSelected ? accent : txPrimary),
+            fontSize: AppTextStyles.sizeSm,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+        trailing: isSelected ? Icon(Icons.check_rounded, color: accent) : null,
+        onTap: () => Navigator.of(context).pop(value),
+      );
+    }
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: txMuted.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('Select your faculty', style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
+          const SizedBox(height: 6),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final faculty in _faculties) option(faculty, faculty),
+                option(_noFaculty, 'Prefer not to say', muted: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

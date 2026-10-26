@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter_front_end/Domain/Entities/power_status.dart';
-import 'package:flutter_front_end/Domain/repositories/power_repositories.dart';
-import 'package:flutter_front_end/Domain/rules/campus_hours.dart';
-import 'package:flutter_front_end/Domain/use_cases/power_use_cases.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/power_state.dart';
+import 'package:flutter_front_end/model/entities/power_status.dart';
+import 'package:flutter_front_end/model/repositories/power_repositories.dart';
+import 'package:flutter_front_end/model/rules/campus_hours.dart';
+import 'package:flutter_front_end/model/use_cases/power_use_cases.dart';
+import 'package:flutter_front_end/view_model/power_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeBattery implements BatteryRepository {
@@ -35,10 +35,10 @@ void main() {
     });
   });
 
-  group('PowerState', () {
+  group('PowerViewModel', () {
     test('switches on and off by itself as the battery changes', () async {
       final battery = _FakeBattery();
-      final power = PowerState(watchBattery: WatchBatteryUseCase(battery))..start();
+      final power = PowerViewModel(watchBattery: WatchBatteryUseCase(battery))..start();
       var notified = 0;
       power.addListener(() => notified++);
 

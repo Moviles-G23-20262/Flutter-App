@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_front_end/Domain/Entities/theme_preference.dart';
-import 'package:flutter_front_end/Domain/repositories/appearance_repositories.dart';
-import 'package:flutter_front_end/Domain/use_cases/appearance_use_cases.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/theme_state.dart';
+import 'package:flutter_front_end/model/entities/theme_preference.dart';
+import 'package:flutter_front_end/model/repositories/appearance_repositories.dart';
+import 'package:flutter_front_end/model/use_cases/appearance_use_cases.dart';
+import 'package:flutter_front_end/view_model/theme_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeSensor implements AmbientLightRepository {
@@ -80,11 +80,11 @@ void main() {
     });
   });
 
-  group('ThemeState', () {
+  group('ThemeViewModel', () {
     late _FakeSensor sensor;
     late _FakePrefs prefs;
 
-    ThemeState build({Duration timeout = const Duration(milliseconds: 50)}) => ThemeState(
+    ThemeViewModel build({Duration timeout = const Duration(milliseconds: 50)}) => ThemeViewModel(
           watchAmbientLight: WatchAmbientLightUseCase(sensor),
           loadPreference: LoadThemePreferenceUseCase(prefs),
           savePreference: SaveThemePreferenceUseCase(prefs),

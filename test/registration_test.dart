@@ -1,9 +1,9 @@
-import 'package:flutter_front_end/Domain/Entities/registration_data.dart';
-import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
-import 'package:flutter_front_end/Domain/exceptions/auth_exceptions.dart';
-import 'package:flutter_front_end/Domain/repositories/auth_repository.dart';
-import 'package:flutter_front_end/Domain/rules/registration_rules.dart';
-import 'package:flutter_front_end/Domain/use_cases/register_student_use_case.dart';
+import 'package:flutter_front_end/model/entities/registration_data.dart';
+import 'package:flutter_front_end/model/entities/user_entity.dart';
+import 'package:flutter_front_end/model/exceptions/auth_exceptions.dart';
+import 'package:flutter_front_end/model/repositories/auth_repository.dart';
+import 'package:flutter_front_end/model/rules/registration_rules.dart';
+import 'package:flutter_front_end/model/use_cases/register_student_use_case.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeAuthRepository implements AuthRepository {
