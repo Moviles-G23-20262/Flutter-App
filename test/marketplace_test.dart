@@ -3,56 +3,56 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_front_end/Data/Models/marketplace_models.dart';
-import 'package:flutter_front_end/Data/Repositories/marketplace_repositories_impl.dart';
-import 'package:flutter_front_end/Data/data_sources/marketplace_remote_data_source.dart';
-import 'package:flutter_front_end/Domain/Entities/analytics_event.dart';
-import 'package:flutter_front_end/Domain/Entities/chat_room_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/enums.dart';
-import 'package:flutter_front_end/Domain/repositories/analytics_event_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/track_event_use_case.dart';
-import 'package:flutter_front_end/Domain/Entities/conversation_insight.dart';
-import 'package:flutter_front_end/Domain/Entities/exchange_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/meeting_point_density.dart';
-import 'package:flutter_front_end/Domain/Entities/meetup_entities.dart';
-import 'package:flutter_front_end/Domain/Entities/new_listing_data.dart';
-import 'package:flutter_front_end/Domain/Entities/notification_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/user_summary.dart';
-import 'package:flutter_front_end/Domain/Entities/wishlist_item_entity.dart';
-import 'package:flutter_front_end/Domain/exceptions/data_exceptions.dart';
-import 'package:flutter_front_end/Domain/repositories/conversation_insight_repository.dart';
-import 'package:flutter_front_end/Domain/repositories/marketplace_repositories.dart';
-import 'package:flutter_front_end/Domain/repositories/meeting_density_repository.dart';
-import 'package:flutter_front_end/Domain/repositories/meetup_repositories.dart';
-import 'package:flutter_front_end/Domain/use_cases/conversation_insight_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/get_meeting_point_density_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/marketplace_use_cases.dart';
-import 'package:flutter_front_end/Domain/use_cases/meeting_point_recommendation_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/meetup_use_cases.dart';
-import 'package:flutter_front_end/Domain/use_cases/rank_meeting_points_use_case.dart';
-import 'package:flutter_front_end/Domain/repositories/connectivity_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/connectivity_use_cases.dart';
-import 'package:flutter_front_end/Presentation/Screens/home_screen.dart';
-import 'package:flutter_front_end/Presentation/Screens/search_screen.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/connectivity_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/account_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/chat_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/marketplace_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/meeting_planner_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/schedule_state.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/theme_state.dart';
-import 'package:flutter_front_end/Domain/Entities/theme_preference.dart';
-import 'package:flutter_front_end/Domain/repositories/appearance_repositories.dart';
-import 'package:flutter_front_end/Domain/use_cases/appearance_use_cases.dart';
-import 'package:flutter_front_end/Domain/Entities/power_status.dart';
-import 'package:flutter_front_end/Domain/repositories/power_repositories.dart';
-import 'package:flutter_front_end/Domain/use_cases/power_use_cases.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/power_state.dart';
-import 'package:flutter_front_end/Presentation/Widgets/formatters.dart';
-import 'package:flutter_front_end/core/network/api_client.dart';
+import 'package:flutter_front_end/model/dto/marketplace_models.dart';
+import 'package:flutter_front_end/model/repositories/impl/marketplace_repositories_impl.dart';
+import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/model/entities/analytics_event.dart';
+import 'package:flutter_front_end/model/entities/chat_room_entity.dart';
+import 'package:flutter_front_end/model/entities/enums.dart';
+import 'package:flutter_front_end/model/repositories/analytics_event_repository.dart';
+import 'package:flutter_front_end/model/use_cases/track_event_use_case.dart';
+import 'package:flutter_front_end/model/entities/conversation_insight.dart';
+import 'package:flutter_front_end/model/entities/exchange_entity.dart';
+import 'package:flutter_front_end/model/entities/material_entity.dart';
+import 'package:flutter_front_end/model/entities/meeting_point_density.dart';
+import 'package:flutter_front_end/model/entities/meetup_entities.dart';
+import 'package:flutter_front_end/model/entities/new_listing_data.dart';
+import 'package:flutter_front_end/model/entities/notification_entity.dart';
+import 'package:flutter_front_end/model/entities/user_entity.dart';
+import 'package:flutter_front_end/model/entities/user_summary.dart';
+import 'package:flutter_front_end/model/entities/wishlist_item_entity.dart';
+import 'package:flutter_front_end/model/exceptions/data_exceptions.dart';
+import 'package:flutter_front_end/model/repositories/conversation_insight_repository.dart';
+import 'package:flutter_front_end/model/repositories/marketplace_repositories.dart';
+import 'package:flutter_front_end/model/repositories/meeting_density_repository.dart';
+import 'package:flutter_front_end/model/repositories/meetup_repositories.dart';
+import 'package:flutter_front_end/model/use_cases/conversation_insight_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/get_meeting_point_density_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/marketplace_use_cases.dart';
+import 'package:flutter_front_end/model/use_cases/meeting_point_recommendation_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/meetup_use_cases.dart';
+import 'package:flutter_front_end/model/use_cases/rank_meeting_points_use_case.dart';
+import 'package:flutter_front_end/model/repositories/connectivity_repository.dart';
+import 'package:flutter_front_end/model/use_cases/connectivity_use_cases.dart';
+import 'package:flutter_front_end/view/screens/home_screen.dart';
+import 'package:flutter_front_end/view/screens/search_screen.dart';
+import 'package:flutter_front_end/view_model/connectivity_view_model.dart';
+import 'package:flutter_front_end/view_model/account_view_model.dart';
+import 'package:flutter_front_end/view_model/app_view_model.dart';
+import 'package:flutter_front_end/view_model/chat_view_model.dart';
+import 'package:flutter_front_end/view_model/marketplace_view_model.dart';
+import 'package:flutter_front_end/view_model/meeting_planner_view_model.dart';
+import 'package:flutter_front_end/view_model/schedule_view_model.dart';
+import 'package:flutter_front_end/view_model/theme_view_model.dart';
+import 'package:flutter_front_end/model/entities/theme_preference.dart';
+import 'package:flutter_front_end/model/repositories/appearance_repositories.dart';
+import 'package:flutter_front_end/model/use_cases/appearance_use_cases.dart';
+import 'package:flutter_front_end/model/entities/power_status.dart';
+import 'package:flutter_front_end/model/repositories/power_repositories.dart';
+import 'package:flutter_front_end/model/use_cases/power_use_cases.dart';
+import 'package:flutter_front_end/view_model/power_view_model.dart';
+import 'package:flutter_front_end/view/widgets/formatters.dart';
+import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -358,7 +358,7 @@ class _World {
     getDensity: GetMeetingPointDensityUseCase(density),
   );
 
-  late final marketplaceState = MarketplaceState(
+  late final marketplaceState = MarketplaceViewModel(
     getMaterials: GetMaterialsUseCase(materials),
     createListing: CreateListingUseCase(materials),
     getWishlist: GetWishlistUseCase(wishlist),
@@ -366,7 +366,7 @@ class _World {
     removeFromWishlist: RemoveFromWishlistUseCase(wishlist),
   );
 
-  late final chatState = ChatState(
+  late final chatState = ChatViewModel(
     getChatRooms: GetChatRoomsUseCase(chats),
     openChatRoom: OpenChatRoomUseCase(chats),
     getMessages: GetMessagesUseCase(chats),
@@ -376,7 +376,7 @@ class _World {
     getConversationInsight: GetConversationInsightUseCase(insights),
   );
 
-  late final accountState = AccountState(
+  late final accountState = AccountViewModel(
     getExchanges: GetExchangesUseCase(exchanges),
     getNotifications: GetNotificationsUseCase(notifications),
     markNotificationOpened: MarkNotificationOpenedUseCase(notifications),
@@ -390,26 +390,26 @@ class _World {
   final network = _TestNetwork();
   final tracker = _FakeTracker();
 
-  late final scheduleState = ScheduleState(
+  late final scheduleState = ScheduleViewModel(
     getSchedule: GetScheduleUseCase(scheduleRepo),
     addBlock: AddScheduleBlockUseCase(scheduleRepo),
     removeBlock: RemoveScheduleBlockUseCase(scheduleRepo),
   );
 
-  late final appState = AppState(
+  late final appState = AppViewModel(
     marketplace: marketplaceState,
     chats: chatState,
     account: accountState,
     schedule: scheduleState,
     meetups: meetups,
-    theme: ThemeState(
+    theme: ThemeViewModel(
       watchAmbientLight: WatchAmbientLightUseCase(_NoLightSensor()),
       loadPreference: LoadThemePreferenceUseCase(_NoSavedTheme()),
       savePreference: SaveThemePreferenceUseCase(_NoSavedTheme()),
     ),
-    power: PowerState(watchBattery: WatchBatteryUseCase(battery)),
+    power: PowerViewModel(watchBattery: WatchBatteryUseCase(battery)),
     trackEvent: TrackEventUseCase(tracker),
-    connectivity: ConnectivityState(
+    connectivity: ConnectivityViewModel(
       getConnectivity: GetConnectivityUseCase(network),
       watchConnectivity: WatchConnectivityUseCase(network),
     ),
@@ -556,7 +556,7 @@ void main() {
     });
   });
 
-  group('MarketplaceState', () {
+  group('MarketplaceViewModel', () {
     test('loads listings and favorites, exposing only available ones to browse', () async {
       final world = _World();
       world.materials.materials = [
@@ -629,7 +629,7 @@ void main() {
     });
   });
 
-  group('ChatState', () {
+  group('ChatViewModel', () {
     ChatRoomEntity room({int unread = 0, DateTime? at}) => ChatRoomEntity(
           id: 'r1',
           materialId: 'm1',
@@ -676,7 +676,7 @@ void main() {
     });
   });
 
-  group('AccountState', () {
+  group('AccountViewModel', () {
     ExchangeEntity exchange(String id, {required String buyer, required String seller, required double price, required DateTime at}) =>
         _order(id: id, materialId: 'm$id', buyerId: buyer, sellerId: seller, price: price,
             status: ExchangeStatusEnum.COMPLETED, completedAt: at);
@@ -882,7 +882,7 @@ void main() {
         otherHasSchedule: false,
       );
       world.location.here = const GeoPoint(4.60286, -74.06485);
-      final planner = MeetingPlannerState(useCases: world.meetups, chatRoomId: 'r1');
+      final planner = MeetingPlannerViewModel(useCases: world.meetups, chatRoomId: 'r1');
 
       await planner.load();
       await Future<void>.delayed(Duration.zero);

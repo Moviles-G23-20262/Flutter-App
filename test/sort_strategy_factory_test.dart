@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_front_end/Domain/Strategies/sort_strategy.dart';
+import 'package:flutter_front_end/model/strategies/sort_strategy.dart';
 
 void main() {
   group('SortStrategyFactory', () {

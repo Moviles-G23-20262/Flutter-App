@@ -1,7 +1,7 @@
-import 'package:flutter_front_end/Domain/Entities/meeting_point_density.dart';
-import 'package:flutter_front_end/Domain/Entities/meetup_entities.dart';
-import 'package:flutter_front_end/Domain/use_cases/meeting_point_recommendation_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/rank_meeting_points_use_case.dart';
+import 'package:flutter_front_end/model/entities/meeting_point_density.dart';
+import 'package:flutter_front_end/model/entities/meetup_entities.dart';
+import 'package:flutter_front_end/model/use_cases/meeting_point_recommendation_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/rank_meeting_points_use_case.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 MeetingPointEntity _zone(String id, double lat, {bool monitored = true}) => MeetingPointEntity(

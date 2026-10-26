@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/price_stats.dart';
-import 'package:flutter_front_end/Domain/repositories/price_stats_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/price_estimator_use_case.dart';
-import 'package:flutter_front_end/Presentation/ViewModels/smart_listing_view_model.dart';
+import 'package:flutter_front_end/model/entities/material_entity.dart';
+import 'package:flutter_front_end/model/entities/price_stats.dart';
+import 'package:flutter_front_end/model/repositories/price_stats_repository.dart';
+import 'package:flutter_front_end/model/use_cases/price_estimator_use_case.dart';
+import 'package:flutter_front_end/view_model/smart_listing_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeStats implements PriceStatsRepository {
