@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_front_end/Domain/Entities/material_entity.dart';
-import 'package:flutter_front_end/Domain/Entities/price_stats.dart';
-import 'package:flutter_front_end/Domain/repositories/item_photo_classifier.dart';
-import 'package:flutter_front_end/Domain/repositories/price_stats_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/classify_item_photo_use_case.dart';
-import 'package:flutter_front_end/Domain/use_cases/price_estimator_use_case.dart';
-import 'package:flutter_front_end/Presentation/Screens/new_listing_smart_screen.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
-import 'package:flutter_front_end/Presentation/ViewModels/smart_listing_view_model.dart';
+import 'package:flutter_front_end/model/entities/material_entity.dart';
+import 'package:flutter_front_end/model/entities/price_stats.dart';
+import 'package:flutter_front_end/model/repositories/item_photo_classifier.dart';
+import 'package:flutter_front_end/model/repositories/price_stats_repository.dart';
+import 'package:flutter_front_end/model/use_cases/classify_item_photo_use_case.dart';
+import 'package:flutter_front_end/model/use_cases/price_estimator_use_case.dart';
+import 'package:flutter_front_end/view/screens/new_listing_smart_screen.dart';
+import 'package:flutter_front_end/view_model/app_view_model.dart';
+import 'package:flutter_front_end/view_model/smart_listing_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -305,7 +305,7 @@ void main() {
   });
 }
 
-class _NoApp implements AppState {
+class _NoApp implements AppViewModel {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

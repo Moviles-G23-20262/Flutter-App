@@ -1,30 +1,32 @@
 import 'package:flutter/material.dart';
-import 'core/app_dependencies.dart';
-import 'Presentation/State Management/account_state.dart';
-import 'Presentation/State Management/app_state.dart';
-import 'Presentation/State Management/chat_state.dart';
-import 'Presentation/State Management/marketplace_state.dart';
-import 'Presentation/State Management/schedule_state.dart';
-import 'Presentation/State Management/power_state.dart';
-import 'Presentation/State Management/connectivity_state.dart';
-import 'Presentation/State Management/theme_state.dart';
-import 'theme/app_theme.dart';
-import 'Presentation/Screens/login_screen.dart';
-import 'Presentation/Screens/register_screen.dart';
-import 'Presentation/Screens/home_screen.dart';
-import 'Presentation/Screens/search_screen.dart';
-import 'Presentation/Screens/material_detail_screen.dart';
-import 'Presentation/Screens/messages_screen.dart';
-import 'Presentation/Screens/profile_screen.dart';
-import 'Presentation/Screens/seller_hub_screen.dart';
-import 'Presentation/Screens/new_listing_smart_screen.dart';
-import 'Presentation/Screens/complete_exchange_screen.dart';
-import 'Presentation/Screens/confirmation_screen.dart';
-import 'Presentation/Screens/meeting_point_screen.dart';
-import 'Presentation/Screens/schedule_screen.dart';
-import 'Presentation/Screens/favorites_screen.dart';
-import 'Presentation/Screens/notifications_screen.dart';
-import 'Presentation/Widgets/common_widgets.dart';
+import 'app/app_dependencies.dart';
+import 'view_model/account_view_model.dart';
+import 'view_model/app_view_model.dart';
+import 'view_model/login_view_model.dart';
+import 'view_model/register_view_model.dart';
+import 'view_model/chat_view_model.dart';
+import 'view_model/marketplace_view_model.dart';
+import 'view_model/schedule_view_model.dart';
+import 'view_model/power_view_model.dart';
+import 'view_model/connectivity_view_model.dart';
+import 'view_model/theme_view_model.dart';
+import 'app/theme/app_theme.dart';
+import 'view/screens/login_screen.dart';
+import 'view/screens/register_screen.dart';
+import 'view/screens/home_screen.dart';
+import 'view/screens/search_screen.dart';
+import 'view/screens/material_detail_screen.dart';
+import 'view/screens/messages_screen.dart';
+import 'view/screens/profile_screen.dart';
+import 'view/screens/seller_hub_screen.dart';
+import 'view/screens/new_listing_smart_screen.dart';
+import 'view/screens/complete_exchange_screen.dart';
+import 'view/screens/confirmation_screen.dart';
+import 'view/screens/meeting_point_screen.dart';
+import 'view/screens/schedule_screen.dart';
+import 'view/screens/favorites_screen.dart';
+import 'view/screens/notifications_screen.dart';
+import 'view/widgets/common_widgets.dart';
 
 void main() {
   runApp(const CampusSwapApp());
@@ -39,16 +41,16 @@ class CampusSwapApp extends StatefulWidget {
 
 class _CampusSwapAppState extends State<CampusSwapApp> {
   final AppDependencies _deps = AppDependencies.create();
-  late final AppState _appState = AppState(
+  late final AppViewModel _appState = AppViewModel(
     onLogout: _deps.logout.execute,
-    marketplace: MarketplaceState(
+    marketplace: MarketplaceViewModel(
       getMaterials: _deps.getMaterials,
       createListing: _deps.createListing,
       getWishlist: _deps.getWishlist,
       addToWishlist: _deps.addToWishlist,
       removeFromWishlist: _deps.removeFromWishlist,
     ),
-    chats: ChatState(
+    chats: ChatViewModel(
       getChatRooms: _deps.getChatRooms,
       openChatRoom: _deps.openChatRoom,
       getMessages: _deps.getMessages,
@@ -57,7 +59,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       answerProposal: _deps.meetups.answer,
       getConversationInsight: _deps.getConversationInsight,
     ),
-    account: AccountState(
+    account: AccountViewModel(
       getExchanges: _deps.getExchanges,
       getNotifications: _deps.getNotifications,
       markNotificationOpened: _deps.markNotificationOpened,
@@ -66,20 +68,20 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       cancelExchange: _deps.cancelExchange,
       rateUser: _deps.rateUser,
     ),
-    schedule: ScheduleState(
+    schedule: ScheduleViewModel(
       getSchedule: _deps.getSchedule,
       addBlock: _deps.addScheduleBlock,
       removeBlock: _deps.removeScheduleBlock,
     ),
     meetups: _deps.meetups,
-    theme: ThemeState(
+    theme: ThemeViewModel(
       watchAmbientLight: _deps.watchAmbientLight,
       loadPreference: _deps.loadThemePreference,
       savePreference: _deps.saveThemePreference,
     ),
-    power: PowerState(watchBattery: _deps.watchBattery),
+    power: PowerViewModel(watchBattery: _deps.watchBattery),
     trackEvent: _deps.trackEvent,
-    connectivity: ConnectivityState(
+    connectivity: ConnectivityViewModel(
       getConnectivity: _deps.getConnectivity,
       watchConnectivity: _deps.watchConnectivity,
     ),
@@ -139,13 +141,22 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       case AppScreen.login:
         return LoginScreen(
           appState: _appState,
-          login: _deps.login,
-          canQuickUnlock: _deps.canQuickUnlock,
-          quickUnlock: _deps.quickUnlock,
-          forgetBiometrics: _deps.forgetBiometrics,
+          createViewModel: () => LoginViewModel(
+            login: _deps.login,
+            canQuickUnlock: _deps.canQuickUnlock,
+            quickUnlock: _deps.quickUnlock,
+            forgetBiometrics: _deps.forgetBiometrics,
+            onSignedIn: _appState.login,
+          ),
         );
       case AppScreen.register:
-        return RegisterScreen(appState: _appState, registerStudent: _deps.registerStudent);
+        return RegisterScreen(
+          appState: _appState,
+          createViewModel: () => RegisterViewModel(
+            registerStudent: _deps.registerStudent,
+            onSignedIn: _appState.login,
+          ),
+        );
       case AppScreen.materialDetail:
         return MaterialDetailScreen(
           appState: _appState,
@@ -202,7 +213,7 @@ class _SplashScreen extends StatelessWidget {
 // ─── App Shell with custom bottom nav ────────────────────────────────────────
 
 class AppShell extends StatelessWidget {
-  final AppState appState;
+  final AppViewModel appState;
   const AppShell({super.key, required this.appState});
 
   @override
