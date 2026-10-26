@@ -1,15 +1,15 @@
 import 'dart:convert';
 
-import 'package:flutter_front_end/Data/Models/auth_session_model.dart';
-import 'package:flutter_front_end/Data/Repositories/auth_repository_impl.dart';
-import 'package:flutter_front_end/Data/data_sources/auth_remote_data_source.dart';
-import 'package:flutter_front_end/Data/data_sources/session_storage.dart';
-import 'package:flutter_front_end/Domain/Entities/registration_data.dart';
-import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
-import 'package:flutter_front_end/Domain/exceptions/auth_exceptions.dart';
-import 'package:flutter_front_end/Domain/repositories/auth_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/login_use_case.dart';
-import 'package:flutter_front_end/core/network/api_client.dart';
+import 'package:flutter_front_end/model/dto/auth_session_model.dart';
+import 'package:flutter_front_end/model/repositories/impl/auth_repository_impl.dart';
+import 'package:flutter_front_end/model/data_sources/auth_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/session_storage.dart';
+import 'package:flutter_front_end/model/entities/registration_data.dart';
+import 'package:flutter_front_end/model/entities/user_entity.dart';
+import 'package:flutter_front_end/model/exceptions/auth_exceptions.dart';
+import 'package:flutter_front_end/model/repositories/auth_repository.dart';
+import 'package:flutter_front_end/model/use_cases/login_use_case.dart';
+import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

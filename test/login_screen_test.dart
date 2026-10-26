@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_front_end/Domain/Entities/registration_data.dart';
-import 'package:flutter_front_end/Domain/Entities/user_entity.dart';
-import 'package:flutter_front_end/Domain/exceptions/auth_exceptions.dart';
-import 'package:flutter_front_end/Domain/repositories/auth_repository.dart';
-import 'package:flutter_front_end/Domain/use_cases/login_use_case.dart';
-import 'package:flutter_front_end/Presentation/Screens/login_screen.dart';
-import 'package:flutter_front_end/Presentation/State%20Management/app_state.dart';
+import 'package:flutter_front_end/view_model/login_view_model.dart';
+import 'package:flutter_front_end/model/entities/registration_data.dart';
+import 'package:flutter_front_end/model/entities/user_entity.dart';
+import 'package:flutter_front_end/model/exceptions/auth_exceptions.dart';
+import 'package:flutter_front_end/model/repositories/auth_repository.dart';
+import 'package:flutter_front_end/model/use_cases/login_use_case.dart';
+import 'package:flutter_front_end/view/screens/login_screen.dart';
+import 'package:flutter_front_end/view_model/app_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 final _user = UserEntity(
@@ -54,7 +55,7 @@ class _FakeAuth implements AuthRepository {
   Future<void> logout() => throw UnimplementedError();
 }
 
-class _NoApp implements AppState {
+class _NoApp implements AppViewModel {
   final loggedIn = <UserEntity>[];
 
   @override
@@ -73,7 +74,7 @@ void main() {
     app = _NoApp();
     await tester.binding.setSurfaceSize(const Size(420, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(MaterialApp(home: LoginScreen(appState: app, login: LoginUseCase(auth))));
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(appState: app, createViewModel: () => LoginViewModel(login: LoginUseCase(auth), onSignedIn: app.login))));
   }
 
   TextField field(WidgetTester tester, String key) => tester.widget<TextField>(
