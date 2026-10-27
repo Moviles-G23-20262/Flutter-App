@@ -52,6 +52,8 @@ import '../model/repositories/impl/draft_repositories_impl.dart';
 import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
 import '../model/use_cases/rating_draft_use_cases.dart';
+import '../model/data_sources/local/draft_photo_store.dart';
+import '../model/use_cases/listing_draft_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -102,6 +104,9 @@ class AppDependencies {
   final LoadRatingDraftUseCase loadRatingDraft;
   final SaveRatingDraftUseCase saveRatingDraft;
   final ClearRatingDraftUseCase clearRatingDraft;
+  final LoadListingDraftUseCase loadListingDraft;
+  final SaveListingDraftUseCase saveListingDraft;
+  final ClearListingDraftUseCase clearListingDraft;
 
   /// Exchange steps done offline: queued in the outbox and sent later.
   final QueueExchangeCompletionUseCase queueExchangeCompletion;
@@ -189,6 +194,9 @@ class AppDependencies {
     required this.loadRatingDraft,
     required this.saveRatingDraft,
     required this.clearRatingDraft,
+    required this.loadListingDraft,
+    required this.saveListingDraft,
+    required this.clearListingDraft,
     required this.queueExchangeCompletion,
     required this.queueRating,
     required this.queueMeetingProposal,
@@ -197,11 +205,16 @@ class AppDependencies {
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
-  SmartListingViewModel createSmartListingViewModel({PublishListing? publish}) => SmartListingViewModel(
+  SmartListingViewModel createSmartListingViewModel({PublishListing? publish, String? userId}) =>
+      SmartListingViewModel(
         estimator: estimatePrice,
         pickPhoto: imagePicker.pick,
         classifyPhoto: classifyItemPhoto,
         publishListing: publish,
+        userId: userId,
+        loadDraft: loadListingDraft,
+        saveDraft: saveListingDraft,
+        clearDraft: clearListingDraft,
       );
 
   factory AppDependencies.create() {
@@ -256,6 +269,7 @@ class AppDependencies {
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
     final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
+    final listingDrafts = ListingDraftRepositoryImpl(DraftStore(), DraftPhotoStore());
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -326,6 +340,9 @@ class AppDependencies {
       loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
       saveRatingDraft: SaveRatingDraftUseCase(ratingDrafts),
       clearRatingDraft: ClearRatingDraftUseCase(ratingDrafts),
+      loadListingDraft: LoadListingDraftUseCase(listingDrafts),
+      saveListingDraft: SaveListingDraftUseCase(listingDrafts),
+      clearListingDraft: ClearListingDraftUseCase(listingDrafts),
       queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
       queueRating: QueueRatingUseCase(pendingActions),
       queueMeetingProposal: QueueMeetingProposalUseCase(pendingActions),
