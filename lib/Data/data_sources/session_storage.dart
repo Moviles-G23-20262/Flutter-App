@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 abstract class SessionStorage {
   Future<String?> readToken();
   Future<void> saveToken(String token);
+  Future<String?> readUserId();
+  Future<void> saveUserId(String userId);
   Future<void> clear();
 }
 
@@ -47,6 +49,7 @@ class SecureBiometricCredentialStorage implements BiometricCredentialStorage {
 
 class SecureSessionStorage implements SessionStorage {
   static const _tokenKey = 'access_token';
+  static const _userIdKey = 'user_id';
 
   final FlutterSecureStorage _storage;
 
@@ -60,5 +63,14 @@ class SecureSessionStorage implements SessionStorage {
   Future<void> saveToken(String token) => _storage.write(key: _tokenKey, value: token);
 
   @override
-  Future<void> clear() => _storage.delete(key: _tokenKey);
+  Future<String?> readUserId() => _storage.read(key: _userIdKey);
+
+  @override
+  Future<void> saveUserId(String userId) => _storage.write(key: _userIdKey, value: userId);
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _userIdKey);
+  }
 }

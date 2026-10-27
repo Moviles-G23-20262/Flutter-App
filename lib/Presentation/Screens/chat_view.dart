@@ -1,3 +1,5 @@
+import '../Widgets/offline_banner.dart';
+import '../Widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
@@ -159,6 +161,29 @@ class _ChatViewState extends State<ChatView> {
                   ],
                 ),
               ),
+              StreamBuilder<int>(
+                stream: widget.appState.outboxStore.pendingCountStream,
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  if (count == 0) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning400,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_upload_outlined, size: 12, color: Colors.black87),
+                        const SizedBox(width: 3),
+                        Text('', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      ],
+                    ),
+                  );
+                },
+              ),
               IconButton(
                 tooltip: 'Safety tips',
                 icon: Icon(Icons.shield_outlined, color: accentHi),
@@ -167,6 +192,12 @@ class _ChatViewState extends State<ChatView> {
             ],
           ),
         ),
+        if (widget.appState.connectivity.isOffline)
+          OfflineBanner.forCache(
+            formattedAge: 'just now',
+            noun: 'messages',
+            onRetry: () => chats.refreshMessages(),
+          ),
         Divider(color: border, height: 1),
 
         // ── The listing being discussed ──
@@ -364,10 +395,12 @@ class _ListingStrip extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: 56, height: 56,
-              child: m.primaryImageUrl.isNotEmpty
-                  ? Image.network(m.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _ListingIcon(color: accentHi, background: tagBg))
-                  : _ListingIcon(color: accentHi, background: tagBg),
+              child: CachedPhoto(
+                imageUrl: m.primaryImageUrl,
+                category: m.category.name,
+                width: 56,
+                height: 56,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -566,8 +599,19 @@ class _Bubble extends StatelessWidget {
                         style: AppTextStyles.mono(isMe ? onMe : txMuted, fontSize: AppTextStyles.sizeXs)),
                     if (isMe) ...[
                       const SizedBox(width: 4),
-                      Icon(message.isRead ? Icons.done_all_rounded : Icons.done_rounded,
-                          size: 15, color: message.isRead ? AppColors.success400 : onMe),
+                      Icon(
+                        message.isPending
+                            ? Icons.access_time_rounded
+                            : message.isRead
+                                ? Icons.done_all_rounded
+                                : Icons.done_rounded,
+                        size: 15,
+                        color: message.isPending
+                            ? (isMe ? onMe : txMuted)
+                            : message.isRead
+                                ? AppColors.success400
+                                : onMe,
+                      ),
                     ],
                   ],
                 ),

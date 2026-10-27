@@ -187,3 +187,67 @@ RatingEntity ratingFromJson(Json json) {
 
 List<T> parseList<T>(Object? response, T Function(Json) parse) =>
     (response as List<dynamic>).map((item) => parse(item as Json)).toList();
+
+
+Map<String, dynamic> materialToJson(MaterialEntity m) => {
+  'id': m.id,
+  'title': m.title,
+  'description': m.description,
+  'courseCode': m.courseCode,
+  'price': m.price,
+  'condition': m.condition?.name,
+  'status': m.status.name,
+  'edition': m.edition,
+  'model': m.model,
+  'imageUrls': m.imageUrls,
+  'sellerId': m.sellerId,
+  'seller': m.seller != null
+      ? {
+          'id': m.seller!.id,
+          'email': m.seller!.email,
+          'fullName': m.seller!.fullName,
+          'rating': m.seller!.rating,
+        }
+      : null,
+  'category': m.category.name,
+  'createdAt': m.createdAt.toIso8601String(),
+  'updatedAt': m.updatedAt.toIso8601String(),
+};
+
+Map<String, dynamic> messageToJson(MessageEntity m) => {
+  'id': m.id,
+  'chatRoomId': m.chatRoomId,
+  'senderId': m.senderId,
+  'content': m.content,
+  'type': m.type.name,
+  'isRead': m.isRead,
+  'createdAt': m.createdAt.toIso8601String(),
+  'meetingProposalId': m.meetingProposalId,
+};
+
+Map<String, dynamic> chatRoomToJson(ChatRoomEntity r) => {
+  'id': r.id,
+  'materialId': r.materialId,
+  'buyerId': r.buyerId,
+  'sellerId': r.sellerId,
+  'createdAt': r.createdAt.toIso8601String(),
+  'material': r.material != null ? materialToJson(r.material!) : null,
+  'buyer': r.buyer != null
+      ? {
+          'id': r.buyer!.id,
+          'email': r.buyer!.email,
+          'fullName': r.buyer!.fullName,
+          'rating': r.buyer!.rating,
+        }
+      : null,
+  'seller': r.seller != null
+      ? {
+          'id': r.seller!.id,
+          'email': r.seller!.email,
+          'fullName': r.seller!.fullName,
+          'rating': r.seller!.rating,
+        }
+      : null,
+  'lastMessage': r.lastMessage != null ? messageToJson(r.lastMessage!) : null,
+  'unreadCount': r.unreadCount,
+};

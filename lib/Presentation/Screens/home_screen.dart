@@ -1,3 +1,5 @@
+import '../Widgets/offline_banner.dart';
+import '../Widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../Widgets/async_views.dart';
@@ -88,8 +90,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final sellers     = _featuredSellers();
     final unreadAlerts = widget.appState.account.unreadNotifications;
 
+    final isOffline = widget.appState.connectivity.isOffline;
+    final isWaitingForWifi = widget.appState.connectivity.isWaitingForWifi;
+
     return Column(
       children: [
+        if (isWaitingForWifi)
+          OfflineBanner.waitingForWifi(onSendNow: () {
+            widget.appState.connectivity.setAllowMobileData(true);
+          })
+        else if (isOffline && market.materials.isEmpty)
+          OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh)
+        else if (isOffline)
+          OfflineBanner.forCache(formattedAge: market.formattedCacheAge, noun: 'listings', onRetry: _refresh),
         // ── Header ─────────────────────────────────────────────────────────
         Container(
           color: surface,
@@ -451,10 +464,13 @@ class _ProductCard extends StatelessWidget {
             // Image
             SizedBox(
               height: 110,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover, width: double.infinity,
-                      errorBuilder: (_, _, _) => Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)))
-                  : Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)),
+              width: double.infinity,
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                width: double.infinity,
+                height: 110,
+              ),
             ),
             // Content
             Padding(
@@ -526,10 +542,12 @@ class _RecommendedRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: SizedBox(
               width: 68, height: 68,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(color: elevated))
-                  : Container(color: elevated),
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                width: 68,
+                height: 68,
+              ),
             ),
           ),
           const SizedBox(width: 12),

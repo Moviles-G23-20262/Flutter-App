@@ -1,3 +1,4 @@
+import '../Widgets/offline_banner.dart';
 import 'package:flutter/material.dart';
 
 import '../../Domain/exceptions/auth_exceptions.dart';
@@ -51,6 +52,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _bannerError = '';
   bool _loading = false;
   bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+    _nameCtrl.addListener(_onFieldChanged);
+    _emailCtrl.addListener(_onFieldChanged);
+    _majorCtrl.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    widget.appState.draftStore.debouncedSaveRegisterDraft(
+      fullName: _nameCtrl.text,
+      major: _majorCtrl.text,
+      email: _emailCtrl.text,
+    );
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await widget.appState.draftStore.getRegisterDraft();
+    if (draft != null && mounted) {
+      setState(() {
+        if (_nameCtrl.text.isEmpty && draft['fullName'] != null) {
+          _nameCtrl.text = draft['fullName'] as String;
+        }
+        if (_emailCtrl.text.isEmpty && draft['email'] != null) {
+          _emailCtrl.text = draft['email'] as String;
+        }
+        if (_majorCtrl.text.isEmpty && draft['major'] != null) {
+          _majorCtrl.text = draft['major'] as String;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -119,6 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         faculty: _faculty,
       );
       if (!mounted) return;
+      await widget.appState.draftStore.clearRegisterDraft();
       // The account exists: sign the student in. AppState switches to Home.
       widget.appState.login(user);
     } on EmailAlreadyRegisteredException catch (e) {

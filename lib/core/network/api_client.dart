@@ -35,6 +35,9 @@ class ApiClient {
   /// Called when the server rejects the token we sent (expired or revoked), so the app can sign out.
   void Function()? onUnauthorized;
 
+  /// Hook to notify connectivity state when requests succeed or fail with transport errors.
+  void Function(bool isOnline)? onConnectivityStatusChanged;
+
   ApiClient({required String baseUrl, required this.client})
       // Config files may end with "/", which would turn "$baseUrl/auth" into "//auth".
       : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), '');
@@ -95,15 +98,21 @@ class ApiClient {
     try {
       response = await request().timeout(_timeout);
     } on TimeoutException {
+      onConnectivityStatusChanged?.call(false);
       throw const NetworkException('The server took too long to respond.');
     } on http.ClientException catch (e) {
+      onConnectivityStatusChanged?.call(false);
       throw NetworkException(e.message);
+    } on Exception catch (e) {
+      onConnectivityStatusChanged?.call(false);
+      throw NetworkException(e.toString());
     }
     return _processResponse(response);
   }
 
   dynamic _processResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      onConnectivityStatusChanged?.call(true);
       if (response.body.isNotEmpty) {
         return jsonDecode(response.body);
       }

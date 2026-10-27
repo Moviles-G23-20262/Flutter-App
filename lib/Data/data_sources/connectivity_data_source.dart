@@ -21,6 +21,27 @@ class ConnectivityDataSource implements ConnectivityRepository {
     }
   }
 
+  Future<bool> isWifi() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      return results.contains(ConnectivityResult.wifi);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> isMobileData() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      return results.contains(ConnectivityResult.mobile);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Stream<List<ConnectivityResult>> watchResults() =>
+      _connectivity.onConnectivityChanged;
+
   @override
   Stream<bool> watch() => _connectivity.onConnectivityChanged.map(_online).distinct();
 }

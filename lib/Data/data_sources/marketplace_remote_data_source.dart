@@ -1,3 +1,5 @@
+import '../local/response_cache.dart';
+import 'session_storage.dart';
 import '../../core/network/api_client.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
 import '../../Domain/Entities/exchange_entity.dart';
@@ -87,17 +89,35 @@ abstract class MarketplaceRemoteDataSource {
 class MarketplaceRemoteDataSourceImpl
     implements MarketplaceRemoteDataSource {
   final ApiClient apiClient;
+  final ResponseCache? responseCache;
+  final SessionStorage? sessionStorage;
 
   MarketplaceRemoteDataSourceImpl({
     required this.apiClient,
+    this.responseCache,
+    this.sessionStorage,
   });
 
   @override
-  Future<List<MaterialEntity>> getMaterials() async =>
-      parseList(
-        await apiClient.get('/materials'),
-        materialFromJson,
-      );
+  Future<List<MaterialEntity>> getMaterials() async {
+    try {
+      final raw = await apiClient.get('/materials');
+      if (responseCache != null && raw is List) {
+        final userId = await sessionStorage?.readUserId() ?? 'shared';
+        await responseCache!.write(userId: userId, endpoint: '/materials', data: raw);
+      }
+      return parseList(raw, materialFromJson);
+    } on NetworkException {
+      if (responseCache != null) {
+        final userId = await sessionStorage?.readUserId() ?? 'shared';
+        final cached = await responseCache!.read(userId: userId, endpoint: '/materials');
+        if (cached != null && cached.data is List) {
+          return parseList(cached.data, materialFromJson);
+        }
+      }
+      rethrow;
+    }
+  }
 
   @override
   Future<MaterialEntity> createMaterial(
@@ -155,11 +175,25 @@ class MarketplaceRemoteDataSourceImpl
   }
 
   @override
-  Future<List<ChatRoomEntity>> getChatRooms() async =>
-      parseList(
-        await apiClient.get('/chatrooms'),
-        chatRoomFromJson,
-      );
+  Future<List<ChatRoomEntity>> getChatRooms() async {
+    try {
+      final raw = await apiClient.get('/chatrooms');
+      if (responseCache != null && raw is List) {
+        final userId = await sessionStorage?.readUserId() ?? 'shared';
+        await responseCache!.write(userId: userId, endpoint: '/chatrooms', data: raw);
+      }
+      return parseList(raw, chatRoomFromJson);
+    } on NetworkException {
+      if (responseCache != null) {
+        final userId = await sessionStorage?.readUserId() ?? 'shared';
+        final cached = await responseCache!.read(userId: userId, endpoint: '/chatrooms');
+        if (cached != null && cached.data is List) {
+          return parseList(cached.data, chatRoomFromJson);
+        }
+      }
+      rethrow;
+    }
+  }
 
   @override
   Future<ChatRoomEntity> openChatRoom(

@@ -1,3 +1,4 @@
+import '../Widgets/offline_banner.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../Domain/Entities/chat_room_entity.dart';
@@ -78,8 +79,16 @@ class _ConversationList extends StatelessWidget {
 
     final unread = chats.unreadTotal;
 
+    final isOffline = appState.connectivity.isOffline;
+
     return Column(
       children: [
+        if (isOffline)
+          OfflineBanner.forCache(
+            formattedAge: 'saved on this phone',
+            noun: 'conversations',
+            onRetry: chats.loadRooms,
+          ),
         // Header
         Container(
           color: surface,

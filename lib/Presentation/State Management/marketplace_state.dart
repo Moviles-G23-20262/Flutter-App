@@ -28,6 +28,22 @@ class MarketplaceState extends ChangeNotifier {
   bool _loadedOnce = false;
   String? _error;
   final Set<String> _togglingFavorites = {};
+  DateTime? _lastSuccessfulSync;
+
+  DateTime? get lastSuccessfulSync => _lastSuccessfulSync;
+
+  String? get formattedCacheAge {
+    if (_lastSuccessfulSync == null) return null;
+    final diff = DateTime.now().difference(_lastSuccessfulSync!);
+    final mins = diff.inMinutes;
+    if (mins < 1) return 'just now';
+    if (mins == 1) return '1 min ago';
+    if (mins < 60) return '\ min ago';
+    final hours = diff.inHours;
+    if (hours == 1) return '1 hour ago';
+    if (hours < 24) return '\ hours ago';
+    return '\ days ago';
+  }
 
   /// Bumped on [clear] so answers that arrive after a sign-out are dropped.
   int _generation = 0;
@@ -58,6 +74,7 @@ class MarketplaceState extends ChangeNotifier {
       if (generation != _generation) return;
       _materials = results[0] as List<MaterialEntity>;
       _wishlist = results[1] as List<WishlistItemEntity>;
+      _lastSuccessfulSync = DateTime.now();
     } on DataException catch (e) {
       if (generation != _generation) return;
       _error = e.message;

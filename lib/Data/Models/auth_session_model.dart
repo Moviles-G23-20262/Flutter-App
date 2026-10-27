@@ -26,3 +26,14 @@ UserEntity userEntityFromJson(Map<String, dynamic> json) {
     createdAt: DateTime.parse(json['createdAt'] as String),
   );
 }
+
+
+Map<String, dynamic> userEntityToJson(UserEntity user) => {
+  'id': user.id,
+  'email': user.email,
+  'fullName': user.fullName,
+  'major': user.major,
+  'faculty': user.faculty,
+  'rating': user.rating,
+  'createdAt': user.createdAt.toIso8601String(),
+};

@@ -1,3 +1,5 @@
+import '../local/response_cache.dart';
+import '../Models/auth_session_model.dart';
 import '../../core/network/api_client.dart';
 import '../../Domain/Entities/registration_data.dart';
 import '../../Domain/Entities/user_entity.dart';
@@ -12,12 +14,14 @@ class AuthRepositoryImpl implements AuthRepository {
   final SessionStorage storage;
   final BiometricCredentialStorage biometricStorage;
   final ApiClient apiClient;
+  final ResponseCache? responseCache;
 
   AuthRepositoryImpl({
     required this.remote,
     required this.storage,
     required this.biometricStorage,
     required this.apiClient,
+    this.responseCache,
   });
 
   @override
@@ -60,7 +64,14 @@ class AuthRepositoryImpl implements AuthRepository {
       apiClient.authToken = null;
       return null;
     } on NetworkException {
-      // Offline at launch: keep the token for next time, show the login screen.
+      // Offline at launch (EC6): restore saved user profile from local cache
+      if (responseCache != null) {
+        final userId = await storage.readUserId() ?? 'shared';
+        final cached = await responseCache!.read(userId: userId, endpoint: '/auth/me');
+        if (cached != null && cached.data is Map<String, dynamic>) {
+          return userEntityFromJson(cached.data as Map<String, dynamic>);
+        }
+      }
       apiClient.authToken = null;
       return null;
     }

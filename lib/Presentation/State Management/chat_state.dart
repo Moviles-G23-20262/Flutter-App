@@ -1,3 +1,5 @@
+import '../../Data/local/pending_message_store.dart';
+import '../../Data/sync/outbox_sync_service.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -25,6 +27,8 @@ class ChatState extends ChangeNotifier {
   final MarkChatReadUseCase markRead;
   final AnswerMeetingProposalUseCase answerProposal;
   final GetConversationInsightUseCase getConversationInsight;
+  final PendingMessageStore? pendingMessageStore;
+  final OutboxSyncService? outboxSyncService;
 
   ChatState({
     required this.getChatRooms,
@@ -34,7 +38,22 @@ class ChatState extends ChangeNotifier {
     required this.markRead,
     required this.answerProposal,
     required this.getConversationInsight,
+    this.pendingMessageStore,
+    this.outboxSyncService,
   });
+
+  bool _isOffline = false;
+
+  void setOffline(bool offline) {
+    if (_isOffline == offline) return;
+    _isOffline = offline;
+    if (_isOffline) {
+      stopPolling();
+    } else {
+      startPolling();
+    }
+    notifyListeners();
+  }
 
   String? _userId;
   List<ChatRoomEntity> _rooms = const [];
@@ -141,14 +160,53 @@ class ChatState extends ChangeNotifier {
 
   /// Sends [text] to the open conversation. Returns an error message to show, or `null`.
   Future<String?> send(String roomId, String text) async {
-    try {
-      final message = await sendMessage.execute(roomId, text);
-      _messages[roomId] = [...messagesOf(roomId), message];
-      notifyListeners();
-      return null;
-    } on DataException catch (e) {
-      return e.message;
+    final senderId = _userId ?? 'me';
+    final clientId = DateTime.now().microsecondsSinceEpoch.toString();
+    final clientCreated = DateTime.now();
+
+    final localMsg = MessageEntity(
+      id: clientId,
+      chatRoomId: roomId,
+      senderId: senderId,
+      content: text,
+      type: MessageTypeEnum.TEXT,
+      isRead: false,
+      createdAt: clientCreated,
+      isPending: true,
+    );
+
+    if (pendingMessageStore != null) {
+      await pendingMessageStore!.insert(PendingMessage(
+        clientId: clientId,
+        userId: senderId,
+        roomId: roomId,
+        content: text,
+        clientCreatedAt: clientCreated,
+      ));
     }
+
+    _messages[roomId] = [...messagesOf(roomId), localMsg];
+    notifyListeners();
+
+    if (outboxSyncService != null) {
+      outboxSyncService!.flush(userId: senderId).then((_) {
+        refreshMessages();
+      }).catchError((_) {
+        notifyListeners();
+      });
+    } else {
+      try {
+        final serverMsg = await sendMessage.execute(roomId, text);
+        _messages[roomId] = [
+          ...messagesOf(roomId).where((m) => m.id != clientId),
+          serverMsg,
+        ];
+        notifyListeners();
+      } on DataException catch (e) {
+        return e.message;
+      }
+    }
+    return null;
   }
 
   /// Accepts, declines or withdraws a meetup proposal shown in the open chat.
@@ -232,6 +290,7 @@ class ChatState extends ChangeNotifier {
 
   void _restartTimer() {
     _timer?.cancel();
+    if (_isOffline) return; // EC8: Pauses polling while offline
     if (_activeRoomId != null) {
       _timer = Timer.periodic(
         _powerSaving ? _savingMessagePollInterval : _messagePollInterval,

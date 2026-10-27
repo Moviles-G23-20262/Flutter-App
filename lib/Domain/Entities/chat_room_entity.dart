@@ -127,6 +127,9 @@ class MessageEntity {
   /// Timestamp when the message was created / sent.
   final DateTime createdAt;
 
+  /// Whether this message is waiting in the local outbox.
+  final bool isPending;
+
   const MessageEntity({
     required this.id,
     required this.chatRoomId,
@@ -136,6 +139,7 @@ class MessageEntity {
     this.meetingProposal,
     required this.isRead,
     required this.createdAt,
+    this.isPending = false,
   });
 
   // ── copyWith ─────────────────────────────────────────────────────────────────
@@ -148,6 +152,7 @@ class MessageEntity {
     String? content,
     bool? isRead,
     DateTime? createdAt,
+    bool? isPending,
   }) {
     return MessageEntity(
       id:         id         ?? this.id,
@@ -158,6 +163,7 @@ class MessageEntity {
       meetingProposal: meetingProposal,
       isRead:     isRead     ?? this.isRead,
       createdAt:  createdAt  ?? this.createdAt,
+      isPending:  isPending  ?? this.isPending,
     );
   }
 
