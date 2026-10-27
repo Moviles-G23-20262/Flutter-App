@@ -26,6 +26,7 @@ class PendingListingRepositoryImpl implements PendingListingRepository {
       ownerId: ownerId,
       payload: newListingToJson(data),
       photoPaths: photoPaths,
+      id: data.clientId,
     );
     sync?.flush();
     return listing;

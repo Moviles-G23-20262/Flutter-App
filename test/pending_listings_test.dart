@@ -7,7 +7,10 @@ import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_front_end/core/isolates/photo_compressor.dart';
 import 'package:flutter_front_end/model/data_sources/local/app_database.dart';
 import 'package:flutter_front_end/model/data_sources/local/outbox_store.dart';
+import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/model/dto/marketplace_models.dart';
 import 'package:flutter_front_end/model/entities/material_entity.dart';
+import 'package:flutter_front_end/model/repositories/impl/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/model/entities/new_listing_data.dart';
 import 'package:flutter_front_end/model/entities/pending_items.dart';
 import 'package:flutter_front_end/model/exceptions/data_exceptions.dart';
@@ -188,7 +191,8 @@ void main() {
     test('uploads every photo in order, then creates the listing with all their urls', () async {
       final a = photoFile('a.jpg');
       final b = photoFile('b.jpg');
-      await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus', 'price': '35000.00'}, photoPaths: [a, b]);
+      final queued =
+          await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus', 'price': '35000.00'}, photoPaths: [a, b]);
 
       sync.start('ana');
       await sync.flush();
@@ -197,6 +201,7 @@ void main() {
       expect(sender.listings.single, {
         'title': 'Calculus',
         'price': '35000.00',
+        'clientId': queued.id,
         'imageUrls': ['https://cdn.test/a.jpg', 'https://cdn.test/b.jpg'],
       });
       expect(await store.listings('ana'), isEmpty);
@@ -233,6 +238,26 @@ void main() {
       expect(sender.uploads, [a, b, c]); // a and b only once
       expect(sender.listings.single['imageUrls'], hasLength(3));
       expect(await store.listings('ana'), isEmpty);
+    });
+
+    test('POST /materials carries the listing\'s own id as clientId, also for rows saved before the field existed', () async {
+      final queued = await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'}); // no clientId in it
+
+      sync.start('ana');
+      await sync.flush();
+
+      expect(sender.listings.single['clientId'], queued.id);
+    });
+
+    test('a retry sends the same clientId again, so the server can recognise the listing', () async {
+      final queued = await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      sender.failures.add(const NetworkException('answer lost'));
+      sync.start('ana');
+      await sync.flush();
+
+      await sync.flush();
+
+      expect(sender.listings.map((l) => l['clientId']), [queued.id]);
     });
 
     test('a listing without photos only needs POST /materials', () async {
@@ -281,6 +306,63 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       expect(sender.listings, hasLength(1));
+    });
+  });
+
+  group('clientId in the POST /materials body', () {
+    const id = '12345678-1234-4234-8234-123456789abc';
+
+    test('newListingToJson includes it when the listing has one', () {
+      final body = newListingToJson(NewListingData(
+        title: 'Calculus',
+        description: 'Barely used',
+        price: 35000,
+        condition: MaterialConditionEnum.GOOD,
+        category: MaterialCategoryEnum.BOOKS,
+        clientId: id,
+      ));
+
+      expect(body['clientId'], id);
+    });
+
+    test('and leaves it out when it has none', () {
+      expect(newListingToJson(_data()).containsKey('clientId'), isFalse);
+    });
+
+    test('publishing online sends it with the request', () async {
+      final remote = _CapturingRemote();
+      final repository = MaterialRepositoryImpl(remote);
+
+      await repository.createListing(NewListingData(
+        title: 'Calculus',
+        description: 'Barely used',
+        price: 35000,
+        condition: MaterialConditionEnum.GOOD,
+        category: MaterialCategoryEnum.BOOKS,
+        images: [PendingImage(bytes: _photo, filename: 'a.jpg')],
+        clientId: id,
+      ));
+
+      expect(remote.created.single['clientId'], id);
+      expect(remote.created.single['imageUrls'], ['https://cdn.test/a.jpg']);
+    });
+
+    test('the offline queue keeps it as the PendingListing id', () async {
+      final queued = await PendingListingRepositoryImpl(store).queue(
+        ownerId: 'ana',
+        data: NewListingData(
+          title: 'Calculus',
+          description: 'Barely used',
+          price: 35000,
+          condition: MaterialConditionEnum.GOOD,
+          category: MaterialCategoryEnum.BOOKS,
+          clientId: id,
+        ),
+        photoPaths: [],
+      );
+
+      expect(queued.id, id);
+      expect((await store.listings('ana')).single.payload['clientId'], id);
     });
   });
 
@@ -350,8 +432,11 @@ void main() {
     Object? publishError;
     late PendingListingRepositoryImpl queueRepo;
 
+    var madeIds = 0;
+
     SmartListingViewModel viewModel({bool withQueue = true, String? userId = 'ana', bool withNetworkCheck = true}) =>
         SmartListingViewModel(
+          newListingId: () => 'listing-${++madeIds}',
           estimator: PriceEstimatorUseCase(repository: _Stats()),
           pickPhoto: (source) async => _photo,
           publishListing: (data) async {
@@ -384,7 +469,78 @@ void main() {
       published = [];
       events = [];
       publishError = null;
+      madeIds = 0;
       queueRepo = PendingListingRepositoryImpl(store);
+    });
+
+    test('publishing online sends a fresh clientId with the request', () async {
+      final vm = viewModel();
+
+      await publish(vm);
+
+      expect(published.single.clientId, 'listing-1');
+      vm.dispose();
+    });
+
+    test('the default id is a UUIDv4', () async {
+      final vm = SmartListingViewModel(
+        estimator: PriceEstimatorUseCase(repository: _Stats()),
+        pickPhoto: (source) async => _photo,
+        publishListing: (data) async => published.add(data),
+      );
+
+      await publish(vm);
+
+      expect(published.single.clientId, matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
+      vm.dispose();
+    });
+
+    test('offline: the queued listing gets that same id', () async {
+      network.online = false;
+      final vm = viewModel();
+
+      await publish(vm);
+
+      final saved = (await store.listings('ana')).single;
+      expect(saved.id, 'listing-1');
+      expect(saved.payload['clientId'], 'listing-1');
+      vm.dispose();
+    });
+
+    test('a request that may have reached the server and is then queued keeps the SAME id', () async {
+      // The server could have created the listing and lost the answer: the retry must repeat the id.
+      publishError = const NoConnectionException();
+      final vm = viewModel();
+
+      await publish(vm);
+
+      expect((await store.listings('ana')).single.id, 'listing-1');
+      expect(madeIds, 1);
+      vm.dispose();
+    });
+
+    test('pressing Publish again after an error is the same listing, so the same id', () async {
+      publishError = const DataException('Something went wrong on our side. Please try again later.');
+      final vm = viewModel();
+      expect(await publish(vm), isFalse);
+
+      publishError = null;
+      expect(await vm.publish(title: 'Calculus', description: 'Barely used', courseCode: '', price: '35000'), isTrue);
+
+      expect(published.single.clientId, 'listing-1');
+      expect(madeIds, 1);
+      vm.dispose();
+    });
+
+    test('a new form gets a new id', () async {
+      final vm = viewModel();
+      await publish(vm);
+
+      vm.reset();
+      await publish(vm);
+
+      expect(published.map((d) => d.clientId), ['listing-1', 'listing-2']);
+      vm.dispose();
     });
 
     test('online: compresses first, publishes the compressed photos, and cleans up', () async {
@@ -537,6 +693,34 @@ class _NoApp implements AppViewModel {
 
   @override
   void navigateTo(AppScreen screen) => screens.add(screen);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Only what `createListing` calls: the rest of the data source is never used here.
+class _CapturingRemote implements MarketplaceRemoteDataSource {
+  final created = <Map<String, dynamic>>[];
+
+  @override
+  Future<String> uploadImage({required List<int> bytes, required String filename}) async => 'https://cdn.test/$filename';
+
+  @override
+  Future<MaterialEntity> createMaterial(Map<String, dynamic> body) async {
+    created.add(body);
+    return MaterialEntity(
+      id: 'm1',
+      title: body['title'] as String,
+      description: 'd',
+      price: 1,
+      status: MaterialStatusEnum.AVAILABLE,
+      imageUrls: const [],
+      sellerId: 'ana',
+      category: MaterialCategoryEnum.BOOKS,
+      createdAt: DateTime(2026, 10, 27),
+      updatedAt: DateTime(2026, 10, 27),
+    );
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
