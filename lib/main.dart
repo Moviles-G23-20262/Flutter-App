@@ -10,6 +10,7 @@ import 'view_model/schedule_view_model.dart';
 import 'view_model/power_view_model.dart';
 import 'view_model/connectivity_view_model.dart';
 import 'view_model/theme_view_model.dart';
+import 'view_model/complete_exchange_view_model.dart';
 import 'app/theme/app_theme.dart';
 import 'view/screens/login_screen.dart';
 import 'view/screens/register_screen.dart';
@@ -39,7 +40,7 @@ class CampusSwapApp extends StatefulWidget {
   State<CampusSwapApp> createState() => _CampusSwapAppState();
 }
 
-class _CampusSwapAppState extends State<CampusSwapApp> {
+class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserver {
   final AppDependencies _deps = AppDependencies.create();
   late final AppViewModel _appState = AppViewModel(
     onLogout: _deps.logout.execute,
@@ -67,6 +68,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       completeExchange: _deps.completeExchange,
       cancelExchange: _deps.cancelExchange,
       rateUser: _deps.rateUser,
+      watchPendingActions: _deps.watchPendingActions,
+      discardPendingAction: _deps.discardPendingAction,
     ),
     schedule: ScheduleViewModel(
       getSchedule: _deps.getSchedule,
@@ -85,11 +88,16 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
       getConnectivity: _deps.getConnectivity,
       watchConnectivity: _deps.watchConnectivity,
     ),
+    startOutboxSync: _deps.startOutboxSync,
+    stopOutboxSync: _deps.stopOutboxSync,
+    syncOutbox: _deps.syncOutbox,
+    verifySession: _deps.verifySession,
   );
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appState.theme.start();
     _appState.power.start();
     _appState.connectivity.start();
@@ -112,7 +120,13 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _appState.appResumed();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _appState.dispose();
     super.dispose();
   }
@@ -181,8 +195,26 @@ class _CampusSwapAppState extends State<CampusSwapApp> {
         return ConfirmationScreen(appState: _appState, exchange: order);
       case AppScreen.completeExchange:
         final exchange = _appState.selectedExchange;
-        if (exchange == null) return AppShell(appState: _appState);
-        return CompleteExchangeScreen(appState: _appState, exchange: exchange);
+        final me = _appState.currentUser;
+        if (exchange == null || me == null) return AppShell(appState: _appState);
+        final account = _appState.account;
+        return CompleteExchangeScreen(
+          appState: _appState,
+          createViewModel: () => CompleteExchangeViewModel(
+            exchange: exchange,
+            userId: me.id,
+            completeExchange: _deps.completeExchange,
+            rateUser: _deps.rateUser,
+            queueCompletion: _deps.queueExchangeCompletion,
+            queueRating: _deps.queueRating,
+            loadDraft: _deps.loadRatingDraft,
+            saveDraft: _deps.saveRatingDraft,
+            clearDraft: _deps.clearRatingDraft,
+            onExchangeUpdated: account.updateExchange,
+            completionQueued: account.isCompletionQueued(exchange.id),
+            ratingQueued: account.isRatingQueued(exchange.id),
+          ),
+        );
       case AppScreen.meetingPlanner:
         final room = _appState.plannerRoom;
         if (room == null) return AppShell(appState: _appState);

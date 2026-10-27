@@ -126,6 +126,9 @@ class _FakeAuth implements AuthRepository {
   Future<UserEntity?> restoreSession() => throw UnimplementedError();
 
   @override
+  Future<UserEntity?> verifySession() async => null;
+
+  @override
   Future<void> logout() => throw UnimplementedError();
 }
 

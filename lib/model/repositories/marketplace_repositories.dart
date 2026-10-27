@@ -1,3 +1,4 @@
+import '../entities/cached_list.dart';
 import '../entities/chat_room_entity.dart';
 import '../entities/exchange_entity.dart';
 import '../entities/material_entity.dart';
@@ -17,7 +18,8 @@ abstract class MaterialRepository {
 }
 
 abstract class WishlistRepository {
-  Future<List<WishlistItemEntity>> getWishlist();
+  /// Offline, the copy saved at the last successful load (see [CachedList.savedAt]).
+  Future<CachedList<WishlistItemEntity>> getWishlist();
 
   /// Saving something twice is harmless.
   Future<WishlistItemEntity> add(String materialId);
@@ -61,7 +63,8 @@ abstract class RatingRepository {
 }
 
 abstract class NotificationRepository {
-  Future<List<NotificationEntity>> getNotifications();
+  /// Offline, the copy saved at the last successful load (see [CachedList.savedAt]).
+  Future<CachedList<NotificationEntity>> getNotifications();
 
   Future<void> markOpened(String notificationId);
 }

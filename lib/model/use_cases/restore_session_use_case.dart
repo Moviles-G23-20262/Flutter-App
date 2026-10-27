@@ -9,3 +9,13 @@ class RestoreSessionUseCase {
 
   Future<UserEntity?> execute() => repository.restoreSession();
 }
+
+/// For a session opened offline from the saved profile: checks the token once the server can be
+/// reached. Returns the fresh profile, or `null` when there was nothing to check.
+class VerifySessionUseCase {
+  final AuthRepository repository;
+
+  VerifySessionUseCase(this.repository);
+
+  Future<UserEntity?> execute() => repository.verifySession();
+}
