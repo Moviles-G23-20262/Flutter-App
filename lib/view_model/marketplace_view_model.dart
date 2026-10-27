@@ -24,6 +24,7 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   List<MaterialEntity> _materials = const [];
   List<WishlistItemEntity> _wishlist = const [];
+  DateTime? _wishlistSavedAt;
   bool _loading = false;
   bool _loadedOnce = false;
   String? _error;
@@ -36,6 +37,9 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<MaterialEntity> get availableMaterials =>
       _materials.where((m) => m.isAvailable).toList(growable: false);
   List<WishlistItemEntity> get wishlist => _wishlist;
+
+  /// Set while the favorites shown are the copy saved on the phone (offline): when it was saved.
+  DateTime? get wishlistSavedAt => _wishlistSavedAt;
   bool get isLoading => _loading;
 
   /// True until the first load finished (successfully or not): show a spinner, not an empty state.
@@ -53,11 +57,13 @@ class MarketplaceViewModel extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    // Both start at once. Favorites load on their own, so the saved copy still shows when the
+    // listings cannot be loaded offline.
+    final favorites = _loadWishlist(generation);
     try {
-      final results = await Future.wait([getMaterials.execute(), getWishlist.execute()]);
+      final materials = await getMaterials.execute();
       if (generation != _generation) return;
-      _materials = results[0] as List<MaterialEntity>;
-      _wishlist = results[1] as List<WishlistItemEntity>;
+      _materials = materials;
     } on DataException catch (e) {
       if (generation != _generation) return;
       _error = e.message;
@@ -65,12 +71,28 @@ class MarketplaceViewModel extends ChangeNotifier {
       if (generation != _generation) return;
       _error = 'Unexpected error. Please try again.';
     }
+    await favorites;
+    if (generation != _generation) return;
     _loading = false;
     _loadedOnce = true;
     notifyListeners();
   }
 
+  Future<void> _loadWishlist(int generation) async {
+    try {
+      final result = await getWishlist.execute();
+      if (generation != _generation) return;
+      _wishlist = result.items;
+      _wishlistSavedAt = result.savedAt;
+    } on DataException catch (e) {
+      if (generation == _generation) _error ??= e.message;
+    } catch (_) {
+      if (generation == _generation) _error ??= 'Unexpected error. Please try again.';
+    }
+  }
+
   /// Heart tapped. Updates instantly and rolls back if the server refuses.
+  /// Offline the server cannot confirm it, so it is rolled back and the user is told why.
   /// Returns an error message to show, or `null` on success.
   Future<String?> toggleFavorite(String materialId) async {
     if (!_togglingFavorites.add(materialId)) return null;
@@ -225,6 +247,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _generation++;
     _materials = const [];
     _wishlist = const [];
+    _wishlistSavedAt = null;
     _loading = false;
     _loadedOnce = false;
     _error = null;

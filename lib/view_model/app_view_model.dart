@@ -14,6 +14,8 @@ import 'schedule_view_model.dart';
 import 'power_view_model.dart';
 import 'connectivity_view_model.dart';
 import '../model/use_cases/track_event_use_case.dart';
+import '../model/use_cases/outbox_use_cases.dart';
+import '../model/use_cases/restore_session_use_case.dart';
 import 'theme_view_model.dart';
 
 // ─── App Navigation State ─────────────────────────────────────────────────────
@@ -72,6 +74,14 @@ class AppViewModel extends ChangeNotifier {
   /// Telemetry for LISTING_VIEW and CONTACT_SELLER; never blocks or fails.
   final TrackEventUseCase trackEvent;
 
+  /// The outbox: actions saved offline are sent while a user is signed in.
+  final StartOutboxSyncUseCase? startOutboxSync;
+  final StopOutboxSyncUseCase? stopOutboxSync;
+  final SyncOutboxUseCase? syncOutbox;
+
+  /// Checks a session that was opened offline once the server can be reached.
+  final VerifySessionUseCase? verifySession;
+
   AppViewModel({
     this.onLogout,
     required this.marketplace,
@@ -83,10 +93,34 @@ class AppViewModel extends ChangeNotifier {
     required this.power,
     required this.connectivity,
     required this.trackEvent,
+    this.startOutboxSync,
+    this.stopOutboxSync,
+    this.syncOutbox,
+    this.verifySession,
   }) {
     // A theme change repaints the whole app, so it goes through the app-wide notifier.
     theme.addListener(notifyListeners);
     power.addListener(_applyPowerSaving);
+    connectivity.addListener(_onConnectivityChanged);
+  }
+
+  void _onConnectivityChanged() {
+    if (connectivity.isOnline) _verifyOfflineSession();
+  }
+
+  /// A session restored offline shows the saved profile. Once the server answers, the profile is
+  /// replaced by the fresh one and everything that could not load offline is loaded again.
+  Future<void> _verifyOfflineSession() async {
+    final verify = verifySession;
+    if (verify == null || !_isLoggedIn) return;
+    final fresh = await verify.execute();
+    if (fresh == null || !_isLoggedIn || fresh.id != _currentUser?.id) return;
+    _currentUser = fresh;
+    notifyListeners();
+    marketplace.load();
+    chats.loadRooms();
+    account.load();
+    schedule.load();
   }
 
   void _applyPowerSaving() => chats.setPowerSaving(power.isSaving);
@@ -182,7 +216,7 @@ class AppViewModel extends ChangeNotifier {
 
   /// A fresh planner for [plannerRoom]; the screen owns and disposes it.
   MeetingPlannerViewModel createMeetingPlanner(ChatRoomEntity room) =>
-      MeetingPlannerViewModel(useCases: meetups, chatRoomId: room.id);
+      MeetingPlannerViewModel(useCases: meetups, chatRoomId: room.id, userId: _currentUser?.id);
 
   /// Back from the planner to the chat it was opened from.
   void closeMeetingPlanner() {
@@ -209,7 +243,16 @@ class AppViewModel extends ChangeNotifier {
     marketplace.load();
     chats.start(user.id);
     account.load();
+    account.watchPending(user.id);
     schedule.load();
+    startOutboxSync?.execute(user.id);
+  }
+
+  /// The app came back to the foreground: send what was queued while it was in the background.
+  void appResumed() {
+    if (!_isLoggedIn) return;
+    syncOutbox?.execute();
+    _verifyOfflineSession();
   }
 
   /// "Message seller": opens (creating it if needed) the conversation about [material].
@@ -243,6 +286,7 @@ class AppViewModel extends ChangeNotifier {
   }
 
   void logout() {
+    stopOutboxSync?.execute();
     marketplace.clear();
     chats.clear();
     account.clear();
@@ -266,6 +310,7 @@ class AppViewModel extends ChangeNotifier {
     theme.dispose();
     power.removeListener(_applyPowerSaving);
     power.dispose();
+    connectivity.removeListener(_onConnectivityChanged);
     connectivity.dispose();
     super.dispose();
   }
