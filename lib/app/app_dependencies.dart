@@ -9,6 +9,7 @@ import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
 import '../model/repositories/impl/analytics_event_repository_impl.dart';
 import '../model/data_sources/analytics_event_remote_data_source.dart';
+import '../model/services/analytics_sync_service.dart';
 import '../model/use_cases/track_event_use_case.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 import '../view_model/smart_listing_view_model.dart';
@@ -83,6 +84,9 @@ class AppDependencies {
 
   /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
   final TrackEventUseCase trackEvent;
+
+  /// Uploads the queued telemetry in the background; started with the app.
+  final AnalyticsSyncService analyticsSync;
 
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
@@ -172,6 +176,7 @@ class AppDependencies {
     required this.classifyItemPhoto,
     required this.imagePicker,
     required this.trackEvent,
+    required this.analyticsSync,
     required this.getConnectivity,
     required this.watchConnectivity,
     required this.responseCache,
@@ -296,8 +301,10 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
-      trackEvent: TrackEventUseCase(
-        AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
+      trackEvent: TrackEventUseCase(AnalyticsEventRepositoryImpl()),
+      analyticsSync: AnalyticsSyncService(
+        remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
+        connectivity: connectivity,
       ),
       classifyItemPhoto: ClassifyItemPhotoUseCase(
         // Gemini API key, only from the run configuration (config/development.json:

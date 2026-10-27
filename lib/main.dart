@@ -101,6 +101,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     _appState.theme.start();
     _appState.power.start();
     _appState.connectivity.start();
+    _deps.analyticsSync.start();
     _restoreSession();
   }
 
@@ -127,6 +128,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _deps.analyticsSync.stop();
     _appState.dispose();
     super.dispose();
   }

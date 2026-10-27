@@ -1,15 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_front_end/model/repositories/impl/analytics_event_repository_impl.dart';
-import 'package:flutter_front_end/model/data_sources/analytics_event_remote_data_source.dart';
 import 'package:flutter_front_end/model/entities/analytics_event.dart';
 import 'package:flutter_front_end/model/entities/enums.dart';
 import 'package:flutter_front_end/model/repositories/analytics_event_repository.dart';
 import 'package:flutter_front_end/model/use_cases/track_event_use_case.dart';
 import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 
 class _Recorder implements AnalyticsEventRepository {
   final sent = <AnalyticsEvent>[];
@@ -59,58 +57,52 @@ void main() {
     });
   });
 
-  group('POST /analytics-events', () {
-    late http.BaseRequest seen;
-    late String body;
+  group('pending.jsonl queue', () {
+    late Directory dir;
+    late AnalyticsEventRepositoryImpl repository;
 
-    AnalyticsEventRepositoryImpl repository({String? token, int status = 201}) {
-      final client = ApiClient(
-        baseUrl: 'https://api.test/',
-        client: MockClient.streaming((request, stream) async {
-          seen = request;
-          body = await utf8.decodeStream(stream);
-          return http.StreamedResponse(Stream.value(utf8.encode('{}')), status);
-        }),
-      )..authToken = token;
-      return AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: client));
-    }
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('analytics_queue');
+      repository = AnalyticsEventRepositoryImpl(directory: () async => dir);
+    });
+    tearDown(() => dir.deleteSync(recursive: true));
 
-    test('sends the payload with the Bearer token', () async {
-      final useCase = TrackEventUseCase(repository(token: 'jwt'), now: () => fixedNow);
+    List<Map<String, dynamic>> lines() => File('${dir.path}/pending.jsonl')
+        .readAsLinesSync()
+        .map((l) => jsonDecode(l) as Map<String, dynamic>)
+        .toList();
+
+    test('appends one JSON line per event with client_id and clientCreatedAt', () async {
+      final useCase = TrackEventUseCase(repository, now: () => fixedNow);
 
       await useCase.execute(
         AnalyticsEventType.CONTACT_SELLER,
         materialId: 'm1',
         metadata: {'chatRoomId': 'r1'},
       );
+      await useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: 'm2');
 
-      expect(seen.method, 'POST');
-      expect(seen.url.toString(), 'https://api.test/analytics-events');
-      expect(seen.headers['Authorization'], 'Bearer jwt');
-      expect(jsonDecode(body), {
-        'eventType': 'CONTACT_SELLER',
-        'materialId': 'm1',
-        'metadata': {'chatRoomId': 'r1'},
-        'occurredAt': '2026-10-12T15:30:00.000Z',
-      });
+      final saved = lines();
+      expect(saved, hasLength(2));
+      expect(saved[0]['eventType'], 'CONTACT_SELLER');
+      expect(saved[0]['materialId'], 'm1');
+      expect(saved[0]['metadata'], {'chatRoomId': 'r1'});
+      expect(saved[0]['occurredAt'], '2026-10-12T15:30:00.000Z');
+      expect(saved[0]['clientCreatedAt'], '2026-10-12T15:30:00.000Z');
+      expect(saved[0]['client_id'], matches(RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
+      expect(saved[1].containsKey('metadata'), isFalse);
+      expect(saved[1]['client_id'], isNot(saved[0]['client_id']));
     });
 
-    test('leaves out the optional fields it does not have', () async {
-      final useCase = TrackEventUseCase(repository(token: 'jwt'), now: () => fixedNow);
+    test('an event survives the JSON round trip', () async {
+      final useCase = TrackEventUseCase(repository, now: () => fixedNow);
+      await useCase.execute(AnalyticsEventType.CONTACT_SELLER, materialId: 'm1', metadata: {'a': 1});
 
-      await useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: 'm1');
-
-      expect(jsonDecode(body), {
-        'eventType': 'LISTING_VIEW',
-        'materialId': 'm1',
-        'occurredAt': '2026-10-12T15:30:00.000Z',
-      });
-    });
-
-    test('a rejected event (server error) does not throw', () async {
-      final useCase = TrackEventUseCase(repository(token: 'jwt', status: 500));
-
-      await expectLater(useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: 'm1'), completes);
+      final event = AnalyticsEvent.fromJson(lines().single);
+      expect(event.type, AnalyticsEventType.CONTACT_SELLER);
+      expect(event.clientCreatedAt, fixedNow);
+      expect(event.metadata, {'a': 1});
     });
   });
 }
