@@ -188,11 +188,15 @@ class _ChatViewState extends State<ChatView> {
             onOpen: () => appState.openCompleteExchange(order),
           ),
 
-        // ── BQ4 insight: hidden once a meeting point has been agreed ──
-        if (chats.insight != null && agreed == null)
+        // ── BQ4: the typical chat while there is no meeting yet, this chat's own result after ──
+        if (agreed == null ? chats.insight != null : chats.agreementOf(room.id) != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-            child: ConversationInsightCard(insight: chats.insight!, messagesSoFar: messages.length),
+            child: ConversationInsightCard(
+              insight: chats.insight,
+              agreement: agreed == null ? null : chats.agreementOf(room.id),
+              messagesSoFar: messages.length,
+            ),
           ),
 
         // ── Messages ──

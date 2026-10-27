@@ -59,6 +59,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       markRead: _deps.markChatRead,
       answerProposal: _deps.meetups.answer,
       getConversationInsight: _deps.getConversationInsight,
+      getChatAgreement: _deps.getChatAgreement,
+      trackEvent: _deps.trackEvent,
     ),
     account: AccountViewModel(
       getExchanges: _deps.getExchanges,

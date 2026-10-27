@@ -1,3 +1,4 @@
+import '../../entities/chat_agreement.dart';
 import '../../entities/conversation_insight.dart';
 import '../conversation_insight_repository.dart';
 import '../../data_sources/analytics_remote_data_source.dart';
@@ -9,4 +10,7 @@ class ConversationInsightRepositoryImpl implements ConversationInsightRepository
 
   @override
   Future<ConversationInsight> getConversationInsight() => remoteDataSource.getConversationInsight();
+
+  @override
+  Future<ChatAgreement> getChatAgreement(String chatRoomId) => remoteDataSource.getChatAgreement(chatRoomId);
 }

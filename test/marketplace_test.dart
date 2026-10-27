@@ -8,6 +8,7 @@ import 'package:flutter_front_end/model/dto/marketplace_models.dart';
 import 'package:flutter_front_end/model/repositories/impl/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
 import 'package:flutter_front_end/model/entities/analytics_event.dart';
+import 'package:flutter_front_end/model/entities/chat_agreement.dart';
 import 'package:flutter_front_end/model/entities/chat_room_entity.dart';
 import 'package:flutter_front_end/model/entities/enums.dart';
 import 'package:flutter_front_end/model/repositories/analytics_event_repository.dart';
@@ -326,6 +327,16 @@ class _FakeInsights implements ConversationInsightRepository {
   @override
   Future<ConversationInsight> getConversationInsight() async =>
       const ConversationInsight(conversationsAnalyzed: 0, medianMessages: 0, medianMinutes: 0);
+
+  /// What analytics answers for a chat; null = not available yet (404).
+  ChatAgreement? agreement;
+  int agreementCalls = 0;
+
+  @override
+  Future<ChatAgreement> getChatAgreement(String chatRoomId) async {
+    agreementCalls++;
+    return agreement ?? (throw const ApiException(404, 'No confirmed meeting for this chat'));
+  }
 }
 
 class _FakeNotifications implements NotificationRepository {
@@ -375,6 +386,8 @@ class _World {
     markRead: MarkChatReadUseCase(chats),
     answerProposal: meetups.answer,
     getConversationInsight: GetConversationInsightUseCase(insights),
+    getChatAgreement: GetChatAgreementUseCase(insights),
+    trackEvent: TrackEventUseCase(tracker),
   );
 
   late final accountState = AccountViewModel(
@@ -660,6 +673,104 @@ void main() {
       expect(world.chats.markedRead, ['r1']);
       expect(world.chatState.unreadTotal, 0);
       expect(world.chatState.messagesOf('r1'), hasLength(1));
+      world.chatState.clear();
+    });
+
+    MessageEntity agreedMeeting() => MessageEntity(
+          id: 'mt',
+          chatRoomId: 'r1',
+          senderId: _other,
+          content: 'Meeting',
+          type: MessageTypeEnum.MEETING,
+          meetingProposal: MeetingProposalEntity(
+            id: 'p1',
+            chatRoomId: 'r1',
+            proposerId: _other,
+            startsAt: DateTime(2026, 9, 16, 10),
+            endsAt: DateTime(2026, 9, 16, 11),
+            status: MeetingProposalStatusEnum.ACCEPTED,
+          ),
+          isRead: true,
+          createdAt: DateTime(2026, 9, 2),
+        );
+
+    test('accepting a meeting proposal records MEETING_CONFIRMED for that chat', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chatState.start(_me);
+      await Future<void>.delayed(Duration.zero);
+      world.chatState.openRoom('r1');
+
+      expect(await world.chatState.acceptProposal('p1'), isNull);
+
+      final event = world.tracker.events.single;
+      expect(event.type, AnalyticsEventType.MEETING_CONFIRMED);
+      expect(event.metadata, {'chatRoomId': 'r1'});
+      expect(event.materialId, 'm1');
+      world.chatState.clear();
+    });
+
+    test('declining or withdrawing a proposal records nothing', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chatState.start(_me);
+      await Future<void>.delayed(Duration.zero);
+      world.chatState.openRoom('r1');
+
+      await world.chatState.declineProposal('p1');
+      await world.chatState.withdrawProposal('p1');
+
+      expect(world.tracker.events, isEmpty);
+      world.chatState.clear();
+    });
+
+    test('an agreed chat shows its own result once analytics has the event', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chats.messages = [agreedMeeting()];
+      world.insights.agreement = const ChatAgreement(messagesToAgreement: 7, minutesToAgreement: 42.5);
+      world.chatState.start(_me);
+      await Future<void>.delayed(Duration.zero);
+      expect(world.chatState.agreementOf('r1'), isNull);
+
+      world.chatState.openRoom('r1');
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final agreement = world.chatState.agreementOf('r1')!;
+      expect(agreement.messagesToAgreement, 7);
+      expect(agreement.minutesToAgreement, 42.5);
+      world.chatState.clear();
+    });
+
+    test('while analytics has no event yet the card stays hidden and the lookup is not repeated on every poll', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chats.messages = [agreedMeeting()];
+      world.chatState.start(_me);
+      await Future<void>.delayed(Duration.zero);
+
+      world.chatState.openRoom('r1');
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      await world.chatState.refreshMessages();
+      await world.chatState.refreshMessages();
+
+      expect(world.chatState.agreementOf('r1'), isNull);
+      expect(world.insights.agreementCalls, 1);
+      world.chatState.clear();
+    });
+
+    test('a chat without an agreed meeting never asks for its agreement', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chatState.start(_me);
+      await Future<void>.delayed(Duration.zero);
+
+      world.chatState.openRoom('r1');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(world.insights.agreementCalls, 0);
       world.chatState.clear();
     });
 

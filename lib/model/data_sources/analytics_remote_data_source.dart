@@ -1,6 +1,7 @@
 import '../../app/network/api_client.dart';
 import '../entities/meeting_point_density.dart';
 import '../entities/price_stats.dart';
+import '../dto/chat_agreement_model.dart';
 import '../dto/conversation_insight_model.dart';
 import '../dto/price_stats_model.dart';
 import '../dto/meeting_point_density_model.dart';
@@ -14,6 +15,12 @@ class AnalyticsRemoteDataSource {
   Future<ConversationInsightModel> getConversationInsight() async {
     final json = await apiClient.get('/analytics/chat-to-meeting-point/');
     return ConversationInsightModel.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// BQ4 for one chat. Throws [ApiException] 404 until its MEETING_CONFIRMED event has been uploaded.
+  Future<ChatAgreementModel> getChatAgreement(String chatRoomId) async {
+    final json = await apiClient.get('/analytics/chat-agreement/$chatRoomId/');
+    return ChatAgreementModel.fromJson(json as Map<String, dynamic>);
   }
 
   /// BQ12: confirmed exchanges per campus meeting point and hour of the day.
