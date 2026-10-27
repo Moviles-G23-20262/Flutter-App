@@ -4,6 +4,7 @@ import '../../model/entities/wishlist_item_entity.dart';
 import '../../view_model/app_view_model.dart';
 import '../widgets/async_views.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/saved_copy_banner.dart';
 
 // ─── Favorites Screen ─────────────────────────────────────────────────────────
 
@@ -59,6 +60,8 @@ class FavoritesScreen extends StatelessWidget {
                   ),
                 ),
                 Divider(color: border, height: 1),
+                if (market.wishlistSavedAt != null)
+                  SavedCopyBanner(savedAt: market.wishlistSavedAt!, onRetry: market.isLoading ? null : market.load),
                 Expanded(
                   child: market.isFirstLoad && market.isLoading
                       ? const LoadingView()

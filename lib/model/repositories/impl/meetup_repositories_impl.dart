@@ -2,6 +2,7 @@ import '../../entities/meetup_entities.dart';
 import '../meetup_repositories.dart';
 import '../../data_sources/device_location_data_source.dart';
 import '../../data_sources/meetup_remote_data_source.dart';
+import '../../dto/marketplace_models.dart';
 import 'marketplace_repositories_impl.dart' show guardRequest;
 
 class MeetupRepositoryImpl implements MeetupRepository {
@@ -23,12 +24,12 @@ class MeetupRepositoryImpl implements MeetupRepository {
     required DateTime startsAt,
     required DateTime endsAt,
   }) =>
-      guardRequest(() => remote.createProposal({
-            'chatRoomId': chatRoomId,
-            'meetingPointId': meetingPointId,
-            'startsAt': startsAt.toUtc().toIso8601String(),
-            'endsAt': endsAt.toUtc().toIso8601String(),
-          }));
+      guardRequest(() => remote.createProposal(meetingProposalToJson(
+            chatRoomId: chatRoomId,
+            meetingPointId: meetingPointId,
+            startsAt: startsAt,
+            endsAt: endsAt,
+          )));
 
   @override
   Future<MeetingProposalEntity> accept(String proposalId) =>

@@ -4,6 +4,7 @@ import '../rules/walking_distance.dart';
 import 'get_meeting_point_density_use_case.dart';
 import 'meeting_point_recommendation_use_case.dart';
 import '../repositories/meetup_repositories.dart';
+import 'pending_action_use_cases.dart';
 
 class GetMeetingPointsUseCase {
   final MeetupRepository repository;
@@ -147,6 +148,9 @@ class MeetupUseCases {
   final RecommendMeetingPointUseCase recommend;
   final GetMeetingPointDensityUseCase getDensity;
 
+  /// Saves a proposal made offline, to be sent later. Without it, proposing needs a connection.
+  final QueueMeetingProposalUseCase? queuePropose;
+
   const MeetupUseCases({
     required this.getMeetingPoints,
     required this.getSuggestions,
@@ -156,5 +160,6 @@ class MeetupUseCases {
     required this.rankZones,
     required this.recommend,
     required this.getDensity,
+    this.queuePropose,
   });
 }

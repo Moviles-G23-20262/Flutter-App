@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/exchange_entity.dart';
 import '../../model/entities/material_entity.dart';
-import '../../model/exceptions/data_exceptions.dart';
 import '../../view_model/app_view_model.dart';
+import '../../view_model/complete_exchange_view_model.dart';
 import '../widgets/formatters.dart';
 import '../widgets/meetup_widgets.dart';
 
@@ -11,39 +11,36 @@ import '../widgets/meetup_widgets.dart';
 
 /// The buyer checks the item at the meetup and confirms the exchange, then both rate each other.
 /// Once the exchange is completed, either side comes back here just to rate.
+/// Only draws [CompleteExchangeViewModel] and forwards taps.
 class CompleteExchangeScreen extends StatefulWidget {
   final AppViewModel appState;
-  final ExchangeEntity exchange;
 
-  const CompleteExchangeScreen({super.key, required this.appState, required this.exchange});
+  /// Builds this screen's view-model; called once, and the screen disposes it.
+  final CompleteExchangeViewModel Function() createViewModel;
+
+  const CompleteExchangeScreen({super.key, required this.appState, required this.createViewModel});
 
   @override
   State<CompleteExchangeScreen> createState() => _CompleteExchangeScreenState();
 }
 
 class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
-  static const _checks = ['Matches the photos', 'Condition is as listed', 'Everything included', 'Works as expected'];
-  static const _tags = ['Punctual', 'Item as described', 'Friendly', 'Good communication', 'Fair price'];
-
-  late ExchangeEntity _exchange = widget.exchange;
-  final _checked = <int>{};
-  late MaterialConditionEnum? _received = widget.exchange.material?.condition;
-  int _stars = 0;
-  final _selectedTags = <String>{};
+  late final CompleteExchangeViewModel _vm = widget.createViewModel();
   final _reviewCtrl = TextEditingController();
-  bool _submitting = false;
 
-  String get _me => widget.appState.currentUser?.id ?? '';
-  bool get _isBuyer => _exchange.buyerId == _me;
-
-  /// The buyer still has to confirm what they received.
-  bool get _needsCheck => _isBuyer && _exchange.isPending;
-  bool get _allChecked => _checked.length == _checks.length;
-
-  String get _otherFirst => _exchange.otherParty(_me)?.fullName.split(' ').first ?? 'them';
+  @override
+  void initState() {
+    super.initState();
+    _vm.init().then((_) {
+      if (!mounted || !_vm.restoredDraft) return;
+      if (_reviewCtrl.text.isEmpty) _reviewCtrl.text = _vm.review;
+      _showMessage('Your unfinished rating was restored.');
+    });
+  }
 
   @override
   void dispose() {
+    _vm.dispose();
     _reviewCtrl.dispose();
     super.dispose();
   }
@@ -53,35 +50,34 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
   }
 
   Future<void> _submit() async {
-    if (_submitting || _stars == 0 || (_needsCheck && !_allChecked)) return;
-    setState(() => _submitting = true);
-    final account = widget.appState.account;
-    try {
-      if (_needsCheck) {
-        _exchange = await account.complete(_exchange, receivedCondition: _received);
+    FocusScope.of(context).unfocus();
+    final completing = _vm.needsCheck;
+    final other = _vm.otherFirstName;
+    final outcome = await _vm.submit();
+    if (!mounted) return;
+    switch (outcome) {
+      case ExchangeSubmitOutcome.sent:
         // The listing is sold now.
-        widget.appState.marketplace.load();
-      }
-      await account.rate(NewRating(
-        exchangeId: _exchange.id,
-        ratedId: _isBuyer ? _exchange.sellerId : _exchange.buyerId,
-        stars: _stars,
-        tags: _selectedTags.toList(),
-        review: _reviewCtrl.text,
-      ));
-      if (!mounted) return;
-      _showMessage(_isBuyer ? 'Exchange completed. Thanks for rating $_otherFirst!' : 'Thanks for rating $_otherFirst!');
-      widget.appState.closeCompleteExchange();
-    } on DataException catch (e) {
-      if (!mounted) return;
-      // The exchange may have been completed even if the rating failed; the form follows suit.
-      setState(() => _submitting = false);
-      _showMessage(e.message);
+        if (completing) widget.appState.marketplace.load();
+        _showMessage(completing ? 'Exchange completed. Thanks for rating $other!' : 'Thanks for rating $other!');
+        widget.appState.closeCompleteExchange();
+      case ExchangeSubmitOutcome.savedOffline:
+        _showMessage("You're offline. It's saved on your phone and will be sent when you're back online.");
+        widget.appState.closeCompleteExchange();
+      case ExchangeSubmitOutcome.failed:
+        if (_vm.errorMessage.isNotEmpty) _showMessage(_vm.errorMessage);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([_vm, widget.appState.account]),
+      builder: (context, _) => _buildView(context),
+    );
+  }
+
+  Widget _buildView(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     final bg         = brightness == Brightness.dark ? AppColors.darkBg          : AppColors.lightBg;
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
@@ -89,18 +85,21 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
     final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
     final elevated   = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
-    final waitingForBuyer = !_isBuyer && _exchange.isPending;
-    final cancelled = _exchange.status == ExchangeStatusEnum.CANCELLED;
+    final exchange = _vm.exchange;
+    final otherFirst = _vm.otherFirstName;
+    final waitingForBuyer = _vm.waitingForBuyer;
+    final cancelled = _vm.isCancelled;
+    final saved = _vm.ratingQueued;
+    final refused = widget.appState.account.refusedStepFor(exchange.id);
 
     final String buttonLabel;
-    if (_needsCheck && !_allChecked) {
+    if (_vm.needsCheck && !_vm.allChecked) {
       buttonLabel = 'Check the item to continue';
-    } else if (_stars == 0) {
-      buttonLabel = 'Rate $_otherFirst to continue';
+    } else if (_vm.stars == 0) {
+      buttonLabel = 'Rate $otherFirst to continue';
     } else {
-      buttonLabel = _needsCheck ? 'Complete exchange' : 'Submit rating';
+      buttonLabel = _vm.needsCheck ? 'Complete exchange' : 'Submit rating';
     }
-    final canSubmit = !_submitting && _stars > 0 && (!_needsCheck || _allChecked);
 
     return Scaffold(
       backgroundColor: bg,
@@ -126,7 +125,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                   ),
                   const SizedBox(width: 14),
                   Text(
-                    _needsCheck || waitingForBuyer || cancelled ? 'Complete exchange' : 'Rate $_otherFirst',
+                    _vm.needsCheck || waitingForBuyer || cancelled ? 'Complete exchange' : 'Rate $otherFirst',
                     style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd),
                   ),
                 ],
@@ -137,39 +136,56 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  _ItemCard(exchange: _exchange),
+                  _ItemCard(exchange: exchange),
                   const SizedBox(height: 14),
+                  if (refused != null) ...[
+                    _InfoCard(
+                      icon: Icons.error_outline_rounded,
+                      text: 'What you saved offline was not accepted: ${refused.lastError ?? 'refused by the server'}. '
+                          'Check the details and send it again.',
+                      actionLabel: 'Discard',
+                      onAction: () => widget.appState.account.discardPending(refused.id),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   if (cancelled)
                     _InfoCard(icon: Icons.block_rounded, text: 'This order was cancelled.')
+                  else if (saved)
+                    _InfoCard(
+                      icon: Icons.cloud_upload_outlined,
+                      text: _vm.completionQueued
+                          ? "The exchange and your rating are saved on your phone. They will be sent when you're back online."
+                          : "Your rating is saved on your phone. It will be sent when you're back online.",
+                    )
                   else if (waitingForBuyer)
                     _InfoCard(
                       icon: Icons.hourglass_top_rounded,
-                      text: '$_otherFirst confirms the exchange after checking the item at your meetup. '
+                      text: '$otherFirst confirms the exchange after checking the item at your meetup. '
                           'You can rate each other once it is completed.',
                     )
                   else ...[
-                    if (_needsCheck) ...[
+                    if (_vm.needsCheck) ...[
                       _checkSection(brightness),
                       const SizedBox(height: 14),
                     ],
-                    _rateSection(brightness, step: _needsCheck ? 2 : 1),
+                    _rateSection(brightness, step: _vm.needsCheck ? 2 : 1),
                   ],
                 ],
               ),
             ),
 
-            if (!cancelled && !waitingForBuyer)
+            if (!cancelled && !waitingForBuyer && !saved)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: canSubmit ? _submit : null,
+                    onPressed: _vm.canSubmit ? _submit : null,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: _submitting
+                    child: _vm.isSubmitting
                         ? const SizedBox(
                             width: 18, height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -186,27 +202,28 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
   Widget _checkSection(Brightness brightness) {
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txSecondary= brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
-    final listed = _exchange.material?.condition;
+    final listed = _vm.exchange.material?.condition;
+    const checks = CompleteExchangeViewModel.checklist;
 
     return _Section(
       step: 1,
-      done: _allChecked,
+      done: _vm.allChecked,
       title: 'Check the item before you pay',
       children: [
-        for (var i = 0; i < _checks.length; i++)
+        for (var i = 0; i < checks.length; i++)
           InkWell(
-            onTap: () => setState(() => _checked.contains(i) ? _checked.remove(i) : _checked.add(i)),
+            onTap: () => _vm.toggleCheck(i),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
                   Checkbox(
-                    value: _checked.contains(i),
-                    onChanged: (v) => setState(() => v == true ? _checked.add(i) : _checked.remove(i)),
+                    value: _vm.checkedItems.contains(i),
+                    onChanged: (_) => _vm.toggleCheck(i),
                   ),
                   Expanded(
                     child: Text(
-                      i == 1 && listed != null ? 'Condition is ${listed.displayName} as listed' : _checks[i],
+                      i == 1 && listed != null ? 'Condition is ${listed.displayName} as listed' : checks[i],
                       style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
                     ),
                   ),
@@ -225,8 +242,8 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
             for (final condition in MaterialConditionEnum.values)
               ChoiceChip(
                 label: Text(condition.displayName),
-                selected: _received == condition,
-                onSelected: (_) => setState(() => _received = condition),
+                selected: _vm.receivedCondition == condition,
+                onSelected: (_) => _vm.setReceivedCondition(condition),
               ),
           ],
         ),
@@ -239,23 +256,24 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
     final txSecondary= brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final starColor  = brightness == Brightness.dark ? AppColors.darkWarning     : AppColors.lightWarning;
+    final stars = _vm.stars;
 
     return _Section(
       step: step,
-      done: _stars > 0,
-      title: 'Rate $_otherFirst',
+      done: stars > 0,
+      title: 'Rate ${_vm.otherFirstName}',
       children: [
         Row(
           children: [
             for (var s = 1; s <= 5; s++)
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: () => setState(() => _stars = s),
-                icon: Icon(s <= _stars ? Icons.star_rounded : Icons.star_outline_rounded,
-                    size: 32, color: s <= _stars ? starColor : txMuted),
+                onPressed: () => _vm.setStars(s),
+                icon: Icon(s <= stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 32, color: s <= stars ? starColor : txMuted),
               ),
             const SizedBox(width: 6),
-            Text(_stars == 0 ? 'Tap to rate' : '$_stars/5',
+            Text(stars == 0 ? 'Tap to rate' : '$stars/5',
                 style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
           ],
         ),
@@ -267,11 +285,11 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final tag in _tags)
+            for (final tag in CompleteExchangeViewModel.ratingTags)
               FilterChip(
                 label: Text(tag),
-                selected: _selectedTags.contains(tag),
-                onSelected: (on) => setState(() => on ? _selectedTags.add(tag) : _selectedTags.remove(tag)),
+                selected: _vm.selectedTags.contains(tag),
+                onSelected: (_) => _vm.toggleTag(tag),
               ),
           ],
         ),
@@ -281,6 +299,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
           maxLength: 500,
           minLines: 3,
           maxLines: 5,
+          onChanged: _vm.setReview,
           style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
           decoration: const InputDecoration(hintText: 'Add a short review (optional)'),
         ),
@@ -398,8 +417,10 @@ class _Section extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
-  const _InfoCard({required this.icon, required this.text});
+  const _InfoCard({required this.icon, required this.text, this.actionLabel, this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -414,6 +435,7 @@ class _InfoCard extends StatelessWidget {
           Icon(icon, size: 20, color: txSecondary),
           const SizedBox(width: 12),
           Expanded(child: Text(text, style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs))),
+          if (actionLabel != null) TextButton(onPressed: onAction, child: Text(actionLabel!)),
         ],
       ),
     );

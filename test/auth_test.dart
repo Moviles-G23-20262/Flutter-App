@@ -111,6 +111,9 @@ class _RecordingRepository implements AuthRepository {
   Future<UserEntity?> restoreSession() => throw UnimplementedError();
 
   @override
+  Future<UserEntity?> verifySession() async => null;
+
+  @override
   Future<bool> hasEnrolledBiometricCredential() async => false;
 
   @override

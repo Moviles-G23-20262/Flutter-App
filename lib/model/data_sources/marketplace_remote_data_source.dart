@@ -25,6 +25,9 @@ abstract class MarketplaceRemoteDataSource {
 
   Future<List<WishlistItemEntity>> getWishlist();
 
+  /// The `GET /wishlist-items` answer as it came, for the saved copy.
+  Future<Object?> getWishlistJson();
+
   Future<WishlistItemEntity> addToWishlist(
     String materialId,
   );
@@ -79,6 +82,9 @@ abstract class MarketplaceRemoteDataSource {
 
   Future<List<NotificationEntity>> getNotifications();
 
+  /// The `GET /notifications` answer as it came, for the saved copy.
+  Future<Object?> getNotificationsJson();
+
   Future<void> markNotificationOpened(
     String notificationId,
   );
@@ -128,9 +134,12 @@ class MarketplaceRemoteDataSourceImpl
   @override
   Future<List<WishlistItemEntity>> getWishlist() async =>
       parseList(
-        await apiClient.get('/wishlist-items'),
+        await getWishlistJson(),
         wishlistItemFromJson,
       );
+
+  @override
+  Future<Object?> getWishlistJson() => apiClient.get('/wishlist-items');
 
   @override
   Future<WishlistItemEntity> addToWishlist(
@@ -279,9 +288,12 @@ class MarketplaceRemoteDataSourceImpl
   @override
   Future<List<NotificationEntity>> getNotifications() async =>
       parseList(
-        await apiClient.get('/notifications'),
+        await getNotificationsJson(),
         notificationFromJson,
       );
+
+  @override
+  Future<Object?> getNotificationsJson() => apiClient.get('/notifications');
 
   @override
   Future<void> markNotificationOpened(
