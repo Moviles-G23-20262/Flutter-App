@@ -244,6 +244,7 @@ class AppViewModel extends ChangeNotifier {
     chats.start(user.id);
     account.load();
     account.watchPending(user.id);
+    marketplace.watchPending(user.id);
     schedule.load();
     startOutboxSync?.execute(user.id);
   }

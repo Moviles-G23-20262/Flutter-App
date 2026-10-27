@@ -126,7 +126,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
       price: _priceCtrl.text,
     );
     if (!done || !mounted) return;
-    // Let the "published" banner be seen, then show the seller's listings.
+    // Let the "published" (or "saved on your phone") banner be seen, then show the seller's listings.
     await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
     widget.appState.navigateTo(AppScreen.sellerHub);
@@ -193,17 +193,21 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
 
             if (vm.published)
               Container(
-                key: const Key('published-banner'),
+                key: Key(vm.savedOffline ? 'saved-offline-banner' : 'published-banner'),
                 width: double.infinity,
                 color: elevated,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded, color: success, size: 15),
+                    Icon(vm.savedOffline ? Icons.cloud_off_rounded : Icons.check_circle_outline_rounded,
+                        color: success, size: 15),
                     const SizedBox(width: 8),
                     Flexible(
-                      child: Text('"${_titleCtrl.text}" is ready for campus buyers.',
+                      child: Text(
+                          vm.savedOffline
+                              ? SmartListingViewModel.savedOfflineMessage
+                              : '"${_titleCtrl.text}" is ready for campus buyers.',
                           style: AppTextStyles.body(success, fontSize: AppTextStyles.sizeXs)),
                     ),
                   ],

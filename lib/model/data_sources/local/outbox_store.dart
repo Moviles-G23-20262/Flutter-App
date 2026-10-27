@@ -85,6 +85,27 @@ class OutboxStore {
     return listing;
   }
 
+  /// Remembers which photos of the listing are already on the server, so a retry sends only the rest.
+  Future<void> saveUploadedUrls(String listingId, List<String> urls) async {
+    final db = await _db.database;
+    await db.update(
+      'pending_listings',
+      {'uploaded_urls': jsonEncode(urls)},
+      where: 'id = ?',
+      whereArgs: [listingId],
+    );
+    _changed();
+  }
+
+  /// The photo files of a queued listing, e.g. to delete them when it is discarded.
+  Future<List<String>> photoPathsOf(String listingId) async {
+    final db = await _db.database;
+    final rows = await db.query('pending_listings', columns: ['photo_paths'], where: 'id = ?', whereArgs: [listingId]);
+    if (rows.isEmpty) return const [];
+    return (jsonDecode(rows.single['photo_paths'] as String) as List).cast<String>();
+  }
+
+  /// [ownerId]'s queued listings, oldest first.
   Future<List<PendingListing>> listings(String ownerId) async {
     final db = await _db.database;
     final rows = await db.query(
@@ -214,6 +235,7 @@ class OutboxStore {
         ownerId: row['owner_id'] as String,
         payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
         photoPaths: (jsonDecode(row['photo_paths'] as String) as List).cast<String>(),
+        uploadedUrls: (jsonDecode(row['uploaded_urls'] as String? ?? '[]') as List).cast<String>(),
         createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
         status: _status(row['status']),
         attempts: row['attempts'] as int,

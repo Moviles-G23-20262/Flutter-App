@@ -1,4 +1,5 @@
 import '../entities/chat_room_entity.dart';
+import '../entities/new_listing_data.dart';
 import '../entities/exchange_entity.dart';
 import '../entities/material_entity.dart';
 import '../entities/meetup_entities.dart';
@@ -189,6 +190,17 @@ List<T> parseList<T>(Object? response, T Function(Json) parse) =>
     (response as List<dynamic>).map((item) => parse(item as Json)).toList();
 
 // Domain → request bodies, shared by the online calls and the outbox.
+
+/// Body of `POST /materials` without `imageUrls`, which exist only once the photos are uploaded.
+/// The same for a listing published now and for one saved on the phone.
+Json newListingToJson(NewListingData data) => {
+      'title': data.title.trim(),
+      'description': data.description.trim(),
+      if (data.courseCode != null && data.courseCode!.trim().isNotEmpty) 'courseCode': data.courseCode!.trim(),
+      'price': data.price.toStringAsFixed(2),
+      'condition': data.condition.name,
+      'category': data.category.name,
+    };
 
 /// Body of `POST /ratings`.
 Json newRatingToJson(NewRating rating) => {
