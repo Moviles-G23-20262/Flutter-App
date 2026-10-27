@@ -1,3 +1,4 @@
+import '../data_sources/local/outbox_store.dart' show newClientId;
 import '../entities/analytics_event.dart';
 import '../entities/enums.dart';
 import '../repositories/analytics_event_repository.dart';
@@ -19,11 +20,14 @@ class TrackEventUseCase {
     Map<String, dynamic>? metadata,
   }) async {
     try {
+      final now = _now();
       await repository.track(AnalyticsEvent(
+        clientId: newClientId(),
         type: type,
         materialId: materialId,
         metadata: metadata,
-        occurredAt: _now(),
+        occurredAt: now,
+        clientCreatedAt: now,
       ));
     } catch (_) {
       // Telemetry is best effort.
