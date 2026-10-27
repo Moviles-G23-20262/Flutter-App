@@ -10,8 +10,14 @@ abstract class AuthRepository {
   /// Throws [InvalidCredentialsException] when email or password are wrong.
   Future<UserEntity> login({required String email, required String password});
 
-  /// The user of the stored session, or `null` if there is none or it expired.
+  /// The user of the stored session, or `null` if there is none or it expired. Offline, it is
+  /// the profile saved at the last sign-in, and [verifySession] checks the token later.
   Future<UserEntity?> restoreSession();
+
+  /// For a session that was opened offline: asks the server whether the token is still valid.
+  /// Returns the fresh profile, or `null` when there is nothing to check or still no connection.
+  /// A rejected token ends the session (the API client then signs the app out).
+  Future<UserEntity?> verifySession();
 
   /// Ends the session (token, user). The fingerprint credential is kept, so Quick Unlock still
   /// works afterwards; see [forgetBiometrics].

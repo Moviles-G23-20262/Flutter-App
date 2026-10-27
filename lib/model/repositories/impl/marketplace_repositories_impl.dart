@@ -1,5 +1,8 @@
 import '../../../app/network/api_client.dart';
 
+import 'dart:async';
+
+import '../../entities/cached_list.dart';
 import '../../entities/chat_room_entity.dart';
 import '../../entities/exchange_entity.dart';
 import '../../entities/material_entity.dart';
@@ -12,6 +15,9 @@ import '../../exceptions/data_exceptions.dart';
 import '../marketplace_repositories.dart';
 
 import '../../data_sources/marketplace_remote_data_source.dart';
+import '../../dto/marketplace_models.dart';
+import '../../data_sources/local/response_cache.dart';
+import '../../services/session_owner.dart';
 
 /// Runs [request], turning transport and HTTP failures into a
 /// [DataException] the UI can show.
@@ -23,9 +29,7 @@ Future<T> guardRequest<T>(
   try {
     return await request();
   } on NetworkException {
-    throw const DataException(
-      "Can't reach the server. Check your connection and try again.",
-    );
+    throw const NoConnectionException();
   } on ApiException catch (e) {
     switch (e.statusCode) {
       case 400:
@@ -91,32 +95,75 @@ class MaterialRepositoryImpl implements MaterialRepository {
       });
 }
 
-class WishlistRepositoryImpl implements WishlistRepository {
-  final MarketplaceRemoteDataSource remote;
+/// Network falling back to the copy saved for the signed-in user.
+///
+/// Without a [cache] (or nobody signed in) it is just the network. After a change the copy is
+/// refreshed in the background, so a restart offline does not show what was just undone.
+Future<CachedList<T>> _cachedList<T>({
+  required ResponseCache? cache,
+  required SessionOwner? owner,
+  required String key,
+  required Future<Object?> Function() fetch,
+  required T Function(Json json) parse,
+}) {
+  final userId = owner?.userId;
+  if (cache == null || userId == null) {
+    return guardRequest(() async => CachedList(parseList(await fetch(), parse)));
+  }
+  return guardRequest(() async {
+    final result = await cache.networkFirst(
+      ownerId: userId,
+      key: key,
+      fetch: fetch,
+      parse: (json) => parseList(json, parse),
+    );
+    return CachedList(result.data, savedAt: result.savedAt);
+  });
+}
 
-  WishlistRepositoryImpl(this.remote);
+class WishlistRepositoryImpl implements WishlistRepository {
+  static const String cacheKey = 'wishlist';
+
+  final MarketplaceRemoteDataSource remote;
+  final ResponseCache? cache;
+  final SessionOwner? owner;
+
+  WishlistRepositoryImpl(this.remote, {this.cache, this.owner});
 
   @override
-  Future<List<WishlistItemEntity>> getWishlist() =>
-      guardRequest(
-        remote.getWishlist,
+  Future<CachedList<WishlistItemEntity>> getWishlist() => _cachedList(
+        cache: cache,
+        owner: owner,
+        key: cacheKey,
+        fetch: remote.getWishlistJson,
+        parse: wishlistItemFromJson,
       );
 
   @override
   Future<WishlistItemEntity> add(
     String materialId,
-  ) =>
-      guardRequest(
-        () => remote.addToWishlist(materialId),
-      );
+  ) async {
+    final item = await guardRequest(
+      () => remote.addToWishlist(materialId),
+    );
+    _refreshCopy();
+    return item;
+  }
 
   @override
   Future<void> remove(
     String wishlistItemId,
-  ) =>
-      guardRequest(
-        () => remote.removeFromWishlist(wishlistItemId),
-      );
+  ) async {
+    await guardRequest(
+      () => remote.removeFromWishlist(wishlistItemId),
+    );
+    _refreshCopy();
+  }
+
+  void _refreshCopy() {
+    if (cache == null) return;
+    unawaited(getWishlist().then((_) {}, onError: (_) {}));
+  }
 }
 
 class ChatRepositoryImpl implements ChatRepository {
@@ -211,15 +258,7 @@ class ExchangeRepositoryImpl implements ExchangeRepository {
     NewRating rating,
   ) =>
       guardRequest(
-        () => remote.createRating({
-          'exchangeId': rating.exchangeId,
-          'ratedId': rating.ratedId,
-          'stars': rating.stars,
-          'tags': rating.tags,
-
-          if (rating.review != null)
-            'review': rating.review,
-        }),
+        () => remote.createRating(newRatingToJson(rating)),
       );
 }
 
@@ -239,21 +278,31 @@ class RatingRepositoryImpl implements RatingRepository {
 
 class NotificationRepositoryImpl
     implements NotificationRepository {
-  final MarketplaceRemoteDataSource remote;
+  static const String cacheKey = 'notifications';
 
-  NotificationRepositoryImpl(this.remote);
+  final MarketplaceRemoteDataSource remote;
+  final ResponseCache? cache;
+  final SessionOwner? owner;
+
+  NotificationRepositoryImpl(this.remote, {this.cache, this.owner});
 
   @override
-  Future<List<NotificationEntity>> getNotifications() =>
-      guardRequest(
-        remote.getNotifications,
+  Future<CachedList<NotificationEntity>> getNotifications() => _cachedList(
+        cache: cache,
+        owner: owner,
+        key: cacheKey,
+        fetch: remote.getNotificationsJson,
+        parse: notificationFromJson,
       );
 
   @override
   Future<void> markOpened(
     String notificationId,
-  ) =>
-      guardRequest(
-        () => remote.markNotificationOpened(notificationId),
-      );
+  ) async {
+    await guardRequest(
+      () => remote.markNotificationOpened(notificationId),
+    );
+    // The saved copy should not bring the unread dot back after a restart.
+    if (cache != null) unawaited(getNotifications().then((_) {}, onError: (_) {}));
+  }
 }

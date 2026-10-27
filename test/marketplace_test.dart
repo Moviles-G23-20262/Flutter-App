@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_front_end/model/entities/cached_list.dart';
 import 'package:flutter_front_end/model/dto/marketplace_models.dart';
 import 'package:flutter_front_end/model/repositories/impl/marketplace_repositories_impl.dart';
 import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
@@ -124,7 +125,7 @@ class _FakeWishlist implements WishlistRepository {
   Object? error;
 
   @override
-  Future<List<WishlistItemEntity>> getWishlist() async => List.of(items);
+  Future<CachedList<WishlistItemEntity>> getWishlist() async => CachedList(List.of(items));
 
   @override
   Future<WishlistItemEntity> add(String materialId) async {
@@ -329,7 +330,7 @@ class _FakeInsights implements ConversationInsightRepository {
 
 class _FakeNotifications implements NotificationRepository {
   @override
-  Future<List<NotificationEntity>> getNotifications() async => [];
+  Future<CachedList<NotificationEntity>> getNotifications() async => const CachedList([]);
 
   @override
   Future<void> markOpened(String notificationId) async {}

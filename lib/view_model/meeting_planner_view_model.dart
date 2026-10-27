@@ -10,7 +10,10 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   final MeetupUseCases useCases;
   final String chatRoomId;
 
-  MeetingPlannerViewModel({required this.useCases, required this.chatRoomId});
+  /// The signed-in user, who owns a proposal saved offline.
+  final String? userId;
+
+  MeetingPlannerViewModel({required this.useCases, required this.chatRoomId, this.userId});
 
   List<MeetingPointEntity> _zones = const [];
   List<RankedZone> _ranked = const [];
@@ -24,6 +27,7 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   bool _zonePickedByUser = false;
   FreeSlot? _selectedSlot;
   bool _sending = false;
+  bool _savedOffline = false;
   bool _disposed = false;
 
   /// Best match first; see [RankMeetingPointsUseCase].
@@ -35,6 +39,9 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   bool get isLoading => _loading;
   String? get error => _error;
   bool get isSending => _sending;
+
+  /// The last [propose] had no connection, so the proposal waits on the phone to be sent.
+  bool get savedOffline => _savedOffline;
   FreeSlot? get selectedSlot => _selectedSlot;
 
   RankedZone? get selectedZone =>
@@ -78,14 +85,24 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   }
 
   /// Sends the picked zone and hour to the chat. Returns an error message, or `null` on success.
+  /// Without a connection the proposal is saved and sent later ([savedOffline]).
   Future<String?> propose() async {
     final zone = selectedZone;
     final slot = _selectedSlot;
     if (zone == null || slot == null) return 'Pick a place and a time first.';
     _sending = true;
+    _savedOffline = false;
     _notify();
     try {
-      await useCases.propose.execute(chatRoomId: chatRoomId, zone: zone.zone, slot: slot);
+      try {
+        await useCases.propose.execute(chatRoomId: chatRoomId, zone: zone.zone, slot: slot);
+      } on NoConnectionException {
+        final queue = useCases.queuePropose;
+        final owner = userId;
+        if (queue == null || owner == null) rethrow;
+        await queue.execute(ownerId: owner, chatRoomId: chatRoomId, zone: zone.zone, slot: slot);
+        _savedOffline = true;
+      }
       return null;
     } on DataException catch (e) {
       return e.message;

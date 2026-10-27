@@ -1,3 +1,4 @@
+import '../entities/cached_list.dart';
 import '../entities/chat_room_entity.dart';
 import '../entities/exchange_entity.dart';
 import '../entities/material_entity.dart';
@@ -30,7 +31,7 @@ class GetWishlistUseCase {
   final WishlistRepository repository;
   GetWishlistUseCase(this.repository);
 
-  Future<List<WishlistItemEntity>> execute() => repository.getWishlist();
+  Future<CachedList<WishlistItemEntity>> execute() => repository.getWishlist();
 }
 
 class AddToWishlistUseCase {
@@ -129,19 +130,22 @@ class RateUserUseCase {
   final ExchangeRepository repository;
   RateUserUseCase(this.repository);
 
-  Future<void> execute(NewRating rating) {
+  Future<void> execute(NewRating rating) => repository.rate(validated(rating));
+
+  /// Checks [rating] and trims its review. Also used before a rating is saved offline.
+  static NewRating validated(NewRating rating) {
     if (rating.stars < 1 || rating.stars > 5) throw const DataException('Pick from 1 to 5 stars.');
     final review = rating.review?.trim();
     if (review != null && review.length > 500) {
       throw const DataException('Reviews can have at most 500 characters.');
     }
-    return repository.rate(NewRating(
+    return NewRating(
       exchangeId: rating.exchangeId,
       ratedId: rating.ratedId,
       stars: rating.stars,
       tags: rating.tags,
       review: review == null || review.isEmpty ? null : review,
-    ));
+    );
   }
 }
 
@@ -149,7 +153,7 @@ class GetNotificationsUseCase {
   final NotificationRepository repository;
   GetNotificationsUseCase(this.repository);
 
-  Future<List<NotificationEntity>> execute() => repository.getNotifications();
+  Future<CachedList<NotificationEntity>> execute() => repository.getNotifications();
 }
 
 class MarkNotificationOpenedUseCase {

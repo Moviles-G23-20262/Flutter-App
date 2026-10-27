@@ -39,12 +39,25 @@ import '../model/use_cases/meetup_use_cases.dart';
 import '../model/use_cases/logout_use_case.dart';
 import '../model/use_cases/register_student_use_case.dart';
 import '../model/use_cases/restore_session_use_case.dart';
+import '../model/data_sources/local/app_database.dart';
+import '../model/data_sources/local/outbox_store.dart';
+import '../model/data_sources/local/response_cache.dart';
+import '../model/data_sources/remote_outbox_sender.dart';
+import '../model/services/outbox_sync_service.dart';
+import '../model/services/session_owner.dart';
+import '../model/use_cases/outbox_use_cases.dart';
+import '../model/data_sources/local/draft_store.dart';
+import '../model/repositories/impl/draft_repositories_impl.dart';
+import '../model/repositories/impl/pending_action_repository_impl.dart';
+import '../model/use_cases/pending_action_use_cases.dart';
+import '../model/use_cases/rating_draft_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
   final LoginUseCase login;
   final RegisterStudentUseCase registerStudent;
   final RestoreSessionUseCase restoreSession;
+  final VerifySessionUseCase verifySession;
 
   /// Fingerprint "Quick Unlock" of a saved session.
   final CanQuickUnlockUseCase canQuickUnlock;
@@ -73,6 +86,25 @@ class AppDependencies {
 
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
+
+  /// Local storage for offline use: saved server answers and the outbox (sqflite).
+  final ResponseCache responseCache;
+  final OutboxStore outbox;
+  final StartOutboxSyncUseCase startOutboxSync;
+  final StopOutboxSyncUseCase stopOutboxSync;
+  final SyncOutboxUseCase syncOutbox;
+
+  /// The unfinished rating, saved while it is written.
+  final LoadRatingDraftUseCase loadRatingDraft;
+  final SaveRatingDraftUseCase saveRatingDraft;
+  final ClearRatingDraftUseCase clearRatingDraft;
+
+  /// Exchange steps done offline: queued in the outbox and sent later.
+  final QueueExchangeCompletionUseCase queueExchangeCompletion;
+  final QueueRatingUseCase queueRating;
+  final QueueMeetingProposalUseCase queueMeetingProposal;
+  final WatchPendingActionsUseCase watchPendingActions;
+  final DiscardPendingActionUseCase discardPendingAction;
 
   /// Signs the app out when the server stops accepting our token.
   final ApiClient apiClient;
@@ -104,6 +136,7 @@ class AppDependencies {
     required this.login,
     required this.registerStudent,
     required this.restoreSession,
+    required this.verifySession,
     required this.canQuickUnlock,
     required this.quickUnlock,
     required this.forgetBiometrics,
@@ -141,6 +174,19 @@ class AppDependencies {
     required this.trackEvent,
     required this.getConnectivity,
     required this.watchConnectivity,
+    required this.responseCache,
+    required this.outbox,
+    required this.startOutboxSync,
+    required this.stopOutboxSync,
+    required this.syncOutbox,
+    required this.loadRatingDraft,
+    required this.saveRatingDraft,
+    required this.clearRatingDraft,
+    required this.queueExchangeCompletion,
+    required this.queueRating,
+    required this.queueMeetingProposal,
+    required this.watchPendingActions,
+    required this.discardPendingAction,
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
@@ -167,21 +213,26 @@ class AppDependencies {
     final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
     final conversationInsights = ConversationInsightRepositoryImpl(remoteDataSource: analyticsRemote);
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
+    final database = AppDatabase();
+    final responseCache = ResponseCache(database);
+    final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
       storage: SecureSessionStorage(),
       biometricStorage: SecureBiometricCredentialStorage(),
       apiClient: apiClient,
+      profileCache: responseCache,
+      sessionOwner: sessionOwner,
     );
 
     final biometrics = BiometricAuthService();
 
     final marketplaceRemote = MarketplaceRemoteDataSourceImpl(apiClient: apiClient);
     final materials = MaterialRepositoryImpl(marketplaceRemote);
-    final wishlist = WishlistRepositoryImpl(marketplaceRemote);
+    final wishlist = WishlistRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
     final chats = ChatRepositoryImpl(marketplaceRemote);
     final exchanges = ExchangeRepositoryImpl(marketplaceRemote);
-    final notifications = NotificationRepositoryImpl(marketplaceRemote);
+    final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
     final meetupRemote = MeetupRemoteDataSourceImpl(apiClient: apiClient);
     final meetupRepository = MeetupRepositoryImpl(meetupRemote);
@@ -190,10 +241,20 @@ class AppDependencies {
     final themePreferences = ThemePreferenceRepositoryImpl();
     final connectivity = ConnectivityDataSource();
 
+    final outbox = OutboxStore(database);
+    final outboxSync = OutboxSyncService(
+      store: outbox,
+      sender: RemoteOutboxSender(marketplaceRemote, meetupRemote),
+      connectivity: connectivity,
+    );
+    final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
+    final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
+
     return AppDependencies._(
       login: LoginUseCase(authRepository),
       registerStudent: RegisterStudentUseCase(authRepository),
       restoreSession: RestoreSessionUseCase(authRepository),
+      verifySession: VerifySessionUseCase(authRepository),
       canQuickUnlock: CanQuickUnlockUseCase(biometrics: biometrics, auth: authRepository),
       quickUnlock: QuickUnlockUseCase(biometrics: biometrics, auth: authRepository),
       forgetBiometrics: ForgetBiometricsUseCase(authRepository),
@@ -225,6 +286,7 @@ class AppDependencies {
         rankZones: RankSafeZonesUseCase(),
         recommend: RecommendMeetingPointUseCase(const RankMeetingPointsUseCase()),
         getDensity: GetMeetingPointDensityUseCase(meetingDensity),
+        queuePropose: QueueMeetingProposalUseCase(pendingActions),
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
       getSchedule: GetScheduleUseCase(scheduleRepository),
@@ -246,6 +308,19 @@ class AppDependencies {
       estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
       getConnectivity: GetConnectivityUseCase(connectivity),
       watchConnectivity: WatchConnectivityUseCase(connectivity),
+      responseCache: responseCache,
+      outbox: outbox,
+      startOutboxSync: StartOutboxSyncUseCase(outboxSync),
+      stopOutboxSync: StopOutboxSyncUseCase(outboxSync),
+      syncOutbox: SyncOutboxUseCase(outboxSync),
+      loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
+      saveRatingDraft: SaveRatingDraftUseCase(ratingDrafts),
+      clearRatingDraft: ClearRatingDraftUseCase(ratingDrafts),
+      queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
+      queueRating: QueueRatingUseCase(pendingActions),
+      queueMeetingProposal: QueueMeetingProposalUseCase(pendingActions),
+      watchPendingActions: WatchPendingActionsUseCase(pendingActions),
+      discardPendingAction: DiscardPendingActionUseCase(pendingActions),
     );
   }
 }

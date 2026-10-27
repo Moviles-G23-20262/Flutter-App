@@ -187,3 +187,28 @@ RatingEntity ratingFromJson(Json json) {
 
 List<T> parseList<T>(Object? response, T Function(Json) parse) =>
     (response as List<dynamic>).map((item) => parse(item as Json)).toList();
+
+// Domain → request bodies, shared by the online calls and the outbox.
+
+/// Body of `POST /ratings`.
+Json newRatingToJson(NewRating rating) => {
+      'exchangeId': rating.exchangeId,
+      'ratedId': rating.ratedId,
+      'stars': rating.stars,
+      'tags': rating.tags,
+      if (rating.review != null) 'review': rating.review,
+    };
+
+/// Body of `POST /meeting-proposals`.
+Json meetingProposalToJson({
+  required String chatRoomId,
+  required String meetingPointId,
+  required DateTime startsAt,
+  required DateTime endsAt,
+}) =>
+    {
+      'chatRoomId': chatRoomId,
+      'meetingPointId': meetingPointId,
+      'startsAt': startsAt.toUtc().toIso8601String(),
+      'endsAt': endsAt.toUtc().toIso8601String(),
+    };

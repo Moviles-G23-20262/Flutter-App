@@ -6,6 +6,7 @@ import '../../view_model/account_view_model.dart';
 import '../widgets/async_views.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
+import '../widgets/saved_copy_banner.dart';
 
 // ─── Notifications Screen ─────────────────────────────────────────────────────
 
@@ -144,6 +145,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   color: border,
                   height: 1,
                 ),
+
+                if (account.notificationsSavedAt != null)
+                  SavedCopyBanner(
+                    savedAt: account.notificationsSavedAt!,
+                    onRetry: account.isLoading ? null : account.load,
+                  ),
 
                 Expanded(
                   child: account.isFirstLoad && account.isLoading
