@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
+import '../model/entities/listing_draft.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
 import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/classify_item_photo_use_case.dart';
+import '../model/use_cases/listing_draft_use_cases.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 
 /// Takes or picks a photo and returns its bytes; null if the user cancelled.
@@ -18,8 +22,12 @@ typedef PublishListing = Future<void> Function(NewListingData data);
 /// Holds everything the screen shows (category and condition, the optional photos, the price
 /// estimate, the publishing state) and is the only code that talks to the use cases.
 /// The View just renders these properties and forwards taps to the methods below.
+///
+/// What is entered is saved as a draft 0.4 s after the last change and restored when the screen
+/// opens again; the draft is deleted once the listing is published or queued, or discarded.
 class SmartListingViewModel extends ChangeNotifier {
   static const int maxPhotos = 3;
+  static const Duration draftDelay = Duration(milliseconds: 400);
 
   final PriceEstimatorUseCase estimator;
 
@@ -31,11 +39,22 @@ class SmartListingViewModel extends ChangeNotifier {
   /// Creates the listing. Without it publishing is unavailable.
   final PublishListing? publishListing;
 
+  /// The signed-in user the draft belongs to, and the draft use cases. Without them nothing is
+  /// saved or restored.
+  final String? userId;
+  final LoadListingDraftUseCase? loadDraft;
+  final SaveListingDraftUseCase? saveDraft;
+  final ClearListingDraftUseCase? clearDraft;
+
   SmartListingViewModel({
     required this.estimator,
     this.pickPhoto,
     this.classifyPhoto,
     this.publishListing,
+    this.userId,
+    this.loadDraft,
+    this.saveDraft,
+    this.clearDraft,
   });
 
   String? _selectedCategory;
@@ -54,6 +73,21 @@ class SmartListingViewModel extends ChangeNotifier {
   bool _isPublishing = false;
   bool _published = false;
   String? _publishError;
+
+  // The text lives in the View's controllers; they report it through [onFormChanged].
+  String _title = '';
+  String _description = '';
+  String _courseCode = '';
+  String _price = '';
+
+  Timer? _draftTimer;
+
+  /// Saves and deletes run one after the other, so a late save never undoes a delete.
+  Future<void> _draftWork = Future.value();
+
+  /// After a publish or a discard nothing more is saved.
+  bool _draftClosed = false;
+  bool _restoredDraft = false;
 
   int _scan = 0; // lets a photo scan that finishes late be ignored
   int _request = 0; // lets an answer that arrives late be ignored
@@ -139,6 +173,7 @@ class SmartListingViewModel extends ChangeNotifier {
     if (category == _selectedCategory) return;
     _selectedCategory = category;
     _discardEstimate();
+    _scheduleDraftSave();
   }
 
   void setCondition(String condition) {
@@ -146,6 +181,22 @@ class SmartListingViewModel extends ChangeNotifier {
     if (condition == _selectedCondition) return;
     _selectedCondition = condition;
     _discardEstimate();
+    _scheduleDraftSave();
+  }
+
+  /// The View reports the text of its fields whenever one changes.
+  void onFormChanged({
+    required String title,
+    required String description,
+    required String courseCode,
+    required String price,
+  }) {
+    if (title == _title && description == _description && courseCode == _courseCode && price == _price) return;
+    _title = title;
+    _description = description;
+    _courseCode = courseCode;
+    _price = price;
+    _scheduleDraftSave();
   }
 
   /// Estimates a fair price for the chosen category and condition. Never throws: whatever
@@ -197,7 +248,10 @@ class SmartListingViewModel extends ChangeNotifier {
     if (_disposed || scan != _scan) return;
     _isPickingPhoto = false;
     _photoMessage = message;
-    if (bytes != null) _photos.add(PendingImage(bytes: bytes, filename: 'photo-${++_photoCounter}.jpg'));
+    if (bytes != null) {
+      _photos.add(PendingImage(bytes: bytes, filename: 'photo-${++_photoCounter}.jpg'));
+      _scheduleDraftSave();
+    }
     notifyListeners();
   }
 
@@ -209,6 +263,7 @@ class SmartListingViewModel extends ChangeNotifier {
       _photoMessage = null;
     }
     notifyListeners();
+    _scheduleDraftSave();
   }
 
   /// Asks the external vision service which category the first photo shows. A recognised
@@ -232,6 +287,7 @@ class SmartListingViewModel extends ChangeNotifier {
     if (category != null && category.name != _selectedCategory) {
       _selectedCategory = category.name;
       _discardEstimate(); // also notifies
+      _scheduleDraftSave();
     } else {
       notifyListeners();
     }
@@ -258,6 +314,7 @@ class SmartListingViewModel extends ChangeNotifier {
   }) async {
     final publisher = publishListing;
     if (_isPublishing || _published) return false;
+    onFormChanged(title: title, description: description, courseCode: courseCode, price: price);
 
     final amount = double.tryParse(price.trim().replaceAll(',', '.'));
     final problem = _selectedCategory == null
@@ -306,12 +363,105 @@ class SmartListingViewModel extends ChangeNotifier {
     _isPublishing = false;
     _publishError = error;
     _published = error == null;
+    // Published, or saved in the offline queue: either way the draft has done its job.
+    if (_published) unawaited(discardDraft());
     notifyListeners();
     return _published;
   }
 
-  /// Back to the initial state: nothing chosen, no photos, nothing estimated.
+  // ── Draft ─────────────────────────────────────────────────────────────────
+
+  /// Whether a draft is being kept for this screen at all.
+  bool get draftEnabled => userId != null && saveDraft != null;
+
+  /// A saved draft was put back into the form.
+  bool get restoredDraft => _restoredDraft;
+
+  /// There is something entered that would be lost on leaving without a draft.
+  bool get hasUnpublishedWork => !_published && !_currentDraft().isEmpty;
+
+  /// Puts the saved draft back (category, condition, photos) and returns it so the View can fill
+  /// its text fields; null when there is none. Call once when the screen opens. A form the user
+  /// already started is left alone.
+  Future<ListingDraft?> restoreDraft() async {
+    final id = userId;
+    final load = loadDraft;
+    if (id == null || load == null) return null;
+    final draft = await load.execute(id);
+    if (draft == null || draft.isEmpty || _disposed || _draftClosed) return null;
+    if (!_currentDraft().isEmpty) return null;
+
+    _title = draft.title;
+    _description = draft.description;
+    _courseCode = draft.courseCode;
+    _price = draft.price;
+    _selectedCategory = draft.category;
+    _selectedCondition = draft.condition;
+    _photos
+      ..clear()
+      ..addAll(draft.photos.take(maxPhotos));
+    // New photos must not reuse the names of the restored ones.
+    for (final photo in _photos) {
+      final number = int.tryParse(RegExp(r'\d+').firstMatch(photo.filename)?.group(0) ?? '') ?? 0;
+      if (number > _photoCounter) _photoCounter = number;
+    }
+    _restoredDraft = true;
+    _discardEstimate(); // also notifies
+    return draft;
+  }
+
+  /// Writes a change still waiting for its timer now (e.g. before leaving the screen).
+  Future<void> flushDraft() async {
+    if (_draftTimer?.isActive ?? false) {
+      _draftTimer!.cancel();
+      await _saveDraft();
+    }
+    await _draftWork;
+  }
+
+  /// Deletes the draft and stops saving: the listing was published or queued, or the user
+  /// threw the draft away.
+  Future<void> discardDraft() {
+    _draftClosed = true;
+    _draftTimer?.cancel();
+    final id = userId;
+    final clear = clearDraft;
+    if (id == null || clear == null) return Future.value();
+    return _draftWork = _draftWork.then((_) => clear.execute(id)).catchError((Object _) {});
+  }
+
+  ListingDraft _currentDraft() => ListingDraft(
+        title: _title,
+        description: _description,
+        courseCode: _courseCode,
+        price: _price,
+        condition: _selectedCondition,
+        category: _selectedCategory,
+        photos: List.of(_photos),
+      );
+
+  /// Debounce: every change restarts the timer, so only the last state is written.
+  void _scheduleDraftSave() {
+    if (!draftEnabled || _draftClosed || _disposed) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(draftDelay, _saveDraft);
+  }
+
+  Future<void> _saveDraft() {
+    final id = userId;
+    final save = saveDraft;
+    if (id == null || save == null || _draftClosed) return _draftWork;
+    final draft = _currentDraft();
+    return _draftWork = _draftWork.then((_) {
+      if (!_draftClosed) return save.execute(id, draft);
+    }).catchError((Object _) {});
+  }
+
+  /// Back to the initial state: nothing chosen, no photos, nothing estimated, no draft.
   void reset() {
+    _title = _description = _courseCode = _price = '';
+    unawaited(discardDraft());
+    _draftClosed = false; // the next form can be saved again
     _scan++; // drop any photo scan still running
     _isScanningPhoto = false;
     _isPickingPhoto = false;
@@ -338,8 +488,13 @@ class SmartListingViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A change still waiting for its timer is written now, so leaving the screen loses nothing.
   @override
   void dispose() {
+    if (_draftTimer?.isActive ?? false) {
+      _draftTimer!.cancel();
+      _saveDraft();
+    }
     _disposed = true;
     super.dispose();
   }

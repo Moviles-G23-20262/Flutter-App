@@ -191,6 +191,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
           appState: _appState,
           viewModelFactory: () => _deps.createSmartListingViewModel(
             publish: _appState.marketplace.publish,
+            userId: _appState.currentUser?.id,
           ),
         );
       case AppScreen.confirmation:
