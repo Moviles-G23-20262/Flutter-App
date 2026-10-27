@@ -132,6 +132,7 @@ class AppDependencies {
   final MarkNotificationOpenedUseCase markNotificationOpened;
   final MeetupUseCases meetups;
   final GetConversationInsightUseCase getConversationInsight;
+  final GetChatAgreementUseCase getChatAgreement;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -165,6 +166,7 @@ class AppDependencies {
     required this.markNotificationOpened,
     required this.meetups,
     required this.getConversationInsight,
+    required this.getChatAgreement,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -294,6 +296,7 @@ class AppDependencies {
         queuePropose: QueueMeetingProposalUseCase(pendingActions),
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
+      getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),
