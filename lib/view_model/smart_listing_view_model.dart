@@ -2,19 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
+import 'package:path/path.dart' as p;
+import '../core/isolates/photo_compressor.dart';
 import '../model/entities/listing_draft.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
 import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/classify_item_photo_use_case.dart';
+import '../model/use_cases/connectivity_use_cases.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
+import '../model/use_cases/pending_listing_use_cases.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 
 /// Takes or picks a photo and returns its bytes; null if the user cancelled.
 /// Throws when the camera or gallery cannot be used.
 typedef PhotoPicker = Future<Uint8List?> Function(ImageSource source);
 
-/// Creates the listing on the server. Throws [DataException] with a message to show.
+/// Creates the listing on the server. Throws [DataException] with a message to show, or its
+/// subclass [NoConnectionException] when the server could not be reached.
 typedef PublishListing = Future<void> Function(NewListingData data);
 
 /// MVVM: the ViewModel of the "sell an item" screen (Smart Listing).
@@ -29,6 +34,9 @@ class SmartListingViewModel extends ChangeNotifier {
   static const int maxPhotos = 3;
   static const Duration draftDelay = Duration(milliseconds: 400);
 
+  /// Shown when the listing could not be sent and was kept on the phone.
+  static const String savedOfflineMessage = "Saved on your phone. We'll publish it as soon as you reconnect.";
+
   final PriceEstimatorUseCase estimator;
 
   /// Camera / gallery and the photo classifier. Without them the photo features are
@@ -38,6 +46,18 @@ class SmartListingViewModel extends ChangeNotifier {
 
   /// Creates the listing. Without it publishing is unavailable.
   final PublishListing? publishListing;
+
+  /// Shrinks the photos before they are uploaded or saved (in an isolate). Without it they go
+  /// as they are.
+  final PhotoCompressor? compressPhotos;
+
+  /// Keeps the listing on the phone when it cannot be sent; the sync service publishes it later.
+  /// Needs [userId]. Without it a failed connection is reported as an error.
+  final QueueListingUseCase? queueListing;
+
+  /// Tells whether the phone is online, so an offline publish is saved at once instead of
+  /// waiting for a request to time out.
+  final GetConnectivityUseCase? connectivity;
 
   /// The signed-in user the draft belongs to, and the draft use cases. Without them nothing is
   /// saved or restored.
@@ -51,6 +71,9 @@ class SmartListingViewModel extends ChangeNotifier {
     this.pickPhoto,
     this.classifyPhoto,
     this.publishListing,
+    this.compressPhotos,
+    this.queueListing,
+    this.connectivity,
     this.userId,
     this.loadDraft,
     this.saveDraft,
@@ -72,6 +95,7 @@ class SmartListingViewModel extends ChangeNotifier {
 
   bool _isPublishing = false;
   bool _published = false;
+  bool _savedOffline = false;
   String? _publishError;
 
   // The text lives in the View's controllers; they report it through [onFormChanged].
@@ -164,6 +188,9 @@ class SmartListingViewModel extends ChangeNotifier {
 
   bool get isPublishing => _isPublishing;
   bool get published => _published;
+
+  /// Published = true and the listing is waiting on the phone ([savedOfflineMessage]), not live yet.
+  bool get savedOffline => _savedOffline;
   String? get publishError => _publishError;
 
   // ── Intents from the View ─────────────────────────────────────────────────
@@ -343,30 +370,75 @@ class SmartListingViewModel extends ChangeNotifier {
     notifyListeners();
 
     String? error;
+    var savedOffline = false;
+    var compressedPaths = <String>[];
     try {
-      await publisher!(NewListingData(
+      // The photos are shrunk and saved on the phone first (in an isolate, so the screen keeps
+      // drawing); they are what gets uploaded now or, offline, what waits in the queue.
+      var images = List.of(_photos);
+      final compress = compressPhotos;
+      if (compress != null) {
+        final compressed = await compress([for (final photo in _photos) photo.bytes]);
+        compressedPaths = [for (final photo in compressed) photo.path];
+        images = [for (final photo in compressed) PendingImage(bytes: photo.bytes, filename: p.basename(photo.path))];
+      }
+      final data = NewListingData(
         title: title,
         description: description,
         courseCode: courseCode,
         price: amount!,
         condition: MaterialConditionEnum.values.byName(_selectedCondition!),
         category: MaterialCategoryEnum.values.byName(_selectedCategory!),
-        images: List.of(_photos),
-      ));
+        images: images,
+      );
+
+      if (await _isOnline()) {
+        try {
+          await publisher!(data);
+        } on NoConnectionException {
+          await _saveOffline(data, compressedPaths);
+          savedOffline = true;
+        }
+      } else {
+        await _saveOffline(data, compressedPaths);
+        savedOffline = true;
+      }
     } on DataException catch (e) {
       error = e.message;
     } catch (_) {
       error = 'Unexpected error. Please try again.';
     }
+    // Published or refused: the compressed copies are not needed. Queued ones are kept.
+    if (!savedOffline) await deleteCompressedPhotos(compressedPaths);
 
     if (_disposed) return false;
     _isPublishing = false;
     _publishError = error;
     _published = error == null;
+    _savedOffline = error == null && savedOffline;
     // Published, or saved in the offline queue: either way the draft has done its job.
     if (_published) unawaited(discardDraft());
     notifyListeners();
     return _published;
+  }
+
+  Future<bool> _isOnline() async {
+    final check = connectivity;
+    if (check == null) return true;
+    try {
+      return await check.execute();
+    } catch (_) {
+      return true; // cannot tell: try the request
+    }
+  }
+
+  /// Keeps the listing on the phone. Throws [NoConnectionException] when that is not possible
+  /// (nobody signed in, or no queue), so the user gets the usual "can't reach the server".
+  Future<void> _saveOffline(NewListingData data, List<String> photoPaths) async {
+    final queue = queueListing;
+    final owner = userId;
+    if (queue == null || owner == null) throw const NoConnectionException();
+    await queue.execute(ownerId: owner, data: data, photoPaths: photoPaths);
   }
 
   // ── Draft ─────────────────────────────────────────────────────────────────
@@ -470,6 +542,7 @@ class SmartListingViewModel extends ChangeNotifier {
     _photoMessage = null;
     _publishError = null;
     _published = false;
+    _savedOffline = false;
     _request++; // drop any answer still on its way
     _selectedCategory = null;
     _selectedCondition = null;

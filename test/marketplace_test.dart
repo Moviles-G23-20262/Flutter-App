@@ -19,6 +19,10 @@ import 'package:flutter_front_end/model/entities/material_entity.dart';
 import 'package:flutter_front_end/model/entities/meeting_point_density.dart';
 import 'package:flutter_front_end/model/entities/meetup_entities.dart';
 import 'package:flutter_front_end/model/entities/new_listing_data.dart';
+import 'package:flutter_front_end/model/entities/pending_items.dart';
+import 'package:flutter_front_end/model/repositories/pending_listing_repository.dart';
+import 'package:flutter_front_end/model/use_cases/pending_listing_use_cases.dart';
+import 'package:flutter_front_end/view/screens/seller_hub_screen.dart';
 import 'package:flutter_front_end/model/entities/notification_entity.dart';
 import 'package:flutter_front_end/model/entities/user_entity.dart';
 import 'package:flutter_front_end/model/entities/user_summary.dart';
@@ -323,6 +327,28 @@ class _FakeDensity implements MeetingDensityRepository {
   Future<MeetingPointDensity> getDensity() async => density;
 }
 
+/// The listings saved on the phone, which the test can change and watch.
+class _FakePendingListings implements PendingListingRepository {
+  final _controller = StreamController<List<PendingListing>>.broadcast();
+  final discarded = <String>[];
+
+  void emit(List<PendingListing> listings) => _controller.add(listings);
+
+  @override
+  Stream<List<PendingListing>> watch(String ownerId) => _controller.stream;
+
+  @override
+  Future<void> discard(String listingId) async => discarded.add(listingId);
+
+  @override
+  Future<PendingListing> queue({
+    required String ownerId,
+    required NewListingData data,
+    required List<String> photoPaths,
+  }) =>
+      throw UnimplementedError();
+}
+
 class _FakeInsights implements ConversationInsightRepository {
   @override
   Future<ConversationInsight> getConversationInsight() async =>
@@ -358,6 +384,7 @@ class _World {
   final location = _FakeLocation();
   final density = _FakeDensity();
   final insights = _FakeInsights();
+  final pendingListings = _FakePendingListings();
 
   late final meetups = MeetupUseCases(
     getMeetingPoints: GetMeetingPointsUseCase(meetupRepo),
@@ -376,6 +403,8 @@ class _World {
     getWishlist: GetWishlistUseCase(wishlist),
     addToWishlist: AddToWishlistUseCase(wishlist),
     removeFromWishlist: RemoveFromWishlistUseCase(wishlist),
+    watchPendingListings: WatchPendingListingsUseCase(pendingListings),
+    discardPendingListing: DiscardPendingListingUseCase(pendingListings),
   );
 
   late final chatState = ChatViewModel(
@@ -1340,6 +1369,100 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Retried Listing'), findsOneWidget);
+      world.chatState.clear();
+    });
+  });
+
+  group('Seller hub: listings saved on the phone', () {
+    void ignoreFontOverflows() {
+      final original = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('overflowed')) return;
+        original?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = original);
+    }
+
+    PendingListing pending(String id, {PendingStatus status = PendingStatus.waiting, String? error}) => PendingListing(
+          id: id,
+          ownerId: _me,
+          payload: {'title': 'Pending $id', 'price': '35000.00'},
+          photoPaths: const [],
+          createdAt: DateTime(2026, 10, 27),
+          status: status,
+          lastError: error,
+        );
+
+    Future<_World> pumpHub(WidgetTester tester, {List<MaterialEntity> materials = const []}) async {
+      ignoreFontOverflows();
+      final world = _World();
+      world.materials.materials = materials;
+      await tester.binding.setSurfaceSize(const Size(420, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      world.appState.login(UserEntity(
+        id: _me,
+        email: 'me@uniandes.edu.co',
+        fullName: 'Maria Santos',
+        major: 'CS',
+        rating: 4.8,
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await tester.pumpWidget(MaterialApp(home: SellerHubScreen(appState: world.appState)));
+      await tester.pumpAndSettle();
+      return world;
+    }
+
+    testWidgets('a listing waiting for the connection shows the "Waiting to publish" badge', (tester) async {
+      final world = await pumpHub(tester);
+
+      world.pendingListings.emit([pending('a')]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pending a'), findsOneWidget);
+      expect(find.text('Waiting to publish'), findsOneWidget);
+      expect(find.text('Discard'), findsNothing);
+      expect(find.textContaining('You have not listed anything yet'), findsNothing);
+      world.chatState.clear();
+    });
+
+    testWidgets('a listing the server refused is "Not published", says why and can be discarded', (tester) async {
+      final world = await pumpHub(tester);
+      world.pendingListings.emit([pending('a', status: PendingStatus.refused, error: 'Title is too long')]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Not published'), findsOneWidget);
+      expect(find.text('Title is too long'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('discard-pending-listing-a')));
+      await tester.pumpAndSettle();
+
+      expect(world.pendingListings.discarded, ['a']);
+      world.chatState.clear();
+    });
+
+    testWidgets('they come before the published listings', (tester) async {
+      final world = await pumpHub(tester, materials: [_material(id: 'live', sellerId: _me)]);
+
+      world.pendingListings.emit([pending('a')]);
+      await tester.pumpAndSettle();
+
+      final pendingTop = tester.getTopLeft(find.text('Pending a')).dy;
+      final liveTop = tester.getTopLeft(find.text('Casio fx-991EX')).dy;
+      expect(pendingTop, lessThan(liveTop));
+      world.chatState.clear();
+    });
+
+    testWidgets('once published it leaves the queue and the listings are read again', (tester) async {
+      final world = await pumpHub(tester);
+      world.pendingListings.emit([pending('a')]);
+      await tester.pumpAndSettle();
+      expect(find.text('Waiting to publish'), findsOneWidget);
+
+      world.materials.materials = [_material(id: 'live', sellerId: _me)];
+      world.pendingListings.emit(const []);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Waiting to publish'), findsNothing);
+      expect(find.text('Casio fx-991EX'), findsOneWidget);
       world.chatState.clear();
     });
   });

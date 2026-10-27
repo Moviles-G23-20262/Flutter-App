@@ -155,7 +155,10 @@ class _RecordingSender implements OutboxSender {
   }
 
   @override
-  Future<void> sendListing(PendingListing listing) async => sent.add('listing');
+  Future<String> uploadPhoto(String path) async => 'https://cdn.test/photo.jpg';
+
+  @override
+  Future<void> createListing(Map<String, dynamic> body) async => sent.add('listing');
 
   @override
   Future<void> sendMessage(PendingMessage message) async => sent.add('message');

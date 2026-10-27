@@ -79,19 +79,7 @@ class MaterialRepositoryImpl implements MaterialRepository {
           );
         }
 
-        return remote.createMaterial({
-          'title': data.title.trim(),
-          'description': data.description.trim(),
-
-          if (data.courseCode != null &&
-              data.courseCode!.trim().isNotEmpty)
-            'courseCode': data.courseCode!.trim(),
-
-          'price': data.price.toStringAsFixed(2),
-          'condition': data.condition.name,
-          'category': data.category.name,
-          'imageUrls': imageUrls,
-        });
+        return remote.createMaterial({...newListingToJson(data), 'imageUrls': imageUrls});
       });
 }
 

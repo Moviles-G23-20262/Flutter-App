@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
+import '../model/entities/pending_items.dart';
 import '../model/entities/wishlist_item_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
+import '../model/use_cases/pending_listing_use_cases.dart';
 import '../model/strategies/sort_strategy.dart';
 
 /// Listings and favorites, shared by Home, Search, Detail and the Seller Hub.
@@ -13,6 +17,8 @@ class MarketplaceViewModel extends ChangeNotifier {
   final GetWishlistUseCase getWishlist;
   final AddToWishlistUseCase addToWishlist;
   final RemoveFromWishlistUseCase removeFromWishlist;
+  final WatchPendingListingsUseCase? watchPendingListings;
+  final DiscardPendingListingUseCase? discardPendingListing;
 
   MarketplaceViewModel({
     required this.getMaterials,
@@ -20,7 +26,13 @@ class MarketplaceViewModel extends ChangeNotifier {
     required this.getWishlist,
     required this.addToWishlist,
     required this.removeFromWishlist,
+    this.watchPendingListings,
+    this.discardPendingListing,
   });
+
+  List<PendingListing> _pendingListings = const [];
+  StreamSubscription<List<PendingListing>>? _pendingSubscription;
+  final Set<String> _discarded = {};
 
   List<MaterialEntity> _materials = const [];
   List<WishlistItemEntity> _wishlist = const [];
@@ -45,6 +57,33 @@ class MarketplaceViewModel extends ChangeNotifier {
   /// True until the first load finished (successfully or not): show a spinner, not an empty state.
   bool get isFirstLoad => !_loadedOnce;
   String? get error => _error;
+
+  /// The signed-in user's listings saved on the phone and not published yet (oldest first):
+  /// waiting for a connection, or refused by the server ([PendingListing.isRefused]).
+  List<PendingListing> get pendingListings => _pendingListings;
+
+  /// Follows [userId]'s queued listings. When one leaves the queue because it was published,
+  /// the listings are read again, so it shows up as a normal one.
+  void watchPending(String userId) {
+    final watch = watchPendingListings;
+    if (watch == null) return;
+    _pendingSubscription?.cancel();
+    final generation = _generation;
+    _pendingSubscription = watch.execute(userId).listen((listings) {
+      if (generation != _generation) return;
+      final stillThere = {for (final l in listings) l.id};
+      final published = _pendingListings.any((l) => !stillThere.contains(l.id) && !_discarded.remove(l.id));
+      _pendingListings = listings;
+      notifyListeners();
+      if (published) load();
+    }, onError: (_) {});
+  }
+
+  /// The user gives up on a listing that is waiting or was refused.
+  Future<void> discardPending(String listingId) async {
+    _discarded.add(listingId);
+    await discardPendingListing?.execute(listingId);
+  }
 
   List<MaterialEntity> listingsOf(String sellerId) =>
       _materials.where((m) => m.sellerId == sellerId).toList(growable: false);
@@ -245,6 +284,10 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   void clear() {
     _generation++;
+    _pendingSubscription?.cancel();
+    _pendingSubscription = null;
+    _pendingListings = const [];
+    _discarded.clear();
     _materials = const [];
     _wishlist = const [];
     _wishlistSavedAt = null;
@@ -253,5 +296,11 @@ class MarketplaceViewModel extends ChangeNotifier {
     _error = null;
     _togglingFavorites.clear();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _pendingSubscription?.cancel();
+    super.dispose();
   }
 }

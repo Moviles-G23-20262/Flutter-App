@@ -16,7 +16,8 @@ class AppDatabase {
   ///
   /// 1: cached_responses, pending_messages, pending_listings.
   /// 2: pending_actions (exchange completion, rating, meeting proposal).
-  static const int version = 2;
+  /// 3: pending_listings.uploaded_urls (photos that already reached the server).
+  static const int version = 3;
 
   final Future<Database> Function() _open;
   Future<Database>? _database;
@@ -78,6 +79,7 @@ class AppDatabase {
           owner_id TEXT NOT NULL,
           payload TEXT NOT NULL,
           photo_paths TEXT NOT NULL,
+          uploaded_urls TEXT NOT NULL DEFAULT '[]',
           created_at INTEGER NOT NULL,
           status TEXT NOT NULL,
           attempts INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +111,7 @@ class AppDatabase {
   static Future<void> _upgrade(Database db, int from, int to) async {
     final batch = db.batch();
     if (from < 2) _createPendingActions(batch);
+    if (from < 3) batch.execute("ALTER TABLE pending_listings ADD COLUMN uploaded_urls TEXT NOT NULL DEFAULT '[]'");
     await batch.commit(noResult: true);
   }
 }

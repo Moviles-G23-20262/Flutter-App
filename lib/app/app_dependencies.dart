@@ -53,7 +53,10 @@ import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
 import '../model/use_cases/rating_draft_use_cases.dart';
 import '../model/data_sources/local/draft_photo_store.dart';
+import '../core/isolates/photo_compressor.dart';
+import '../model/repositories/impl/pending_listing_repository_impl.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
+import '../model/use_cases/pending_listing_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -107,6 +110,9 @@ class AppDependencies {
   final LoadListingDraftUseCase loadListingDraft;
   final SaveListingDraftUseCase saveListingDraft;
   final ClearListingDraftUseCase clearListingDraft;
+  final QueueListingUseCase queueListing;
+  final WatchPendingListingsUseCase watchPendingListings;
+  final DiscardPendingListingUseCase discardPendingListing;
 
   /// Exchange steps done offline: queued in the outbox and sent later.
   final QueueExchangeCompletionUseCase queueExchangeCompletion;
@@ -197,6 +203,9 @@ class AppDependencies {
     required this.loadListingDraft,
     required this.saveListingDraft,
     required this.clearListingDraft,
+    required this.queueListing,
+    required this.watchPendingListings,
+    required this.discardPendingListing,
     required this.queueExchangeCompletion,
     required this.queueRating,
     required this.queueMeetingProposal,
@@ -211,6 +220,9 @@ class AppDependencies {
         pickPhoto: imagePicker.pick,
         classifyPhoto: classifyItemPhoto,
         publishListing: publish,
+        compressPhotos: compressPhotoBytes,
+        queueListing: queueListing,
+        connectivity: getConnectivity,
         userId: userId,
         loadDraft: loadListingDraft,
         saveDraft: saveListingDraft,
@@ -268,6 +280,7 @@ class AppDependencies {
       connectivity: connectivity,
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
+    final pendingListings = PendingListingRepositoryImpl(outbox, sync: outboxSync);
     final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
     final listingDrafts = ListingDraftRepositoryImpl(DraftStore(), DraftPhotoStore());
 
@@ -343,6 +356,9 @@ class AppDependencies {
       loadListingDraft: LoadListingDraftUseCase(listingDrafts),
       saveListingDraft: SaveListingDraftUseCase(listingDrafts),
       clearListingDraft: ClearListingDraftUseCase(listingDrafts),
+      queueListing: QueueListingUseCase(pendingListings),
+      watchPendingListings: WatchPendingListingsUseCase(pendingListings),
+      discardPendingListing: DiscardPendingListingUseCase(pendingListings),
       queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
       queueRating: QueueRatingUseCase(pendingActions),
       queueMeetingProposal: QueueMeetingProposalUseCase(pendingActions),
