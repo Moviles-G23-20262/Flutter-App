@@ -203,7 +203,9 @@ class OutboxSyncService {
       urls.add(await sender.uploadPhoto(listing.photoPaths[i]));
       await store.saveUploadedUrls(listing.id, urls);
     }
-    await sender.createListing({...listing.payload, 'imageUrls': urls});
+    // The listing's own id is its clientId: if an earlier attempt reached the server but its answer
+    // was lost, the server returns that listing instead of creating a second one.
+    await sender.createListing({...listing.payload, 'clientId': listing.id, 'imageUrls': urls});
   }
 
   Future<SyncOutcome> _attempt(PendingKind kind, String id, Future<void> Function() send) async {

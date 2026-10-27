@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
 import 'package:path/path.dart' as p;
 import '../core/isolates/photo_compressor.dart';
+import '../model/data_sources/local/outbox_store.dart' show newClientId;
 import '../model/entities/listing_draft.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
@@ -59,6 +60,9 @@ class SmartListingViewModel extends ChangeNotifier {
   /// waiting for a request to time out.
   final GetConnectivityUseCase? connectivity;
 
+  /// Makes the client id of a listing (UUIDv4). Replaceable so tests can know it.
+  final String Function() newListingId;
+
   /// The signed-in user the draft belongs to, and the draft use cases. Without them nothing is
   /// saved or restored.
   final String? userId;
@@ -74,11 +78,12 @@ class SmartListingViewModel extends ChangeNotifier {
     this.compressPhotos,
     this.queueListing,
     this.connectivity,
+    String Function()? newListingId,
     this.userId,
     this.loadDraft,
     this.saveDraft,
     this.clearDraft,
-  });
+  }) : newListingId = newListingId ?? newClientId;
 
   String? _selectedCategory;
   String? _selectedCondition;
@@ -96,6 +101,11 @@ class SmartListingViewModel extends ChangeNotifier {
   bool _isPublishing = false;
   bool _published = false;
   bool _savedOffline = false;
+
+  /// The client id of the listing being published. It stays the same for every attempt of this
+  /// form (online, retried after an error, or saved offline), so the server can tell they are
+  /// one listing. A new form gets a new one.
+  String? _listingClientId;
   String? _publishError;
 
   // The text lives in the View's controllers; they report it through [onFormChanged].
@@ -390,6 +400,7 @@ class SmartListingViewModel extends ChangeNotifier {
         condition: MaterialConditionEnum.values.byName(_selectedCondition!),
         category: MaterialCategoryEnum.values.byName(_selectedCategory!),
         images: images,
+        clientId: _listingClientId ??= newListingId(),
       );
 
       if (await _isOnline()) {
@@ -543,6 +554,7 @@ class SmartListingViewModel extends ChangeNotifier {
     _publishError = null;
     _published = false;
     _savedOffline = false;
+    _listingClientId = null;
     _request++; // drop any answer still on its way
     _selectedCategory = null;
     _selectedCondition = null;

@@ -60,13 +60,16 @@ class OutboxStore {
 
   // Listings
 
+  /// [id] is the listing's client id when the app already made one (it was sent to the server in
+  /// an earlier attempt); a new one is made otherwise.
   Future<PendingListing> enqueueListing({
     required String ownerId,
     required Map<String, dynamic> payload,
     List<String> photoPaths = const [],
+    String? id,
   }) async {
     final listing = PendingListing(
-      id: newClientId(),
+      id: id ?? newClientId(),
       ownerId: ownerId,
       payload: payload,
       photoPaths: photoPaths,

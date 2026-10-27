@@ -194,6 +194,7 @@ List<T> parseList<T>(Object? response, T Function(Json) parse) =>
 /// Body of `POST /materials` without `imageUrls`, which exist only once the photos are uploaded.
 /// The same for a listing published now and for one saved on the phone.
 Json newListingToJson(NewListingData data) => {
+      if (data.clientId != null) 'clientId': data.clientId,
       'title': data.title.trim(),
       'description': data.description.trim(),
       if (data.courseCode != null && data.courseCode!.trim().isNotEmpty) 'courseCode': data.courseCode!.trim(),
