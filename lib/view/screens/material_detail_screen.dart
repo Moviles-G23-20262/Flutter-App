@@ -1,3 +1,4 @@
+import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
@@ -109,10 +110,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                       SizedBox(
                         height: 260,
                         width: double.infinity,
-                        child: m.primaryImageUrl.isNotEmpty
-                            ? Image.network(m.primaryImageUrl, fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Container(color: elevated))
-                            : Container(color: elevated, child: const Icon(Icons.image_outlined, size: 48)),
+                        child: CachedPhoto(imageUrl: m.primaryImageUrl, category: m.category.name, fit: BoxFit.cover),
                       ),
                       // Gradient overlay
                       Positioned(

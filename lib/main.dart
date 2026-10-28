@@ -30,6 +30,9 @@ import 'view/screens/notifications_screen.dart';
 import 'view/widgets/common_widgets.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSize = 100;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
   runApp(const CampusSwapApp());
 }
 
@@ -59,6 +62,9 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       markRead: _deps.markChatRead,
       answerProposal: _deps.meetups.answer,
       getConversationInsight: _deps.getConversationInsight,
+      outboxStore: _deps.outbox,
+      outboxSyncService: _deps.outboxSync,
+      responseCache: _deps.responseCache,
     ),
     account: AccountViewModel(
       getExchanges: _deps.getExchanges,
@@ -88,6 +94,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       getConnectivity: _deps.getConnectivity,
       watchConnectivity: _deps.watchConnectivity,
     ),
+    draftStore: _deps.draftStore,
+    pendingListingStore: _deps.pendingListings,
     startOutboxSync: _deps.startOutboxSync,
     stopOutboxSync: _deps.stopOutboxSync,
     syncOutbox: _deps.syncOutbox,
@@ -102,6 +110,13 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     _appState.power.start();
     _appState.connectivity.start();
     _restoreSession();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
   }
 
   Future<void> _restoreSession() async {
@@ -187,6 +202,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
           appState: _appState,
           viewModelFactory: () => _deps.createSmartListingViewModel(
             publish: _appState.marketplace.publish,
+            currentUserId: _appState.currentUser?.id,
           ),
         );
       case AppScreen.confirmation:

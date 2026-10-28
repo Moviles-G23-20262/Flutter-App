@@ -5,7 +5,9 @@ import '../../view_model/app_view_model.dart';
 import '../widgets/async_views.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/power_saving_note.dart';
+import '../widgets/saved_copy_banner.dart';
 import 'chat_view.dart';
 
 // ─── Messages Screen ──────────────────────────────────────────────────────────
@@ -41,15 +43,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chats = widget.appState.chats;
     return ListenableBuilder(
-      listenable: chats,
+      listenable: Listenable.merge([widget.appState.chats, widget.appState.connectivity]),
       builder: (context, _) {
-        final room = chats.activeRoom;
-        if (chats.activeRoomId != null && room != null) {
-          return ChatView(appState: widget.appState, room: room);
-        }
-        return _ConversationList(appState: widget.appState);
+        final chats = widget.appState.chats;
+        chats.setOffline(widget.appState.connectivity.isOffline);
+        return chats.activeRoom != null
+            ? ChatView(appState: widget.appState, room: chats.activeRoom!)
+            : _ConversationList(appState: widget.appState);
       },
     );
   }
@@ -77,9 +78,16 @@ class _ConversationList extends StatelessWidget {
     final successColor= brightness == Brightness.dark ? AppColors.darkSuccess    : AppColors.lightSuccess;
 
     final unread = chats.unreadTotal;
+    final isOffline = appState.connectivity.isOffline;
+    final savedAt = chats.roomsSavedAt;
 
     return Column(
       children: [
+        if (savedAt != null)
+          SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
+        else if (isOffline && chats.rooms.isEmpty)
+          OfflineBanner.firstLaunchOffline(noun: 'conversations', onRetry: chats.loadRooms),
+
         // Header
         Container(
           color: surface,
@@ -124,20 +132,41 @@ class _ConversationList extends StatelessWidget {
             ],
           ),
         ),
+        PowerSavingNote(isSaving: chats.isPowerSaving),
         Divider(color: border, height: 1),
-        if (chats.isPowerSaving) const PowerSavingNote(),
 
+        // List
         Expanded(
           child: chats.isFirstRoomsLoad && chats.isLoadingRooms
               ? const LoadingView()
               : chats.roomsError != null && chats.rooms.isEmpty
-                  ? ErrorView(message: chats.roomsError!, onRetry: chats.loadRooms)
-                  : chats.rooms.isEmpty
-                      ? const EmptyView(
-                          icon: Icons.forum_outlined,
-                          title: 'No conversations yet',
-                          subtitle: 'Tap "Message Seller" on a listing to start one.',
+                  ? (isOffline
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: EmptyView(
+                            icon: Icons.wifi_off_rounded,
+                            title: 'No saved conversations',
+                            subtitle: 'Connect once to load your messages.',
+                            action: AppButton(label: 'Retry', onPressed: chats.loadRooms),
+                          ),
                         )
+                      : ErrorView(message: chats.roomsError!, onRetry: chats.loadRooms))
+                  : chats.rooms.isEmpty
+                      ? (isOffline
+                          ? Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: EmptyView(
+                                icon: Icons.wifi_off_rounded,
+                                title: 'No saved conversations',
+                                subtitle: 'Connect once to load your messages.',
+                                action: AppButton(label: 'Retry', onPressed: chats.loadRooms),
+                              ),
+                            )
+                          : const EmptyView(
+                              icon: Icons.forum_outlined,
+                              title: 'No conversations yet',
+                              subtitle: 'Tap "Message Seller" on a listing to start one.',
+                            ))
                       : RefreshIndicator(
                           onRefresh: chats.loadRooms,
                           child: ListView.builder(
@@ -178,72 +207,97 @@ class _ConversationTile extends StatelessWidget {
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final txSecondary= brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
-    final accent     = brightness == Brightness.dark ? AppColors.darkAccent      : AppColors.lightAccent;
-    final accentLo   = brightness == Brightness.dark ? AppColors.darkAccentLo   : AppColors.lightAccentLo;
-    final surface    = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
-    final border     = room.unreadCount > 0 ? accentLo : (brightness == Brightness.dark ? AppColors.darkBorder : AppColors.lightBorder);
-    final shadow     = brightness == Brightness.dark ? AppColors.darkShadowCard  : AppColors.lightShadowCard;
+    final accentHi   = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
+    final badgeBg    = brightness == Brightness.dark ? AppColors.darkAccent     : AppColors.lightAccent;
 
-    final other = room.otherParty(me);
-    final last = room.lastMessage;
+    final other      = room.otherParty(me);
+    final isBuyer    = me == room.buyerId;
+    final roleTag    = isBuyer ? 'Seller' : 'Buyer';
+    final last       = room.lastMessage;
+    final hasUnread  = room.unreadCount > 0;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: border),
-            boxShadow: [BoxShadow(color: shadow, blurRadius: 10, offset: const Offset(0, 2))],
-          ),
-          child: Row(
-            children: [
-              UserAvatar(initials: other?.initials ?? '?', size: 42, outlined: true),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(other?.fullName ?? 'Campus user',
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
-                        ),
-                        Text(timeAgo(room.lastActivity), style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    if (room.material != null)
-                      Text('Re: ${room.material!.title}',
+        child: Row(
+          children: [
+            UserAvatar(initials: other?.initials ?? '?', size: 48, outlined: true),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          other?.fullName ?? 'Student',
                           maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
-                    Text(
-                      last == null ? 'No messages yet. Say hi!' : '${last.senderId == me ? 'You: ' : ''}${last.content}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs),
-                    ),
-                  ],
-                ),
-              ),
-              if (room.unreadCount > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  height: 20,
-                  decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(999)),
-                  child: Center(
-                    child: Text('${room.unreadCount}',
-                        style: AppTextStyles.mono(Colors.white, fontSize: AppTextStyles.size2xs)),
+                          style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeSm, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (last != null)
+                        Text(
+                          timeAgo(last.createdAt),
+                          style: AppTextStyles.mono(hasUnread ? accentHi : txMuted, fontSize: AppTextStyles.size2xs),
+                        ),
+                    ],
                   ),
-                ),
-              ],
-            ],
-          ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(roleTag, style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs)),
+                      ),
+                      const SizedBox(width: 6),
+                      if (room.material != null)
+                        Expanded(
+                          child: Text(
+                            room.material!.title,
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.size2xs),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          last?.content ?? 'Conversation started',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.body(
+                            hasUnread ? txPrimary : txMuted,
+                            fontSize: AppTextStyles.sizeXs,
+                            fontWeight: hasUnread ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      if (hasUnread) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(999)),
+                          child: Text(
+                            '${room.unreadCount}',
+                            style: AppTextStyles.mono(Colors.white, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

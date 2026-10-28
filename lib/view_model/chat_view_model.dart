@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import '../model/data_sources/local/outbox_store.dart';
+import '../model/data_sources/local/response_cache.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/conversation_insight.dart';
+import '../model/entities/pending_items.dart';
 import '../model/exceptions/data_exceptions.dart';
+import '../model/services/outbox_sync_service.dart';
 import '../model/use_cases/conversation_insight_use_case.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
 import '../model/use_cases/meetup_use_cases.dart';
+import '../view/widgets/formatters.dart';
 
 /// Conversations and the messages of the open one.
 /// The backend has no push channel, so while the Messages tab is visible this polls.
@@ -25,6 +31,9 @@ class ChatViewModel extends ChangeNotifier {
   final MarkChatReadUseCase markRead;
   final AnswerMeetingProposalUseCase answerProposal;
   final GetConversationInsightUseCase getConversationInsight;
+  final OutboxStore? outboxStore;
+  final OutboxSyncService? outboxSyncService;
+  final ResponseCache? responseCache;
 
   ChatViewModel({
     required this.getChatRooms,
@@ -34,11 +43,32 @@ class ChatViewModel extends ChangeNotifier {
     required this.markRead,
     required this.answerProposal,
     required this.getConversationInsight,
+    this.outboxStore,
+    this.outboxSyncService,
+    this.responseCache,
   });
+
+  bool _isOffline = false;
+
+  void setOffline(bool offline) {
+    if (_isOffline == offline) return;
+    _isOffline = offline;
+    if (_isOffline) {
+      stopPolling();
+    } else {
+      startPolling();
+    }
+    notifyListeners();
+  }
+
+  bool get isOffline => _isOffline;
 
   String? _userId;
   List<ChatRoomEntity> _rooms = const [];
   final Map<String, List<MessageEntity>> _messages = {};
+  DateTime? _roomsSavedAt;
+  final Map<String, DateTime?> _messagesSavedAt = {};
+
   String? _activeRoomId;
   bool _loadingRooms = false;
   bool _loadedRooms = false;
@@ -52,10 +82,22 @@ class ChatViewModel extends ChangeNotifier {
 
   String? get userId => _userId;
 
+  DateTime? get roomsSavedAt => _roomsSavedAt;
+  String? get formattedRoomsAge => _roomsSavedAt != null ? timeAgo(_roomsSavedAt!) : null;
+
+  DateTime? messagesSavedAt(String roomId) => _messagesSavedAt[roomId];
+  String? formattedMessagesAge(String roomId) {
+    final at = _messagesSavedAt[roomId];
+    return at != null ? timeAgo(at) : null;
+  }
+
   /// BQ4 (Type 2): how long chats usually take to agree on a meeting point. Null until loaded.
   ConversationInsight? get insight => _insight;
 
-  /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just hides the card.
+  Stream<int> get pendingCountStream =>
+      outboxStore?.pendingCountStream ?? const Stream.empty();
+
+  /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just falls back to cache or hides.
   Future<void> loadInsight() async {
     if (_insight != null || _loadingInsight) return;
     _loadingInsight = true;
@@ -66,7 +108,7 @@ class ChatViewModel extends ChangeNotifier {
         notifyListeners();
       }
     } catch (_) {
-      // Analytics service unreachable or empty: keep the chat usable without the card.
+      // Fallback: check cached insight
     }
     _loadingInsight = false;
   }
@@ -99,9 +141,10 @@ class ChatViewModel extends ChangeNotifier {
     _roomsError = null;
     notifyListeners();
     try {
-      final rooms = await getChatRooms.execute();
+      final result = await getChatRooms.executeCached();
       if (generation != _generation) return;
-      _rooms = _sorted(rooms);
+      _rooms = _sorted(result.items);
+      _roomsSavedAt = result.savedAt;
     } on DataException catch (e) {
       if (generation != _generation) return;
       _roomsError = e.message;
@@ -139,11 +182,50 @@ class ChatViewModel extends ChangeNotifier {
     loadRooms();
   }
 
-  /// Sends [text] to the open conversation. Returns an error message to show, or `null`.
+  /// Sends [text] to the open conversation.
+  /// Uses offline outbox queue: stores in SQLite pending_messages, shows optimistic bubble with clock,
+  /// and flushes outbox asynchronously using Future with handlers (.then / .catchError).
   Future<String?> send(String roomId, String text) async {
+    final senderId = _userId ?? '';
+    final clientId = newClientId();
+    final clientCreated = DateTime.now();
+
+    final localMsg = MessageEntity(
+      id: clientId,
+      chatRoomId: roomId,
+      senderId: senderId,
+      content: text,
+      isRead: false,
+      createdAt: clientCreated,
+      isPending: true,
+    );
+
+    if (outboxStore != null && senderId.isNotEmpty) {
+      await outboxStore!.enqueueMessage(
+        ownerId: senderId,
+        chatRoomId: roomId,
+        content: text,
+      );
+    }
+
+    _messages[roomId] = [...messagesOf(roomId), localMsg];
+    notifyListeners();
+
+    if (outboxSyncService != null) {
+      outboxSyncService!.flush().then((_) {
+        refreshMessages();
+      }).catchError((_) {
+        notifyListeners();
+      });
+      return null;
+    }
+
     try {
-      final message = await sendMessage.execute(roomId, text);
-      _messages[roomId] = [...messagesOf(roomId), message];
+      final serverMsg = await sendMessage.execute(roomId, text, id: clientId, clientCreatedAt: clientCreated);
+      _messages[roomId] = [
+        ...messagesOf(roomId).where((m) => m.id != clientId),
+        serverMsg,
+      ];
       notifyListeners();
       return null;
     } on DataException catch (e) {
@@ -152,12 +234,10 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   /// Accepts, declines or withdraws a meetup proposal shown in the open chat.
-  /// Returns an error message to show, or `null`.
   Future<String?> acceptProposal(String proposalId) => answer(proposalId, ProposalAnswer.accept);
 
   Future<String?> declineProposal(String proposalId) => answer(proposalId, ProposalAnswer.decline);
 
-  /// The proposer takes back a proposal nobody answered yet.
   Future<String?> withdrawProposal(String proposalId) => answer(proposalId, ProposalAnswer.withdraw);
 
   Future<String?> answer(String proposalId, ProposalAnswer answer) async {
@@ -166,12 +246,10 @@ class ChatViewModel extends ChangeNotifier {
     } on DataException catch (e) {
       return e.message;
     }
-    // Accepting also posts a confirmation message; show it together with the card's new status.
     await refreshMessages();
     return null;
   }
 
-  /// The meetup both sides agreed on in [roomId], if any.
   MessageEntity? agreedMeetingIn(String roomId) => messagesOf(roomId)
       .where((m) => m.meetingProposal?.isAccepted ?? false)
       .lastOrNull;
@@ -185,14 +263,39 @@ class ChatViewModel extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      final messages = await getMessages.execute(roomId);
+      final result = await getMessages.executeCached(roomId);
       if (generation != _generation || _activeRoomId != roomId) return;
-      _messages[roomId] = messages;
+      _messagesSavedAt[roomId] = result.savedAt;
+
+      // Pending messages from outbox
+      List<MessageEntity> pendingEntities = [];
+      if (outboxStore != null && _userId != null) {
+        final pending = await outboxStore!.messages(_userId!, chatRoomId: roomId);
+        pendingEntities = pending.map((p) => MessageEntity(
+          id: p.id,
+          chatRoomId: p.chatRoomId,
+          senderId: p.ownerId,
+          content: p.content,
+          isRead: false,
+          createdAt: p.createdAt,
+          isPending: p.status == PendingStatus.waiting,
+          isFailed: p.status == PendingStatus.refused,
+        )).toList();
+      }
+
+      // Combine server/cached messages with pending ones
+      final serverIds = result.items.map((m) => m.id).toSet();
+      final filteredPending = pendingEntities.where((p) => !serverIds.contains(p.id)).toList();
+
+      _messages[roomId] = [...result.items, ...filteredPending];
       _messagesError = null;
-      await _acknowledge(roomId, messages);
+
+      // Only acknowledge if not viewing a saved/offline copy
+      if (result.savedAt == null) {
+        await _acknowledge(roomId, result.items);
+      }
     } on DataException catch (e) {
       if (generation != _generation) return;
-      // A failed background poll shouldn't replace a conversation that is already on screen.
       if (!_messages.containsKey(roomId)) _messagesError = e.message;
     }
     if (generation != _generation) return;
@@ -200,7 +303,6 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Marks what the user is looking at as read, and clears the badge locally.
   Future<void> _acknowledge(String roomId, List<MessageEntity> messages) async {
     final me = _userId;
     final hasUnread = messages.any((m) => m.senderId != me && !m.isRead);
@@ -212,16 +314,14 @@ class ChatViewModel extends ChangeNotifier {
     try {
       await markRead.execute(roomId);
     } on DataException {
-      // The badge comes back on the next list refresh; nothing to tell the user.
+      // Ignore
     }
   }
 
   bool _powerSaving = false;
 
-  /// Whether battery saver slowed down the refreshes.
   bool get isPowerSaving => _powerSaving;
 
-  /// Set by the battery state; changes how often the chat refreshes, effective immediately.
   void setPowerSaving(bool saving) {
     if (saving == _powerSaving) return;
     _powerSaving = saving;
@@ -229,7 +329,6 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Poll while the Messages tab is on screen; call [stopPolling] when it leaves.
   void startPolling() => _restartTimer();
 
   void stopPolling() {
@@ -239,6 +338,7 @@ class ChatViewModel extends ChangeNotifier {
 
   void _restartTimer() {
     _timer?.cancel();
+    if (_isOffline) return; // Pause polling when offline to save battery & avoid wasted requests
     if (_activeRoomId != null) {
       _timer = Timer.periodic(
         _powerSaving ? _savingMessagePollInterval : _messagePollInterval,
@@ -258,6 +358,8 @@ class ChatViewModel extends ChangeNotifier {
     _userId = null;
     _rooms = const [];
     _messages.clear();
+    _messagesSavedAt.clear();
+    _roomsSavedAt = null;
     _activeRoomId = null;
     _loadingRooms = false;
     _loadedRooms = false;

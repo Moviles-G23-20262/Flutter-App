@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/register_view_model.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/offline_banner.dart';
 
 const List<String> _faculties = [
   'Faculty of Administration',
@@ -43,7 +44,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+    _nameCtrl.addListener(_onFieldChanged);
+    _emailCtrl.addListener(_onFieldChanged);
+    _majorCtrl.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    widget.appState.draftStore?.debouncedSaveRegisterDraft(
+      fullName: _nameCtrl.text,
+      major: _majorCtrl.text,
+      email: _emailCtrl.text,
+      faculty: _vm.faculty,
+    );
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await widget.appState.draftStore?.getRegisterDraft();
+    if (draft != null && mounted) {
+      setState(() {
+        if (_nameCtrl.text.isEmpty && draft['fullName'] != null) {
+          _nameCtrl.text = draft['fullName'] as String;
+          _vm.update(RegisterField.name, _nameCtrl.text);
+        }
+        if (_emailCtrl.text.isEmpty && draft['email'] != null) {
+          _emailCtrl.text = draft['email'] as String;
+          _vm.update(RegisterField.email, _emailCtrl.text);
+        }
+        if (_majorCtrl.text.isEmpty && draft['major'] != null) {
+          _majorCtrl.text = draft['major'] as String;
+          _vm.update(RegisterField.major, _majorCtrl.text);
+        }
+        if (draft['faculty'] != null && draft['faculty'] is String) {
+          _vm.setFaculty(draft['faculty'] as String);
+          _facultyCtrl.text = draft['faculty'] as String;
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _nameCtrl.removeListener(_onFieldChanged);
+    _emailCtrl.removeListener(_onFieldChanged);
+    _majorCtrl.removeListener(_onFieldChanged);
     _vm.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
@@ -54,9 +100,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    _vm.submit();
+    await _vm.submit();
+    if (widget.appState.isLoggedIn) {
+      await widget.appState.draftStore?.clearRegisterDraft();
+    }
   }
 
   Future<void> _pickFaculty() async {
@@ -74,6 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (selected == null || !mounted) return;
     _vm.setFaculty(selected == _noFaculty ? null : selected);
     _facultyCtrl.text = _vm.faculty ?? '';
+    _onFieldChanged();
   }
 
   void _goToLogin() {
@@ -85,7 +135,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(listenable: _vm, builder: (context, _) => _buildView(context));
+    return ListenableBuilder(
+      listenable: Listenable.merge([_vm, widget.appState.connectivity]),
+      builder: (context, _) => _buildView(context),
+    );
   }
 
   Widget _buildView(BuildContext context) {
@@ -103,64 +156,74 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Scaffold(
         backgroundColor: bg,
         body: SafeArea(
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    tooltip: 'Back to log in',
-                    onPressed: _vm.isLoading ? null : _goToLogin,
-                    icon: Icon(Icons.arrow_back_rounded, color: txMuted),
-                  ),
+          child: Column(
+            children: [
+              if (widget.appState.connectivity.isOffline)
+                const OfflineBanner(
+                  message: 'Waiting for connection. Connect to the internet to create an account.',
                 ),
-                const SizedBox(height: 4),
-                const CampusSwapLogo(size: 56),
-                const SizedBox(height: 14),
-                Text(
-                  'Create your account',
-                  style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeLg),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Only verified Uniandes students can join.',
-                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 28),
-                AppCard(child: _buildForm()),
-                const SizedBox(height: 8),
-                Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _goToLogin,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      child: RichText(
-                        text: TextSpan(
-                          text: 'Already have an account? ',
-                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                          children: [
-                            TextSpan(
-                              text: 'Log in',
-                              style: AppTextStyles.body(
-                                accentHi,
-                                fontSize: AppTextStyles.sizeXs,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          tooltip: 'Back to log in',
+                          onPressed: _vm.isLoading ? null : _goToLogin,
+                          icon: Icon(Icons.arrow_back_rounded, color: txMuted),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      const CampusSwapLogo(size: 56),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Create your account',
+                        style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeLg),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Only verified Uniandes students can join.',
+                        style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      AppCard(child: _buildForm()),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _goToLogin,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            child: RichText(
+                              text: TextSpan(
+                                text: 'Already have an account? ',
+                                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                                children: [
+                                  TextSpan(
+                                    text: 'Log in',
+                                    style: AppTextStyles.body(
+                                      accentHi,
+                                      fontSize: AppTextStyles.sizeXs,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 32),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

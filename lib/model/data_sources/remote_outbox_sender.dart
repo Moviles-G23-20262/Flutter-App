@@ -17,7 +17,12 @@ class RemoteOutboxSender implements OutboxSender {
 
   @override
   Future<void> sendMessage(PendingMessage message) async {
-    await remote.sendMessage(message.chatRoomId, message.content);
+    await remote.sendMessage(
+      message.chatRoomId,
+      message.content,
+      id: message.id,
+      clientCreatedAt: message.createdAt,
+    );
   }
 
   /// Uploads the photos (up to 3 at once; `Future.wait` keeps their order), then creates the listing.
@@ -28,7 +33,11 @@ class RemoteOutboxSender implements OutboxSender {
       final batch = listing.photoPaths.skip(i).take(3);
       imageUrls.addAll(await Future.wait(batch.map(_upload)));
     }
-    await remote.createMaterial({...listing.payload, 'imageUrls': imageUrls});
+    await remote.createMaterial({
+      'id': listing.id,
+      ...listing.payload,
+      'imageUrls': imageUrls,
+    });
   }
 
   @override

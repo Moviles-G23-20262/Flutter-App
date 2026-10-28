@@ -17,4 +17,10 @@ class ConversationInsightModel extends ConversationInsight {
       medianMinutes: (minutes['median'] as num).toDouble(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'conversations_analyzed': conversationsAnalyzed,
+    'messages_before_agreement': {'median': medianMessages},
+    'minutes_to_agreement': {'median': medianMinutes},
+  };
 }

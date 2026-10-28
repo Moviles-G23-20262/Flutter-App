@@ -1,3 +1,4 @@
+import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 
 import '../../model/entities/exchange_entity.dart';
@@ -240,18 +241,7 @@ class _ExchangeCard extends StatelessWidget {
             child: SizedBox(
               width: 64,
               height: 64,
-              child: exchange.material?.primaryImageUrl.isNotEmpty ==
-                      true
-                  ? Image.network(
-                      exchange.material!.primaryImageUrl,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      color: isDark
-                          ? AppColors.darkElevated
-                          : AppColors.lightElevated,
-                      child: const Icon(Icons.inventory_2_outlined),
-                    ),
+              child: CachedPhoto(imageUrl: exchange.material?.primaryImageUrl ?? '', category: exchange.material?.category.name, fit: BoxFit.cover),
             ),
           ),
           const SizedBox(width: 12),

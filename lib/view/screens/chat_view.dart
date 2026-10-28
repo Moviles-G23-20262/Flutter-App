@@ -6,11 +6,14 @@ import '../../model/entities/material_entity.dart';
 import '../../model/entities/meetup_entities.dart';
 import '../../view_model/app_view_model.dart';
 import '../widgets/async_views.dart';
+import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/conversation_insight_card.dart';
 import '../widgets/formatters.dart';
 import '../widgets/meetup_widgets.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/power_saving_note.dart';
+import '../widgets/saved_copy_banner.dart';
 
 // ─── One conversation ─────────────────────────────────────────────────────────
 
@@ -104,7 +107,7 @@ class _ChatViewState extends State<ChatView> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.appState.account, widget.appState.chats]),
+      listenable: Listenable.merge([widget.appState.account, widget.appState.chats, widget.appState.connectivity]),
       builder: (context, _) => _buildChat(context),
     );
   }
@@ -159,6 +162,29 @@ class _ChatViewState extends State<ChatView> {
                   ],
                 ),
               ),
+              StreamBuilder<int>(
+                stream: chats.pendingCountStream,
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  if (count == 0) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning400,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_upload_outlined, size: 12, color: Colors.black87),
+                        const SizedBox(width: 4),
+                        Text('$count', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      ],
+                    ),
+                  );
+                },
+              ),
               IconButton(
                 tooltip: 'Safety tips',
                 icon: Icon(Icons.shield_outlined, color: accentHi),
@@ -167,13 +193,18 @@ class _ChatViewState extends State<ChatView> {
             ],
           ),
         ),
+        if (appState.connectivity.isOffline || chats.messagesSavedAt(room.id) != null)
+          OfflineBanner.forCache(
+            formattedAge: chats.formattedMessagesAge(room.id),
+            noun: 'messages',
+            onRetry: () => chats.refreshMessages(),
+          ),
         Divider(color: border, height: 1),
 
         // ── The listing being discussed ──
         if (room.material != null)
           _ListingStrip(
             material: room.material!,
-            // The chat only embeds the listing itself; the marketplace copy also has the seller.
             onView: () => appState.openMaterialDetail(
               appState.marketplace.materials.where((m) => m.id == room.materialId).firstOrNull ?? room.material!,
             ),
@@ -369,10 +400,12 @@ class _ListingStrip extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
               width: 56, height: 56,
-              child: m.primaryImageUrl.isNotEmpty
-                  ? Image.network(m.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => _ListingIcon(color: accentHi, background: tagBg))
-                  : _ListingIcon(color: accentHi, background: tagBg),
+              child: CachedPhoto(
+                imageUrl: m.primaryImageUrl,
+                category: m.category.name,
+                width: 56,
+                height: 56,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -405,17 +438,6 @@ class _ListingStrip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ListingIcon extends StatelessWidget {
-  final Color color;
-  final Color background;
-
-  const _ListingIcon({required this.color, required this.background});
-
-  @override
-  Widget build(BuildContext context) =>
-      Container(color: background, child: Icon(Icons.inventory_2_outlined, color: color, size: 28));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -571,8 +593,23 @@ class _Bubble extends StatelessWidget {
                         style: AppTextStyles.mono(isMe ? onMe : txMuted, fontSize: AppTextStyles.sizeXs)),
                     if (isMe) ...[
                       const SizedBox(width: 4),
-                      Icon(message.isRead ? Icons.done_all_rounded : Icons.done_rounded,
-                          size: 15, color: message.isRead ? AppColors.success400 : onMe),
+                      Icon(
+                        message.isPending
+                            ? Icons.access_time_rounded
+                            : message.isFailed
+                                ? Icons.error_outline_rounded
+                                : message.isRead
+                                    ? Icons.done_all_rounded
+                                    : Icons.done_rounded,
+                        size: 15,
+                        color: message.isPending
+                            ? (isMe ? onMe : txMuted)
+                            : message.isFailed
+                                ? AppColors.lightDanger
+                                : message.isRead
+                                    ? AppColors.success400
+                                    : onMe,
+                      ),
                     ],
                   ],
                 ),
