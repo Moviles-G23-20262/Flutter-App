@@ -1,5 +1,6 @@
 import '../entities/meetup_entities.dart';
 import '../exceptions/data_exceptions.dart';
+import '../rules/campus_default_zones.dart';
 import '../rules/walking_distance.dart';
 import 'get_meeting_point_density_use_case.dart';
 import 'meeting_point_recommendation_use_case.dart';
@@ -32,6 +33,10 @@ class ProposeMeetingUseCase {
   }) {
     if (!slot.startsAt.isAfter(now ?? DateTime.now())) {
       throw const DataException('That time already passed. Pick another one.');
+    }
+    if (CampusDefaultZones.isBundled(zone.id)) {
+      // Offline with nothing saved yet: these zones are only a guide, the server doesn't know them.
+      throw const DataException('Connect to the internet once to load the campus zones, then propose.');
     }
     return repository.propose(
       chatRoomId: chatRoomId,

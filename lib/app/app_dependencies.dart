@@ -44,6 +44,7 @@ import '../model/use_cases/register_student_use_case.dart';
 import '../model/use_cases/restore_session_use_case.dart';
 import '../model/data_sources/local/app_database.dart';
 import '../model/data_sources/local/outbox_store.dart';
+import '../model/data_sources/local/campus_zones_asset_data_source.dart';
 import '../model/data_sources/local/response_cache.dart';
 import '../model/data_sources/remote_outbox_sender.dart';
 import '../model/services/outbox_sync_service.dart';
@@ -305,7 +306,12 @@ class AppDependencies {
     final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
     final meetupRemote = MeetupRemoteDataSourceImpl(apiClient: apiClient);
-    final meetupRepository = MeetupRepositoryImpl(meetupRemote);
+    final meetupRepository = MeetupRepositoryImpl(
+      meetupRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+      bundledZones: CampusZonesAssetDataSource(),
+    );
     final scheduleRepository = ScheduleRepositoryImpl(meetupRemote);
     final locationRepository = LocationRepositoryImpl(DeviceLocationDataSource());
     final themePreferences = ThemePreferenceRepositoryImpl();

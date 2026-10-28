@@ -1,0 +1,47 @@
+[
+  {
+    "id": "campus-default-central-library",
+    "name": "Central Library lobby",
+    "detail": "Main entrance, next to the security desk",
+    "zoneType": "LIBRARY",
+    "isMonitored": true,
+    "lat": 4.60198,
+    "lng": -74.06532
+  },
+  {
+    "id": "campus-default-mario-laserna",
+    "name": "Mario Laserna lobby",
+    "detail": "Ground floor, next to the turnstiles",
+    "zoneType": "BUILDING_LOBBY",
+    "isMonitored": true,
+    "lat": 4.60286,
+    "lng": -74.06485
+  },
+  {
+    "id": "campus-default-plazoleta-lleras",
+    "name": "Plazoleta Lleras",
+    "detail": "Open plaza by the Lleras building",
+    "zoneType": "PLAZA",
+    "isMonitored": false,
+    "lat": 4.60165,
+    "lng": -74.06642
+  },
+  {
+    "id": "campus-default-santo-domingo",
+    "name": "Santo Domingo lobby",
+    "detail": "Main hall, by the reception",
+    "zoneType": "BUILDING_LOBBY",
+    "isMonitored": true,
+    "lat": 4.60446,
+    "lng": -74.06555
+  },
+  {
+    "id": "campus-default-student-center",
+    "name": "Student Center plaza",
+    "detail": "In front of the cafeteria, by the info point",
+    "zoneType": "STUDENT_CENTER",
+    "isMonitored": true,
+    "lat": 4.60252,
+    "lng": -74.06588
+  }
+]
