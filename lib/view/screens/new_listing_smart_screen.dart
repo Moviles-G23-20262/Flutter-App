@@ -62,13 +62,13 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
     final draft = await _viewModel.loadDraft();
     if (draft != null && mounted) {
       setState(() {
-        if (_titleCtrl.text.isEmpty && draft.title != null) {
-          _titleCtrl.text = draft.title!;
+        if (_titleCtrl.text.isEmpty && draft.title.isNotEmpty) {
+          _titleCtrl.text = draft.title;
         }
-        if (_descCtrl.text.isEmpty && draft.description != null) {
-          _descCtrl.text = draft.description!;
+        if (_descCtrl.text.isEmpty && draft.description.isNotEmpty) {
+          _descCtrl.text = draft.description;
         }
-        if (_courseCtrl.text.isEmpty && draft.courseCode != null) {
+        if (_courseCtrl.text.isEmpty && (draft.courseCode?.isNotEmpty ?? false)) {
           _courseCtrl.text = draft.courseCode!;
         }
         if (_priceCtrl.text.isEmpty && draft.price != null) {

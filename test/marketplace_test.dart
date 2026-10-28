@@ -117,6 +117,12 @@ class _FakeMaterials implements MaterialRepository {
   }
 
   @override
+  Future<CachedList<MaterialEntity>> getMaterialsCached() async {
+    if (error != null) throw error!;
+    return CachedList(materials);
+  }
+
+  @override
   Future<MaterialEntity> createListing(NewListingData data) async => _material(id: 'new');
 }
 
@@ -148,19 +154,30 @@ class _FakeChats implements ChatRepository {
   Future<List<ChatRoomEntity>> getChatRooms() async => rooms;
 
   @override
+  Future<CachedList<ChatRoomEntity>> getChatRoomsCached() async => CachedList(rooms);
+
+  @override
   Future<ChatRoomEntity> openChatRoom(String materialId) async => rooms.first;
 
   @override
   Future<List<MessageEntity>> getMessages(String chatRoomId) async => messages;
 
   @override
-  Future<MessageEntity> sendMessage(String chatRoomId, String content) async => MessageEntity(
-        id: 'sent',
+  Future<CachedList<MessageEntity>> getMessagesCached(String chatRoomId) async => CachedList(messages);
+
+  @override
+  Future<MessageEntity> sendMessage(
+    String chatRoomId,
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  }) async => MessageEntity(
+        id: id ?? 'sent',
         chatRoomId: chatRoomId,
         senderId: _me,
         content: content,
         isRead: false,
-        createdAt: DateTime(2026, 9, 3),
+        createdAt: clientCreatedAt ?? DateTime(2026, 9, 3),
       );
 
   @override
@@ -462,6 +479,12 @@ class _FakeRemote implements MarketplaceRemoteDataSource {
 
   @override
   Future<List<MaterialEntity>> getMaterials() async {
+    if (error != null) throw error!;
+    return [];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getMaterialsJson() async {
     if (error != null) throw error!;
     return [];
   }

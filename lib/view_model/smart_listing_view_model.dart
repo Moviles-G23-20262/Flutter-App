@@ -302,8 +302,12 @@ class SmartListingViewModel extends ChangeNotifier {
       description: description,
       courseCode: courseCode.isEmpty ? null : courseCode,
       price: double.tryParse(price.trim().replaceAll(',', '.')),
-      category: _selectedCategory,
-      condition: _selectedCondition,
+      category: _selectedCategory != null
+          ? MaterialCategoryEnum.values.where((c) => c.name == _selectedCategory).firstOrNull
+          : null,
+      condition: _selectedCondition != null
+          ? MaterialConditionEnum.values.where((c) => c.name == _selectedCondition).firstOrNull
+          : null,
     );
     await sellDraftRepository!.save(userId: userId, draft: draft);
   }
@@ -314,10 +318,10 @@ class SmartListingViewModel extends ChangeNotifier {
     final draft = await sellDraftRepository!.load(userId: userId);
     if (draft != null && !draft.isEmpty) {
       if (draft.category != null && _selectedCategory == null) {
-        _selectedCategory = draft.category;
+        _selectedCategory = draft.category!.name;
       }
       if (draft.condition != null && _selectedCondition == null) {
-        _selectedCondition = draft.condition;
+        _selectedCondition = draft.condition!.name;
       }
       notifyListeners();
       return draft;

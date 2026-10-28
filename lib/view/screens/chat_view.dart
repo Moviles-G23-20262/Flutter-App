@@ -13,7 +13,6 @@ import '../widgets/formatters.dart';
 import '../widgets/meetup_widgets.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/power_saving_note.dart';
-import '../widgets/saved_copy_banner.dart';
 
 // ─── One conversation ─────────────────────────────────────────────────────────
 
@@ -387,8 +386,6 @@ class _ListingStrip extends StatelessWidget {
     final elevated   = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txSecondary= brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
-    final accentHi   = brightness == Brightness.dark ? AppColors.darkAccentHi    : AppColors.lightAccentHi;
-    final tagBg      = brightness == Brightness.dark ? AppColors.darkTagBg       : AppColors.lightTagBg;
     final m = material;
 
     return Container(
@@ -605,7 +602,7 @@ class _Bubble extends StatelessWidget {
                         color: message.isPending
                             ? (isMe ? onMe : txMuted)
                             : message.isFailed
-                                ? AppColors.lightDanger
+                                ? AppColors.lightError
                                 : message.isRead
                                     ? AppColors.success400
                                     : onMe,

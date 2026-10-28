@@ -53,7 +53,7 @@ class PendingListingStore {
 
   Future<List<PendingListing>> getForOwner(String ownerId) async {
     if (outboxStore != null) {
-      return outboxStore!.pendingListings(ownerId);
+      return outboxStore!.listings(ownerId);
     }
     final db = await appDatabase.database;
     final rows = await db.query(
@@ -74,9 +74,16 @@ class PendingListingStore {
     )).toList();
   }
 
+  Future<List<PendingListing>> getAllForOwner(String ownerId) => getForOwner(ownerId);
+
+  Future<List<PendingListing>> getPendingOnly(String ownerId) async {
+    final all = await getForOwner(ownerId);
+    return all.where((l) => l.status == PendingStatus.waiting).toList();
+  }
+
   Future<void> delete(String id) async {
     if (outboxStore != null) {
-      await outboxStore!.deleteListing(id);
+      await outboxStore!.discard(PendingKind.listing, id);
       return;
     }
     final db = await appDatabase.database;
@@ -85,5 +92,10 @@ class PendingListingStore {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<int> countPending(String ownerId) async {
+    final all = await getForOwner(ownerId);
+    return all.where((l) => l.status == PendingStatus.waiting).length;
   }
 }

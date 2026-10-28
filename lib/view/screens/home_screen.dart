@@ -189,16 +189,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ? const LoadingView()
               : market.error != null && market.materials.isEmpty
                   ? (isOffline
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-                          child: EmptyView(
-                            icon: Icons.wifi_off_rounded,
-                            title: 'Connect once to load listings',
-                            subtitle: 'An internet connection is required the first time.',
-                            action: AppButton(
-                              label: 'Retry',
-                              onPressed: _refresh,
-                            ),
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const EmptyView(
+                                icon: Icons.wifi_off_rounded,
+                                title: 'Connect once to load listings',
+                                subtitle: 'An internet connection is required the first time.',
+                              ),
+                              const SizedBox(height: 12),
+                              PrimaryButton(
+                                label: 'Retry',
+                                onPressed: _refresh,
+                              ),
+                            ],
                           ),
                         )
                       : ErrorView(message: market.error!, onRetry: market.load))

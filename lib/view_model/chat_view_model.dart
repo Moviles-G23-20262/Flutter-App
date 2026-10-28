@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import '../model/data_sources/local/outbox_store.dart';
@@ -186,6 +185,14 @@ class ChatViewModel extends ChangeNotifier {
   /// Uses offline outbox queue: stores in SQLite pending_messages, shows optimistic bubble with clock,
   /// and flushes outbox asynchronously using Future with handlers (.then / .catchError).
   Future<String?> send(String roomId, String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return 'Write a message first.';
+    }
+    if (trimmed.length > 2000) {
+      return 'Messages can have at most 2000 characters.';
+    }
+
     final senderId = _userId ?? '';
     final clientId = newClientId();
     final clientCreated = DateTime.now();
