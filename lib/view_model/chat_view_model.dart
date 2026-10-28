@@ -1,23 +1,29 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import '../model/data_sources/local/outbox_store.dart';
-import '../model/data_sources/local/response_cache.dart';
+import '../model/entities/chat_agreement.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/conversation_insight.dart';
+import '../model/entities/enums.dart';
 import '../model/entities/pending_items.dart';
 import '../model/exceptions/data_exceptions.dart';
-import '../model/services/outbox_sync_service.dart';
 import '../model/use_cases/conversation_insight_use_case.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
 import '../model/use_cases/meetup_use_cases.dart';
-import '../view/widgets/formatters.dart';
+import '../model/use_cases/pending_message_use_cases.dart';
+import '../model/rules/client_id.dart';
+import '../model/use_cases/track_event_use_case.dart';
 
 /// Conversations and the messages of the open one.
 /// The backend has no push channel, so while the Messages tab is visible this polls.
 class ChatViewModel extends ChangeNotifier {
   static const _messagePollInterval = Duration(seconds: 4);
   static const _roomsPollInterval = Duration(seconds: 12);
+
+  /// The agreement is read from analytics once the MEETING_CONFIRMED event has been uploaded,
+  /// which can take a sync cycle: retry now and then, not on every message poll.
+  static const _agreementRetryInterval = Duration(seconds: 30);
+  static const _agreementMaxTries = 10;
 
   /// Battery saver (low battery, not charging): poll a lot less.
   static const _savingMessagePollInterval = Duration(seconds: 15);
@@ -30,9 +36,12 @@ class ChatViewModel extends ChangeNotifier {
   final MarkChatReadUseCase markRead;
   final AnswerMeetingProposalUseCase answerProposal;
   final GetConversationInsightUseCase getConversationInsight;
-  final OutboxStore? outboxStore;
-  final OutboxSyncService? outboxSyncService;
-  final ResponseCache? responseCache;
+  /// Offline chat: messages go to the outbox first. Without them, sending needs a connection.
+  final QueueMessageUseCase? queueMessage;
+  final GetPendingMessagesUseCase? getPendingMessages;
+  final WatchPendingCountUseCase? watchPendingCount;
+  final GetChatAgreementUseCase getChatAgreement;
+  final TrackEventUseCase trackEvent;
 
   ChatViewModel({
     required this.getChatRooms,
@@ -42,9 +51,11 @@ class ChatViewModel extends ChangeNotifier {
     required this.markRead,
     required this.answerProposal,
     required this.getConversationInsight,
-    this.outboxStore,
-    this.outboxSyncService,
-    this.responseCache,
+    this.queueMessage,
+    this.getPendingMessages,
+    this.watchPendingCount,
+    required this.getChatAgreement,
+    required this.trackEvent,
   });
 
   bool _isOffline = false;
@@ -78,23 +89,21 @@ class ChatViewModel extends ChangeNotifier {
   int _generation = 0;
   ConversationInsight? _insight;
   bool _loadingInsight = false;
+  final Map<String, ChatAgreement> _agreements = {};
+  final Map<String, int> _agreementTries = {};
+  final Map<String, DateTime> _agreementLastTry = {};
+  final Set<String> _loadingAgreements = {};
 
   String? get userId => _userId;
 
   DateTime? get roomsSavedAt => _roomsSavedAt;
-  String? get formattedRoomsAge => _roomsSavedAt != null ? timeAgo(_roomsSavedAt!) : null;
 
   DateTime? messagesSavedAt(String roomId) => _messagesSavedAt[roomId];
-  String? formattedMessagesAge(String roomId) {
-    final at = _messagesSavedAt[roomId];
-    return at != null ? timeAgo(at) : null;
-  }
 
   /// BQ4 (Type 2): how long chats usually take to agree on a meeting point. Null until loaded.
   ConversationInsight? get insight => _insight;
 
-  Stream<int> get pendingCountStream =>
-      outboxStore?.pendingCountStream ?? const Stream.empty();
+  Stream<int> get pendingCountStream => watchPendingCount?.execute() ?? const Stream.empty();
 
   /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just falls back to cache or hides.
   Future<void> loadInsight() async {
@@ -110,6 +119,31 @@ class ChatViewModel extends ChangeNotifier {
       // Fallback: check cached insight
     }
     _loadingInsight = false;
+  }
+
+  /// BQ4 for one chat: how long it took to agree on the meeting point. Null until its meeting is
+  /// confirmed and analytics has the event.
+  ChatAgreement? agreementOf(String roomId) => _agreements[roomId];
+
+  /// Asks analytics how the agreed chat [roomId] went. Like the insight it is a nice-to-have:
+  /// a failure (or a 404 while the event is still queued on the phone) just keeps the card hidden
+  /// and is retried later.
+  void _loadAgreementIfNeeded(String roomId) {
+    if (_agreements.containsKey(roomId) || _loadingAgreements.contains(roomId)) return;
+    if (agreedMeetingIn(roomId) == null) return;
+    final tries = _agreementTries[roomId] ?? 0;
+    final last = _agreementLastTry[roomId];
+    if (tries >= _agreementMaxTries) return;
+    if (last != null && DateTime.now().difference(last) < _agreementRetryInterval) return;
+    _agreementTries[roomId] = tries + 1;
+    _agreementLastTry[roomId] = DateTime.now();
+    _loadingAgreements.add(roomId);
+    getChatAgreement.execute(roomId).then((agreement) {
+      _agreements[roomId] = agreement;
+      notifyListeners();
+    }).catchError((Object _) {
+      // Not available yet: the next poll tries again.
+    }).whenComplete(() => _loadingAgreements.remove(roomId));
   }
 
   /// Conversations, most recently active first.
@@ -194,38 +228,48 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     final senderId = _userId ?? '';
-    final clientId = newClientId();
-    final clientCreated = DateTime.now();
+    final queue = queueMessage;
 
-    final localMsg = MessageEntity(
-      id: clientId,
-      chatRoomId: roomId,
-      senderId: senderId,
-      content: text,
-      isRead: false,
-      createdAt: clientCreated,
-      isPending: true,
-    );
-
-    if (outboxStore != null && senderId.isNotEmpty) {
-      await outboxStore!.enqueueMessage(
-        ownerId: senderId,
-        chatRoomId: roomId,
-        content: text,
-      );
-    }
-
-    _messages[roomId] = [...messagesOf(roomId), localMsg];
-    notifyListeners();
-
-    if (outboxSyncService != null) {
-      outboxSyncService!.flush().then((_) {
+    // Offline-first: saved in the outbox and shown at once with the clock icon; the sync service
+    // sends it. The bubble keeps the queued message's id, so the sent copy replaces it.
+    if (queue != null && senderId.isNotEmpty) {
+      final queued = await queue.execute(ownerId: senderId, chatRoomId: roomId, content: text);
+      _messages[roomId] = [
+        ...messagesOf(roomId),
+        MessageEntity(
+          id: queued.id,
+          chatRoomId: roomId,
+          senderId: senderId,
+          content: text,
+          isRead: false,
+          createdAt: queued.createdAt,
+          isPending: true,
+        ),
+      ];
+      notifyListeners();
+      queue.send().then((_) {
         refreshMessages();
       }).catchError((_) {
         notifyListeners();
       });
       return null;
     }
+
+    final clientId = newClientId();
+    final clientCreated = DateTime.now();
+    _messages[roomId] = [
+      ...messagesOf(roomId),
+      MessageEntity(
+        id: clientId,
+        chatRoomId: roomId,
+        senderId: senderId,
+        content: text,
+        isRead: false,
+        createdAt: clientCreated,
+        isPending: true,
+      ),
+    ];
+    notifyListeners();
 
     try {
       final serverMsg = await sendMessage.execute(roomId, text, id: clientId, clientCreatedAt: clientCreated);
@@ -253,10 +297,25 @@ class ChatViewModel extends ChangeNotifier {
     } on DataException catch (e) {
       return e.message;
     }
+    if (answer == ProposalAnswer.accept) _trackMeetingConfirmed();
+    // Accepting also posts a confirmation message; show it together with the card's new status.
     await refreshMessages();
     return null;
   }
 
+  /// BQ4: the moment this chat agreed on a meeting point. Queued like any telemetry, so it keeps
+  /// its real time (clientCreatedAt) even when the phone is offline and it uploads later.
+  void _trackMeetingConfirmed() {
+    final room = activeRoom;
+    if (room == null) return;
+    trackEvent.execute(
+      AnalyticsEventType.MEETING_CONFIRMED,
+      materialId: room.materialId,
+      metadata: {'chatRoomId': room.id},
+    );
+  }
+
+  /// The meetup both sides agreed on in [roomId], if any.
   MessageEntity? agreedMeetingIn(String roomId) => messagesOf(roomId)
       .where((m) => m.meetingProposal?.isAccepted ?? false)
       .lastOrNull;
@@ -276,8 +335,9 @@ class ChatViewModel extends ChangeNotifier {
 
       // Pending messages from outbox
       List<MessageEntity> pendingEntities = [];
-      if (outboxStore != null && _userId != null) {
-        final pending = await outboxStore!.messages(_userId!, chatRoomId: roomId);
+      final readPending = getPendingMessages;
+      if (readPending != null && _userId != null) {
+        final pending = await readPending.execute(_userId!, roomId);
         pendingEntities = pending.map((p) => MessageEntity(
           id: p.id,
           chatRoomId: p.chatRoomId,
@@ -296,6 +356,7 @@ class ChatViewModel extends ChangeNotifier {
 
       _messages[roomId] = [...result.items, ...filteredPending];
       _messagesError = null;
+      _loadAgreementIfNeeded(roomId);
 
       // Only acknowledge if not viewing a saved/offline copy
       if (result.savedAt == null) {

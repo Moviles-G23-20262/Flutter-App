@@ -1,5 +1,6 @@
-import '../dto/draft_models.dart';
+import '../entities/listing_draft.dart';
 import '../entities/rating_draft.dart';
+import '../entities/registration_draft.dart';
 
 /// The unfinished rating of one exchange, per signed-in user.
 abstract class RatingDraftRepository {
@@ -15,9 +16,13 @@ abstract class RegistrationDraftRepository {
   Future<void> clear();
 }
 
-/// The unfinished listing form, per signed-in user.
-abstract class SellDraftRepository {
-  Future<SellDraft?> load({required String userId});
-  Future<void> save({required String userId, required SellDraft draft});
-  Future<void> clear({required String userId});
+/// The unfinished "sell an item" form, per signed-in user.
+abstract class ListingDraftRepository {
+  Future<ListingDraft?> load(String userId);
+
+  /// An empty draft deletes the saved one.
+  Future<void> save(String userId, ListingDraft draft);
+
+  /// Deletes the draft and the photos saved with it.
+  Future<void> clear(String userId);
 }

@@ -36,7 +36,13 @@ class _FakeSender implements OutboxSender {
   }
 
   @override
-  Future<void> sendListing(PendingListing listing) => _send('listing:${listing.title}');
+  Future<String> uploadPhoto(String path) async {
+    await _send('upload:$path');
+    return 'https://cdn.test/${path.split('/').last}';
+  }
+
+  @override
+  Future<void> createListing(Map<String, dynamic> body) => _send('listing:${body['title']}');
 
   @override
   Future<void> sendMessage(PendingMessage message) => _send('${message.chatRoomId}:${message.content}');

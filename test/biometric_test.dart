@@ -17,6 +17,9 @@ import 'package:flutter_front_end/model/use_cases/logout_use_case.dart';
 import 'package:flutter_front_end/model/use_cases/quick_unlock_use_cases.dart';
 import 'package:flutter_front_end/view/screens/login_screen.dart';
 import 'package:flutter_front_end/view_model/app_view_model.dart';
+import 'package:flutter_front_end/view_model/connectivity_view_model.dart';
+import 'package:flutter_front_end/model/repositories/connectivity_repository.dart';
+import 'package:flutter_front_end/model/use_cases/connectivity_use_cases.dart';
 import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -132,8 +135,23 @@ class _FakeAuth implements AuthRepository {
   Future<void> logout() => throw UnimplementedError();
 }
 
+class _AlwaysOnline implements ConnectivityRepository {
+  @override
+  Future<bool> isOnline() async => true;
+
+  @override
+  Stream<bool> watch() => const Stream.empty();
+}
+
 class _NoApp implements AppViewModel {
   final loggedIn = <UserEntity>[];
+
+  /// The login screen shows a "waiting for connection" note while offline.
+  @override
+  final ConnectivityViewModel connectivity = ConnectivityViewModel(
+    getConnectivity: GetConnectivityUseCase(_AlwaysOnline()),
+    watchConnectivity: WatchConnectivityUseCase(_AlwaysOnline()),
+  );
 
   @override
   void login(UserEntity user) => loggedIn.add(user);

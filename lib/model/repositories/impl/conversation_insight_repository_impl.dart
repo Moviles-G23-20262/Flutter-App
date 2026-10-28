@@ -1,6 +1,7 @@
 import '../../data_sources/analytics_remote_data_source.dart';
 import '../../data_sources/local/response_cache.dart';
 import '../../dto/conversation_insight_model.dart';
+import '../../entities/chat_agreement.dart';
 import '../../entities/conversation_insight.dart';
 import '../conversation_insight_repository.dart';
 
@@ -10,6 +11,7 @@ class ConversationInsightRepositoryImpl implements ConversationInsightRepository
 
   ConversationInsightRepositoryImpl({required this.remoteDataSource, this.cache});
 
+  /// Network falling back to the last insight saved on the phone.
   @override
   Future<ConversationInsight> getConversationInsight() async {
     try {
@@ -32,4 +34,7 @@ class ConversationInsightRepositoryImpl implements ConversationInsightRepository
       rethrow;
     }
   }
+
+  @override
+  Future<ChatAgreement> getChatAgreement(String chatRoomId) => remoteDataSource.getChatAgreement(chatRoomId);
 }

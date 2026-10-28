@@ -25,19 +25,13 @@ class RemoteOutboxSender implements OutboxSender {
     );
   }
 
-  /// Uploads the photos (up to 3 at once; `Future.wait` keeps their order), then creates the listing.
   @override
-  Future<void> sendListing(PendingListing listing) async {
-    final imageUrls = <String>[];
-    for (var i = 0; i < listing.photoPaths.length; i += 3) {
-      final batch = listing.photoPaths.skip(i).take(3);
-      imageUrls.addAll(await Future.wait(batch.map(_upload)));
-    }
-    await remote.createMaterial({
-      'id': listing.id,
-      ...listing.payload,
-      'imageUrls': imageUrls,
-    });
+  Future<String> uploadPhoto(String path) async =>
+      remote.uploadImage(bytes: await File(path).readAsBytes(), filename: p.basename(path));
+
+  @override
+  Future<void> createListing(Map<String, dynamic> body) async {
+    await remote.createMaterial(body);
   }
 
   @override
@@ -55,7 +49,4 @@ class RemoteOutboxSender implements OutboxSender {
         await meetups.createProposal(body);
     }
   }
-
-  Future<String> _upload(String path) async =>
-      remote.uploadImage(bytes: await File(path).readAsBytes(), filename: p.basename(path));
 }

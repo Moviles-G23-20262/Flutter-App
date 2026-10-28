@@ -53,6 +53,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       getWishlist: _deps.getWishlist,
       addToWishlist: _deps.addToWishlist,
       removeFromWishlist: _deps.removeFromWishlist,
+      watchPendingListings: _deps.watchPendingListings,
+      discardPendingListing: _deps.discardPendingListing,
     ),
     chats: ChatViewModel(
       getChatRooms: _deps.getChatRooms,
@@ -62,9 +64,11 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       markRead: _deps.markChatRead,
       answerProposal: _deps.meetups.answer,
       getConversationInsight: _deps.getConversationInsight,
-      outboxStore: _deps.outbox,
-      outboxSyncService: _deps.outboxSync,
-      responseCache: _deps.responseCache,
+      queueMessage: _deps.queueMessage,
+      getPendingMessages: _deps.getPendingMessages,
+      watchPendingCount: _deps.watchPendingCount,
+      getChatAgreement: _deps.getChatAgreement,
+      trackEvent: _deps.trackEvent,
     ),
     account: AccountViewModel(
       getExchanges: _deps.getExchanges,
@@ -94,8 +98,6 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       getConnectivity: _deps.getConnectivity,
       watchConnectivity: _deps.watchConnectivity,
     ),
-    draftStore: _deps.draftStore,
-    pendingListingStore: _deps.pendingListings,
     startOutboxSync: _deps.startOutboxSync,
     stopOutboxSync: _deps.stopOutboxSync,
     syncOutbox: _deps.syncOutbox,
@@ -109,6 +111,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     _appState.theme.start();
     _appState.power.start();
     _appState.connectivity.start();
+    _deps.analyticsSync.start();
     _restoreSession();
   }
 
@@ -142,6 +145,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _deps.analyticsSync.stop();
     _appState.dispose();
     super.dispose();
   }
@@ -184,6 +188,9 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
           createViewModel: () => RegisterViewModel(
             registerStudent: _deps.registerStudent,
             onSignedIn: _appState.login,
+            loadDraft: _deps.loadRegistrationDraft,
+            saveDraft: _deps.saveRegistrationDraft,
+            clearDraft: _deps.clearRegistrationDraft,
           ),
         );
       case AppScreen.materialDetail:
@@ -202,7 +209,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
           appState: _appState,
           viewModelFactory: () => _deps.createSmartListingViewModel(
             publish: _appState.marketplace.publish,
-            currentUserId: _appState.currentUser?.id,
+            userId: _appState.currentUser?.id,
           ),
         );
       case AppScreen.confirmation:

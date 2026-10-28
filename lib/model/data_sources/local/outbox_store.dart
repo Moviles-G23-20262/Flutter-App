@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import '../../entities/pending_items.dart';
+import '../../rules/client_id.dart';
 import 'app_database.dart';
+
+export '../../rules/client_id.dart' show newClientId;
 
 /// The outbox: `pending_messages`, `pending_listings` and `pending_actions`. The user's action is written here
 /// first and shown at once; [OutboxSyncService] sends it later.
@@ -77,13 +79,16 @@ class OutboxStore {
 
   // Listings
 
+  /// [id] is the listing's client id when the app already made one (it was sent to the server in
+  /// an earlier attempt); a new one is made otherwise.
   Future<PendingListing> enqueueListing({
     required String ownerId,
     required Map<String, dynamic> payload,
     List<String> photoPaths = const [],
+    String? id,
   }) async {
     final listing = PendingListing(
-      id: newClientId(),
+      id: id ?? newClientId(),
       ownerId: ownerId,
       payload: payload,
       photoPaths: photoPaths,
@@ -102,6 +107,27 @@ class OutboxStore {
     return listing;
   }
 
+  /// Remembers which photos of the listing are already on the server, so a retry sends only the rest.
+  Future<void> saveUploadedUrls(String listingId, List<String> urls) async {
+    final db = await _db.database;
+    await db.update(
+      'pending_listings',
+      {'uploaded_urls': jsonEncode(urls)},
+      where: 'id = ?',
+      whereArgs: [listingId],
+    );
+    _changed();
+  }
+
+  /// The photo files of a queued listing, e.g. to delete them when it is discarded.
+  Future<List<String>> photoPathsOf(String listingId) async {
+    final db = await _db.database;
+    final rows = await db.query('pending_listings', columns: ['photo_paths'], where: 'id = ?', whereArgs: [listingId]);
+    if (rows.isEmpty) return const [];
+    return (jsonDecode(rows.single['photo_paths'] as String) as List).cast<String>();
+  }
+
+  /// [ownerId]'s queued listings, oldest first.
   Future<List<PendingListing>> listings(String ownerId) async {
     final db = await _db.database;
     final rows = await db.query(
@@ -237,6 +263,7 @@ class OutboxStore {
         ownerId: row['owner_id'] as String,
         payload: jsonDecode(row['payload'] as String) as Map<String, dynamic>,
         photoPaths: (jsonDecode(row['photo_paths'] as String) as List).cast<String>(),
+        uploadedUrls: (jsonDecode(row['uploaded_urls'] as String? ?? '[]') as List).cast<String>(),
         createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
         status: _status(row['status']),
         attempts: row['attempts'] as int,
@@ -254,14 +281,3 @@ enum PendingKind {
   const PendingKind(this.table);
 }
 
-final Random _random = Random.secure();
-
-/// A random (version 4) UUID, used as the client id of every queued item.
-String newClientId() {
-  final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-      '${hex.substring(16, 20)}-${hex.substring(20)}';
-}
