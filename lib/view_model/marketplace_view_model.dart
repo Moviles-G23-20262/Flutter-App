@@ -9,6 +9,8 @@ import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
 import '../model/use_cases/pending_listing_use_cases.dart';
 import '../model/strategies/sort_strategy.dart';
+import '../model/entities/time_to_sell.dart';
+import '../model/use_cases/get_time_to_sell_use_case.dart';
 
 /// Listings and favorites, shared by Home, Search, Detail and the Seller Hub.
 class MarketplaceViewModel extends ChangeNotifier {
@@ -19,6 +21,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   final RemoveFromWishlistUseCase removeFromWishlist;
   final WatchPendingListingsUseCase? watchPendingListings;
   final DiscardPendingListingUseCase? discardPendingListing;
+  final GetTimeToSellUseCase? getTimeToSell;
 
   MarketplaceViewModel({
     required this.getMaterials,
@@ -28,6 +31,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     required this.removeFromWishlist,
     this.watchPendingListings,
     this.discardPendingListing,
+    this.getTimeToSell,
   });
 
   List<PendingListing> _pendingListings = const [];
@@ -41,6 +45,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   bool _loading = false;
   bool _loadedOnce = false;
   String? _error;
+  TimeToSellInsight? _timeToSell;
   final Set<String> _togglingFavorites = {};
 
   /// Bumped on [clear] so answers that arrive after a sign-out are dropped.
@@ -57,6 +62,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   /// Set while the listings shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get materialsSavedAt => _materialsSavedAt;
   bool get isOffline => _materialsSavedAt != null;
+  TimeToSellInsight? get timeToSell => _timeToSell;
 
   bool get isLoading => _loading;
 
@@ -100,11 +106,13 @@ class MarketplaceViewModel extends ChangeNotifier {
     final generation = _generation;
     _loading = true;
     _error = null;
+    _timeToSell = null;
     notifyListeners();
 
     // Both start at once. Favorites load on their own, so the saved copy still shows when the
     // listings cannot be loaded offline.
     final favorites = _loadWishlist(generation);
+    final timeToSellJob = _loadTimeToSell(generation);
     try {
       final result = await getMaterials.executeCached();
       if (generation != _generation) return;
@@ -118,6 +126,7 @@ class MarketplaceViewModel extends ChangeNotifier {
       _error = 'Unexpected error. Please try again.';
     }
     await favorites;
+    await timeToSellJob;
     if (generation != _generation) return;
     _loading = false;
     _loadedOnce = true;
@@ -135,6 +144,16 @@ class MarketplaceViewModel extends ChangeNotifier {
     } catch (_) {
       if (generation == _generation) _error ??= 'Unexpected error. Please try again.';
     }
+  }
+
+  Future<void> _loadTimeToSell(int generation) async {
+    final useCase = getTimeToSell;
+    if (useCase == null) return;
+    try {
+      final result = await useCase.execute();
+      if (generation != _generation) return;
+      _timeToSell = result;
+    } catch (_) {}
   }
 
   /// Heart tapped. Updates instantly and rolls back if the server refuses.
@@ -273,6 +292,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _loading = false;
     _loadedOnce = false;
     _error = null;
+    _timeToSell = null;
     _togglingFavorites.clear();
     notifyListeners();
   }
