@@ -4,6 +4,7 @@ import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
+import '../../model/entities/pending_items.dart';
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
@@ -35,6 +36,8 @@ class SellerHubScreen extends StatelessWidget {
     final me         = appState.currentUser;
     final myId       = me?.id ?? '';
     final myListings = appState.marketplace.listingsOf(myId);
+    // Saved on the phone and not published yet: shown first, with a badge.
+    final pendingListings = appState.marketplace.pendingListings;
     final activeCount = myListings.where((m) => m.isAvailable).length;
     final mySales    = appState.account.salesOf(myId).take(5).toList();
     // Conversations on my listings that already have a message from a buyer.
@@ -112,7 +115,20 @@ class SellerHubScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                if (myListings.isEmpty)
+                ...pendingListings.map((l) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _PendingListingRow(
+                    listing: l,
+                    onDiscard: () => appState.marketplace.discardPending(l.id),
+                    brightness: brightness,
+                    elevated: elevated,
+                    borderSubtle: borderSubtle,
+                    txPrimary: txPrimary,
+                    txMuted: txMuted,
+                    accentHi: accentHi,
+                  ),
+                )),
+                if (myListings.isEmpty && pendingListings.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AppCard(
@@ -333,6 +349,103 @@ class _ListingRow extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// A listing saved on the phone: "Waiting to publish" until the connection is back, or
+/// "Not published" with the server's reason and a Discard button if the server refused it.
+class _PendingListingRow extends StatelessWidget {
+  final PendingListing listing;
+  final VoidCallback onDiscard;
+  final Brightness brightness;
+  final Color elevated;
+  final Color borderSubtle;
+  final Color txPrimary;
+  final Color txMuted;
+  final Color accentHi;
+
+  const _PendingListingRow({
+    required this.listing,
+    required this.onDiscard,
+    required this.brightness,
+    required this.elevated,
+    required this.borderSubtle,
+    required this.txPrimary,
+    required this.txMuted,
+    required this.accentHi,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final refused = listing.isRefused;
+    final dark = brightness == Brightness.dark;
+    final badgeColor = refused ? (dark ? AppColors.darkError : AppColors.lightError) : accentHi;
+
+    return AppCard(
+      key: Key('pending-listing-${listing.id}'),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(listing.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 8),
+              Text('\$${listing.price}',
+                  style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                key: Key('pending-badge-${listing.id}'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(refused ? Icons.error_outline_rounded : Icons.cloud_off_rounded, size: 12, color: badgeColor),
+                    const SizedBox(width: 4),
+                    Text(refused ? 'Not published' : 'Waiting to publish',
+                        style: AppTextStyles.body(badgeColor, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              if (refused)
+                TextButton(
+                  key: Key('discard-pending-listing-${listing.id}'),
+                  onPressed: onDiscard,
+                  style: TextButton.styleFrom(
+                    foregroundColor: badgeColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 28),
+                  ),
+                  child: const Text('Discard'),
+                ),
+            ],
+          ),
+          if (refused && listing.lastError != null) ...[
+            const SizedBox(height: 6),
+            Text(listing.lastError!, style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+          ] else if (!refused) ...[
+            const SizedBox(height: 6),
+            Text("We'll publish it as soon as you reconnect.",
+                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+          ],
         ],
       ),
     );

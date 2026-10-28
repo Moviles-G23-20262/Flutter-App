@@ -1,18 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import '../model/entities/chat_agreement.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/conversation_insight.dart';
+import '../model/entities/enums.dart';
 import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/conversation_insight_use_case.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
 import '../model/use_cases/meetup_use_cases.dart';
+import '../model/use_cases/track_event_use_case.dart';
 
 /// Conversations and the messages of the open one.
 /// The backend has no push channel, so while the Messages tab is visible this polls.
 class ChatViewModel extends ChangeNotifier {
   static const _messagePollInterval = Duration(seconds: 4);
   static const _roomsPollInterval = Duration(seconds: 12);
+
+  /// The agreement is read from analytics once the MEETING_CONFIRMED event has been uploaded,
+  /// which can take a sync cycle: retry now and then, not on every message poll.
+  static const _agreementRetryInterval = Duration(seconds: 30);
+  static const _agreementMaxTries = 10;
 
   /// Battery saver (low battery, not charging): poll a lot less.
   static const _savingMessagePollInterval = Duration(seconds: 15);
@@ -25,6 +33,8 @@ class ChatViewModel extends ChangeNotifier {
   final MarkChatReadUseCase markRead;
   final AnswerMeetingProposalUseCase answerProposal;
   final GetConversationInsightUseCase getConversationInsight;
+  final GetChatAgreementUseCase getChatAgreement;
+  final TrackEventUseCase trackEvent;
 
   ChatViewModel({
     required this.getChatRooms,
@@ -34,6 +44,8 @@ class ChatViewModel extends ChangeNotifier {
     required this.markRead,
     required this.answerProposal,
     required this.getConversationInsight,
+    required this.getChatAgreement,
+    required this.trackEvent,
   });
 
   String? _userId;
@@ -49,6 +61,10 @@ class ChatViewModel extends ChangeNotifier {
   int _generation = 0;
   ConversationInsight? _insight;
   bool _loadingInsight = false;
+  final Map<String, ChatAgreement> _agreements = {};
+  final Map<String, int> _agreementTries = {};
+  final Map<String, DateTime> _agreementLastTry = {};
+  final Set<String> _loadingAgreements = {};
 
   String? get userId => _userId;
 
@@ -69,6 +85,31 @@ class ChatViewModel extends ChangeNotifier {
       // Analytics service unreachable or empty: keep the chat usable without the card.
     }
     _loadingInsight = false;
+  }
+
+  /// BQ4 for one chat: how long it took to agree on the meeting point. Null until its meeting is
+  /// confirmed and analytics has the event.
+  ChatAgreement? agreementOf(String roomId) => _agreements[roomId];
+
+  /// Asks analytics how the agreed chat [roomId] went. Like the insight it is a nice-to-have:
+  /// a failure (or a 404 while the event is still queued on the phone) just keeps the card hidden
+  /// and is retried later.
+  void _loadAgreementIfNeeded(String roomId) {
+    if (_agreements.containsKey(roomId) || _loadingAgreements.contains(roomId)) return;
+    if (agreedMeetingIn(roomId) == null) return;
+    final tries = _agreementTries[roomId] ?? 0;
+    final last = _agreementLastTry[roomId];
+    if (tries >= _agreementMaxTries) return;
+    if (last != null && DateTime.now().difference(last) < _agreementRetryInterval) return;
+    _agreementTries[roomId] = tries + 1;
+    _agreementLastTry[roomId] = DateTime.now();
+    _loadingAgreements.add(roomId);
+    getChatAgreement.execute(roomId).then((agreement) {
+      _agreements[roomId] = agreement;
+      notifyListeners();
+    }).catchError((Object _) {
+      // Not available yet: the next poll tries again.
+    }).whenComplete(() => _loadingAgreements.remove(roomId));
   }
 
   /// Conversations, most recently active first.
@@ -166,9 +207,22 @@ class ChatViewModel extends ChangeNotifier {
     } on DataException catch (e) {
       return e.message;
     }
+    if (answer == ProposalAnswer.accept) _trackMeetingConfirmed();
     // Accepting also posts a confirmation message; show it together with the card's new status.
     await refreshMessages();
     return null;
+  }
+
+  /// BQ4: the moment this chat agreed on a meeting point. Queued like any telemetry, so it keeps
+  /// its real time (clientCreatedAt) even when the phone is offline and it uploads later.
+  void _trackMeetingConfirmed() {
+    final room = activeRoom;
+    if (room == null) return;
+    trackEvent.execute(
+      AnalyticsEventType.MEETING_CONFIRMED,
+      materialId: room.materialId,
+      metadata: {'chatRoomId': room.id},
+    );
   }
 
   /// The meetup both sides agreed on in [roomId], if any.
@@ -189,6 +243,7 @@ class ChatViewModel extends ChangeNotifier {
       if (generation != _generation || _activeRoomId != roomId) return;
       _messages[roomId] = messages;
       _messagesError = null;
+      _loadAgreementIfNeeded(roomId);
       await _acknowledge(roomId, messages);
     } on DataException catch (e) {
       if (generation != _generation) return;

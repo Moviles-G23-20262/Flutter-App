@@ -20,6 +20,10 @@ class NewListingData {
   final MaterialCategoryEnum category;
   final List<PendingImage> images;
 
+  /// UUIDv4 that identifies this listing for the server: sending the same one twice (a retry, or
+  /// the offline queue after a lost response) never creates a second listing.
+  final String? clientId;
+
   const NewListingData({
     required this.title,
     required this.description,
@@ -28,5 +32,6 @@ class NewListingData {
     required this.condition,
     required this.category,
     this.images = const [],
+    this.clientId,
   });
 }
