@@ -7,6 +7,8 @@ import '../model/use_cases/connectivity_use_cases.dart';
 import '../model/data_sources/analytics_remote_data_source.dart';
 import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
+import '../model/repositories/impl/time_to_sell_repository_impl.dart';
+import '../model/use_cases/get_time_to_sell_use_case.dart';
 import '../model/repositories/impl/analytics_event_repository_impl.dart';
 import '../model/data_sources/analytics_event_remote_data_source.dart';
 import '../model/services/analytics_sync_service.dart';
@@ -157,6 +159,7 @@ class AppDependencies {
   final MeetupUseCases meetups;
   final GetConversationInsightUseCase getConversationInsight;
   final GetChatAgreementUseCase getChatAgreement;
+  final GetTimeToSellUseCase getTimeToSell;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -191,6 +194,7 @@ class AppDependencies {
     required this.meetups,
     required this.getConversationInsight,
     required this.getChatAgreement,
+    required this.getTimeToSell,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -248,6 +252,7 @@ class AppDependencies {
         loadDraft: loadListingDraft,
         saveDraft: saveListingDraft,
         clearDraft: clearListingDraft,
+        getTimeToSell: getTimeToSell,
       );
 
   factory AppDependencies.create() {
@@ -271,6 +276,7 @@ class AppDependencies {
       cache: responseCache,
     );
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
+    final timeToSellRepository = TimeToSellRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
@@ -358,6 +364,7 @@ class AppDependencies {
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
       getChatAgreement: GetChatAgreementUseCase(conversationInsights),
+      getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),

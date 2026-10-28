@@ -6,6 +6,7 @@ import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/pending_items.dart';
 import '../widgets/cached_photo.dart';
+import '../../model/entities/time_to_sell.dart';
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
@@ -107,6 +108,18 @@ class SellerHubScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
+                if (appState.marketplace.timeToSell?.hasData == true) ...[
+                  _MarketLiquidityCard(
+                    insight: appState.marketplace.timeToSell!,
+                    brightness: brightness,
+                    elevated: elevated,
+                    borderSubtle: borderSubtle,
+                    txPrimary: txPrimary,
+                    txMuted: txMuted,
+                    accentHi: accentHi,
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 // Active listings
                 Row(
                   children: [
@@ -245,6 +258,69 @@ class SellerHubScreen extends StatelessWidget {
         ),
       ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Market Liquidity Card (BQ11) ─────────────────────────────────────────────
+
+class _MarketLiquidityCard extends StatelessWidget {
+  final TimeToSellInsight insight;
+  final Brightness brightness;
+  final Color elevated;
+  final Color borderSubtle;
+  final Color txPrimary;
+  final Color txMuted;
+  final Color accentHi;
+
+  const _MarketLiquidityCard({
+    required this.insight,
+    required this.brightness,
+    required this.elevated,
+    required this.borderSubtle,
+    required this.txPrimary,
+    required this.txMuted,
+    required this.accentHi,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      key: const Key('market-liquidity-card'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights_rounded, color: accentHi, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Market Liquidity (BQ11)',
+                  style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentHi.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '~${insight.meanDays.toStringAsFixed(1)} days avg',
+                  style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Academic items sell in an average of ${insight.meanDays.toStringAsFixed(1)} days (median: ${insight.medianDays.toStringAsFixed(1)} days) across ${insight.soldListings} completed campus sales.',
+            style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs),
+          ),
+        ],
       ),
     );
   }
