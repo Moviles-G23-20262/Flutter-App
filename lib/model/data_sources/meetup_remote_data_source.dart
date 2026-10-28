@@ -6,7 +6,13 @@ import '../dto/marketplace_models.dart';
 /// Errors surface as [ApiException] / [NetworkException]; the repositories translate them.
 abstract class MeetupRemoteDataSource {
   Future<List<MeetingPointEntity>> getMeetingPoints();
+
+  /// The raw answer of [getMeetingPoints], for the copy saved on the phone.
+  Future<Object?> getMeetingPointsJson();
   Future<MeetingSuggestions> getSuggestions(String chatRoomId);
+
+  /// The raw answer of [getSuggestions], for the copy saved on the phone.
+  Future<Object?> getSuggestionsJson(String chatRoomId);
   Future<MeetingProposalEntity> createProposal(Map<String, dynamic> body);
 
   /// [action] is `accept`, `decline` or `cancel`.
@@ -24,12 +30,18 @@ class MeetupRemoteDataSourceImpl implements MeetupRemoteDataSource {
 
   @override
   Future<List<MeetingPointEntity>> getMeetingPoints() async =>
-      parseList(await apiClient.get('/meeting-points'), meetingPointFromJson);
+      parseList(await getMeetingPointsJson(), meetingPointFromJson);
 
   @override
-  Future<MeetingSuggestions> getSuggestions(String chatRoomId) async => meetingSuggestionsFromJson(
-        await apiClient.get('/meeting-proposals/suggestions?chatRoomId=$chatRoomId') as Json,
-      );
+  Future<Object?> getMeetingPointsJson() => apiClient.get('/meeting-points');
+
+  @override
+  Future<MeetingSuggestions> getSuggestions(String chatRoomId) async =>
+      meetingSuggestionsFromJson(await getSuggestionsJson(chatRoomId) as Json);
+
+  @override
+  Future<Object?> getSuggestionsJson(String chatRoomId) =>
+      apiClient.get('/meeting-proposals/suggestions?chatRoomId=$chatRoomId');
 
   @override
   Future<MeetingProposalEntity> createProposal(Map<String, dynamic> body) async =>

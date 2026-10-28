@@ -17,7 +17,8 @@ import '../repositories/impl/analytics_event_repository_impl.dart';
 ///   `pending.sending.jsonl` (atomic, so `track()` keeps appending to a fresh `pending.jsonl`);
 /// - sends it in batches of at most [batchSize]; a batch the server accepted (2xx) is removed
 ///   from the file, a batch that fails stays, and everything unsent goes back to `pending.jsonl`;
-/// - reading, parsing and rewriting the files all run in isolates.
+/// - reading, parsing and rewriting the files all run in isolates, one at a time with the
+///   appends of `track()` ([AnalyticsQueueLock]), so no event is lost to a race.
 ///
 /// A singleton: there must be one queue consumer. Listen to [isSyncing] to react to uploads.
 class AnalyticsSyncService extends ChangeNotifier {
@@ -84,7 +85,7 @@ class AnalyticsSyncService extends ChangeNotifier {
         await _upload(pending, sending);
       } finally {
         // Whatever happened, what was not delivered goes back to the queue.
-        await Isolate.run(() => _returnToQueue(pending, sending));
+        await AnalyticsQueueLock.run(() => Isolate.run(() => _returnToQueue(pending, sending)));
       }
     } catch (_) {
       // Best effort: the events stay on disk for the next pass.
@@ -101,7 +102,7 @@ class AnalyticsSyncService extends ChangeNotifier {
   }
 
   Future<void> _upload(String pending, String sending) async {
-    final events = await Isolate.run(() => _takeQueue(pending, sending));
+    final events = await AnalyticsQueueLock.run(() => Isolate.run(() => _takeQueue(pending, sending)));
     for (var i = 0; i < events.length; i += batchSize) {
       final batch = events.sublist(i, i + batchSize > events.length ? events.length : i + batchSize);
       try {
@@ -110,7 +111,7 @@ class AnalyticsSyncService extends ChangeNotifier {
         return; // The rest waits for the next pass.
       }
       final sent = {for (final e in batch) e.clientId};
-      await Isolate.run(() => _removeSent(sending, sent));
+      await AnalyticsQueueLock.run(() => Isolate.run(() => _removeSent(sending, sent)));
     }
   }
 }
