@@ -32,3 +32,54 @@ class RatingDraftRepositoryImpl implements RatingDraftRepository {
   Future<void> clear({required String userId, required String exchangeId}) =>
       store.remove(_key(userId, exchangeId));
 }
+
+class RegistrationDraftRepositoryImpl implements RegistrationDraftRepository {
+  static const String key = 'register_draft';
+  final DraftStore store;
+
+  RegistrationDraftRepositoryImpl(this.store);
+
+  @override
+  Future<RegistrationDraft?> load() async {
+    final json = await store.read(key);
+    if (json == null) return null;
+    try {
+      return registrationDraftFromJson(json);
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> save(RegistrationDraft draft) =>
+      draft.isEmpty ? store.remove(key) : store.write(key, registrationDraftToJson(draft));
+
+  @override
+  Future<void> clear() => store.remove(key);
+}
+
+class SellDraftRepositoryImpl implements SellDraftRepository {
+  final DraftStore store;
+
+  SellDraftRepositoryImpl(this.store);
+
+  static String _key(String userId) => 'sell_draft:$userId';
+
+  @override
+  Future<SellDraft?> load({required String userId}) async {
+    final json = await store.read(_key(userId));
+    if (json == null) return null;
+    try {
+      return sellDraftFromJson(json);
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> save({required String userId, required SellDraft draft}) =>
+      draft.isEmpty ? store.remove(_key(userId)) : store.write(_key(userId), sellDraftToJson(draft));
+
+  @override
+  Future<void> clear({required String userId}) => store.remove(_key(userId));
+}

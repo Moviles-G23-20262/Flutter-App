@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../widgets/async_views.dart';
+import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/offline_banner.dart';
+import '../widgets/saved_copy_banner.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/theme_preference.dart';
@@ -88,8 +91,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final sellers     = _featuredSellers();
     final unreadAlerts = widget.appState.account.unreadNotifications;
 
+    final isOffline = widget.appState.connectivity.isOffline;
+    final materialsSavedAt = market.materialsSavedAt;
+
     return Column(
       children: [
+        if (materialsSavedAt != null)
+          SavedCopyBanner(savedAt: materialsSavedAt, onRetry: _refresh)
+        else if (isOffline && market.materials.isEmpty)
+          OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh),
+
         // ── Header ─────────────────────────────────────────────────────────
         Container(
           color: surface,
@@ -177,7 +188,20 @@ class _HomeScreenState extends State<HomeScreen> {
           child: market.isFirstLoad && market.isLoading
               ? const LoadingView()
               : market.error != null && market.materials.isEmpty
-                  ? ErrorView(message: market.error!, onRetry: market.load)
+                  ? (isOffline
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                          child: EmptyView(
+                            icon: Icons.wifi_off_rounded,
+                            title: 'Connect once to load listings',
+                            subtitle: 'An internet connection is required the first time.',
+                            action: AppButton(
+                              label: 'Retry',
+                              onPressed: _refresh,
+                            ),
+                          ),
+                        )
+                      : ErrorView(message: market.error!, onRetry: market.load))
                   : RefreshIndicator(
                       onRefresh: _refresh,
                       child: SingleChildScrollView(
@@ -242,11 +266,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 24),
                                 child: EmptyView(
-                                  icon: Icons.inventory_2_outlined,
-                                  title: 'Nothing listed yet',
-                                  subtitle: _activeCategory == 'All'
-                                      ? 'Be the first to list something with the Sell button.'
-                                      : 'No items in $_activeCategory right now.',
+                                  icon: isOffline ? Icons.wifi_off_rounded : Icons.inventory_2_outlined,
+                                  title: (isOffline && market.materialsSavedAt == null)
+                                      ? 'Connect once to load listings'
+                                      : 'Nothing listed yet',
+                                  subtitle: (isOffline && market.materialsSavedAt == null)
+                                      ? 'An internet connection is required the first time.'
+                                      : _activeCategory == 'All'
+                                          ? 'Be the first to list something with the Sell button.'
+                                          : 'No items in $_activeCategory right now.',
                                 ),
                               )
                             else
@@ -437,7 +465,6 @@ class _ProductCard extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final accentHi  = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
-    final elevated  = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
     return GestureDetector(
       onTap: onTap,
@@ -451,10 +478,13 @@ class _ProductCard extends StatelessWidget {
             // Image
             SizedBox(
               height: 110,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover, width: double.infinity,
-                      errorBuilder: (_, _, _) => Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)))
-                  : Container(color: elevated, child: const Icon(Icons.image_outlined, size: 32)),
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                width: double.infinity,
+                height: 110,
+                fit: BoxFit.cover,
+              ),
             ),
             // Content
             Padding(
@@ -514,7 +544,6 @@ class _RecommendedRow extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final accentHi  = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
-    final elevated  = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
     return AppCard(
       padding: const EdgeInsets.all(12),
@@ -526,10 +555,13 @@ class _RecommendedRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: SizedBox(
               width: 68, height: 68,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(color: elevated))
-                  : Container(color: elevated),
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                width: 68,
+                height: 68,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 12),

@@ -13,6 +13,7 @@ class GetMaterialsUseCase {
   GetMaterialsUseCase(this.repository);
 
   Future<List<MaterialEntity>> execute() => repository.getMaterials();
+  Future<CachedList<MaterialEntity>> executeCached() => repository.getMaterialsCached();
 }
 
 class CreateListingUseCase {
@@ -53,6 +54,7 @@ class GetChatRoomsUseCase {
   GetChatRoomsUseCase(this.repository);
 
   Future<List<ChatRoomEntity>> execute() => repository.getChatRooms();
+  Future<CachedList<ChatRoomEntity>> executeCached() => repository.getChatRoomsCached();
 }
 
 class OpenChatRoomUseCase {
@@ -67,17 +69,29 @@ class GetMessagesUseCase {
   GetMessagesUseCase(this.repository);
 
   Future<List<MessageEntity>> execute(String chatRoomId) => repository.getMessages(chatRoomId);
+  Future<CachedList<MessageEntity>> executeCached(String chatRoomId) =>
+      repository.getMessagesCached(chatRoomId);
 }
 
 class SendMessageUseCase {
   final ChatRepository repository;
   SendMessageUseCase(this.repository);
 
-  Future<MessageEntity> execute(String chatRoomId, String content) {
+  Future<MessageEntity> execute(
+    String chatRoomId,
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  }) {
     final text = content.trim();
     if (text.isEmpty) throw const DataException('Write a message first.');
     if (text.length > 2000) throw const DataException('Messages can have at most 2000 characters.');
-    return repository.sendMessage(chatRoomId, text);
+    return repository.sendMessage(
+      chatRoomId,
+      text,
+      id: id,
+      clientCreatedAt: clientCreatedAt,
+    );
   }
 }
 
@@ -130,22 +144,11 @@ class RateUserUseCase {
   final ExchangeRepository repository;
   RateUserUseCase(this.repository);
 
-  Future<void> execute(NewRating rating) => repository.rate(validated(rating));
-
-  /// Checks [rating] and trims its review. Also used before a rating is saved offline.
-  static NewRating validated(NewRating rating) {
-    if (rating.stars < 1 || rating.stars > 5) throw const DataException('Pick from 1 to 5 stars.');
-    final review = rating.review?.trim();
-    if (review != null && review.length > 500) {
-      throw const DataException('Reviews can have at most 500 characters.');
+  Future<void> execute(NewRating rating) {
+    if (rating.stars < 1 || rating.stars > 5) {
+      throw const DataException('Pick a rating between 1 and 5 stars.');
     }
-    return NewRating(
-      exchangeId: rating.exchangeId,
-      ratedId: rating.ratedId,
-      stars: rating.stars,
-      tags: rating.tags,
-      review: review == null || review.isEmpty ? null : review,
-    );
+    return repository.rate(rating);
   }
 }
 

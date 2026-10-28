@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../model/data_sources/local/draft_store.dart';
+import '../model/data_sources/local/pending_listing_store.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/exchange_entity.dart';
 import '../model/entities/enums.dart';
@@ -82,6 +84,9 @@ class AppViewModel extends ChangeNotifier {
   /// Checks a session that was opened offline once the server can be reached.
   final VerifySessionUseCase? verifySession;
 
+  final DraftStore? draftStore;
+  final PendingListingStore? pendingListingStore;
+
   AppViewModel({
     this.onLogout,
     required this.marketplace,
@@ -97,6 +102,8 @@ class AppViewModel extends ChangeNotifier {
     this.stopOutboxSync,
     this.syncOutbox,
     this.verifySession,
+    this.draftStore,
+    this.pendingListingStore,
   }) {
     // A theme change repaints the whole app, so it goes through the app-wide notifier.
     theme.addListener(notifyListeners);
@@ -105,7 +112,13 @@ class AppViewModel extends ChangeNotifier {
   }
 
   void _onConnectivityChanged() {
-    if (connectivity.isOnline) _verifyOfflineSession();
+    marketplace.load();
+    if (connectivity.isOnline) {
+      _verifyOfflineSession();
+      chats.setOffline(false);
+    } else {
+      chats.setOffline(true);
+    }
   }
 
   /// A session restored offline shows the saved profile. Once the server answers, the profile is
@@ -320,4 +333,3 @@ class AppViewModel extends ChangeNotifier {
   /// The sun/moon button: pins light or dark. Auto is chosen again in Profile → Appearance.
   void toggleTheme() => theme.toggle();
 }
-

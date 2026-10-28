@@ -41,12 +41,14 @@ import '../model/use_cases/register_student_use_case.dart';
 import '../model/use_cases/restore_session_use_case.dart';
 import '../model/data_sources/local/app_database.dart';
 import '../model/data_sources/local/outbox_store.dart';
+import '../model/data_sources/local/pending_listing_store.dart';
 import '../model/data_sources/local/response_cache.dart';
 import '../model/data_sources/remote_outbox_sender.dart';
 import '../model/services/outbox_sync_service.dart';
 import '../model/services/session_owner.dart';
 import '../model/use_cases/outbox_use_cases.dart';
 import '../model/data_sources/local/draft_store.dart';
+import '../model/repositories/draft_repositories.dart';
 import '../model/repositories/impl/draft_repositories_impl.dart';
 import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
@@ -90,6 +92,12 @@ class AppDependencies {
   /// Local storage for offline use: saved server answers and the outbox (sqflite).
   final ResponseCache responseCache;
   final OutboxStore outbox;
+  final OutboxSyncService outboxSync;
+  final DraftStore draftStore;
+  final RegistrationDraftRepository registrationDrafts;
+  final SellDraftRepository sellDrafts;
+  final PendingListingStore pendingListings;
+  final SessionOwner sessionOwner;
   final StartOutboxSyncUseCase startOutboxSync;
   final StopOutboxSyncUseCase stopOutboxSync;
   final SyncOutboxUseCase syncOutbox;
@@ -176,6 +184,12 @@ class AppDependencies {
     required this.watchConnectivity,
     required this.responseCache,
     required this.outbox,
+    required this.outboxSync,
+    required this.draftStore,
+    required this.registrationDrafts,
+    required this.sellDrafts,
+    required this.pendingListings,
+    required this.sessionOwner,
     required this.startOutboxSync,
     required this.stopOutboxSync,
     required this.syncOutbox,
@@ -190,11 +204,18 @@ class AppDependencies {
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
-  SmartListingViewModel createSmartListingViewModel({PublishListing? publish}) => SmartListingViewModel(
+  SmartListingViewModel createSmartListingViewModel({
+    PublishListing? publish,
+    String? currentUserId,
+  }) =>
+      SmartListingViewModel(
         estimator: estimatePrice,
         pickPhoto: imagePicker.pick,
         classifyPhoto: classifyItemPhoto,
         publishListing: publish,
+        sellDraftRepository: sellDrafts,
+        outboxStore: outbox,
+        currentUserId: currentUserId,
       );
 
   factory AppDependencies.create() {
@@ -211,10 +232,13 @@ class AppDependencies {
     const analyticsBaseUrl = String.fromEnvironment('ANALYTICS_BASE_URL');
     final analyticsClient = ApiClient(baseUrl: analyticsBaseUrl, client: http.Client());
     final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
-    final conversationInsights = ConversationInsightRepositoryImpl(remoteDataSource: analyticsRemote);
-    final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final database = AppDatabase();
     final responseCache = ResponseCache(database);
+    final conversationInsights = ConversationInsightRepositoryImpl(
+      remoteDataSource: analyticsRemote,
+      cache: responseCache,
+    );
+    final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
@@ -228,9 +252,17 @@ class AppDependencies {
     final biometrics = BiometricAuthService();
 
     final marketplaceRemote = MarketplaceRemoteDataSourceImpl(apiClient: apiClient);
-    final materials = MaterialRepositoryImpl(marketplaceRemote);
+    final materials = MaterialRepositoryImpl(
+      marketplaceRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+    );
     final wishlist = WishlistRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
-    final chats = ChatRepositoryImpl(marketplaceRemote);
+    final chats = ChatRepositoryImpl(
+      marketplaceRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+    );
     final exchanges = ExchangeRepositoryImpl(marketplaceRemote);
     final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
@@ -248,7 +280,11 @@ class AppDependencies {
       connectivity: connectivity,
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
-    final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
+    final draftStore = DraftStore();
+    final ratingDrafts = RatingDraftRepositoryImpl(draftStore);
+    final registrationDrafts = RegistrationDraftRepositoryImpl(draftStore);
+    final sellDrafts = SellDraftRepositoryImpl(draftStore);
+    final pendingListings = PendingListingStore(appDatabase: database, outboxStore: outbox);
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -310,6 +346,12 @@ class AppDependencies {
       watchConnectivity: WatchConnectivityUseCase(connectivity),
       responseCache: responseCache,
       outbox: outbox,
+      outboxSync: outboxSync,
+      draftStore: draftStore,
+      registrationDrafts: registrationDrafts,
+      sellDrafts: sellDrafts,
+      pendingListings: pendingListings,
+      sessionOwner: sessionOwner,
       startOutboxSync: StartOutboxSyncUseCase(outboxSync),
       stopOutboxSync: StopOutboxSyncUseCase(outboxSync),
       syncOutbox: SyncOutboxUseCase(outboxSync),

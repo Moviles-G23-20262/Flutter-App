@@ -1,8 +1,15 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
+
+import '../core/isolates/photo_compressor.dart';
+import '../model/data_sources/local/outbox_store.dart';
+import '../model/dto/draft_models.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
 import '../model/exceptions/data_exceptions.dart';
+import '../model/repositories/draft_repositories.dart';
 import '../model/use_cases/classify_item_photo_use_case.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 
@@ -31,11 +38,18 @@ class SmartListingViewModel extends ChangeNotifier {
   /// Creates the listing. Without it publishing is unavailable.
   final PublishListing? publishListing;
 
+  final SellDraftRepository? sellDraftRepository;
+  final OutboxStore? outboxStore;
+  final String? currentUserId;
+
   SmartListingViewModel({
     required this.estimator,
     this.pickPhoto,
     this.classifyPhoto,
     this.publishListing,
+    this.sellDraftRepository,
+    this.outboxStore,
+    this.currentUserId,
   });
 
   String? _selectedCategory;
@@ -53,11 +67,13 @@ class SmartListingViewModel extends ChangeNotifier {
 
   bool _isPublishing = false;
   bool _published = false;
+  bool _publishedOffline = false;
   String? _publishError;
 
   int _scan = 0; // lets a photo scan that finishes late be ignored
   int _request = 0; // lets an answer that arrives late be ignored
   bool _disposed = false;
+  Timer? _draftTimer;
 
   // ── Category and condition ────────────────────────────────────────────────
 
@@ -98,6 +114,7 @@ class SmartListingViewModel extends ChangeNotifier {
         return 'Heuristic estimate, no connection to sales data';
     }
   }
+
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -130,6 +147,7 @@ class SmartListingViewModel extends ChangeNotifier {
 
   bool get isPublishing => _isPublishing;
   bool get published => _published;
+  bool get publishedOffline => _publishedOffline;
   String? get publishError => _publishError;
 
   // ── Intents from the View ─────────────────────────────────────────────────
@@ -197,7 +215,10 @@ class SmartListingViewModel extends ChangeNotifier {
     if (_disposed || scan != _scan) return;
     _isPickingPhoto = false;
     _photoMessage = message;
-    if (bytes != null) _photos.add(PendingImage(bytes: bytes, filename: 'photo-${++_photoCounter}.jpg'));
+    if (bytes != null) {
+      final compressed = await PhotoCompressor.compressBytes(bytes);
+      _photos.add(PendingImage(bytes: Uint8List.fromList(compressed), filename: 'photo-${++_photoCounter}.jpg'));
+    }
     notifyListeners();
   }
 
@@ -247,6 +268,70 @@ class SmartListingViewModel extends ChangeNotifier {
     if (_photos.length > before) await detectCategoryFromPhoto();
   }
 
+  // ── Draft management ──────────────────────────────────────────────────────
+
+  void debouncedSaveDraft({
+    required String title,
+    required String description,
+    String courseCode = '',
+    required String price,
+  }) {
+    final userId = currentUserId;
+    if (sellDraftRepository == null || userId == null || userId.isEmpty) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 400), () {
+      saveDraft(
+        title: title,
+        description: description,
+        courseCode: courseCode,
+        price: price,
+      );
+    });
+  }
+
+  Future<void> saveDraft({
+    required String title,
+    required String description,
+    String courseCode = '',
+    required String price,
+  }) async {
+    final userId = currentUserId;
+    if (sellDraftRepository == null || userId == null || userId.isEmpty) return;
+    final draft = SellDraft(
+      title: title,
+      description: description,
+      courseCode: courseCode.isEmpty ? null : courseCode,
+      price: double.tryParse(price.trim().replaceAll(',', '.')),
+      category: _selectedCategory,
+      condition: _selectedCondition,
+    );
+    await sellDraftRepository!.save(userId: userId, draft: draft);
+  }
+
+  Future<SellDraft?> loadDraft() async {
+    final userId = currentUserId;
+    if (sellDraftRepository == null || userId == null || userId.isEmpty) return null;
+    final draft = await sellDraftRepository!.load(userId: userId);
+    if (draft != null && !draft.isEmpty) {
+      if (draft.category != null && _selectedCategory == null) {
+        _selectedCategory = draft.category;
+      }
+      if (draft.condition != null && _selectedCondition == null) {
+        _selectedCondition = draft.condition;
+      }
+      notifyListeners();
+      return draft;
+    }
+    return null;
+  }
+
+  Future<void> clearDraft() async {
+    _draftTimer?.cancel();
+    final userId = currentUserId;
+    if (sellDraftRepository == null || userId == null || userId.isEmpty) return;
+    await sellDraftRepository!.clear(userId: userId);
+  }
+
   /// Validates the form and creates the listing. Returns true when it was published; otherwise
   /// [publishError] says why. Needs at least one photo; the price can be typed by hand, the
   /// estimate is only an optional help. Never throws.
@@ -267,13 +352,11 @@ class SmartListingViewModel extends ChangeNotifier {
             : _photos.isEmpty
                 ? 'Please add at least one photo of the item'
                 : title.trim().isEmpty
-                ? 'Add a title.'
-                : description.trim().isEmpty
-                    ? 'Add a description.'
-                    : (amount == null || amount <= 0)
-                        ? 'Enter a valid price.'
-                        : publisher == null
-                            ? 'Publishing is not available right now.'
+                    ? 'Add a title.'
+                    : description.trim().isEmpty
+                        ? 'Add a description.'
+                        : (amount == null || amount <= 0)
+                            ? 'Enter a valid price.'
                             : null;
     if (problem != null) {
       _publishError = problem;
@@ -283,19 +366,58 @@ class SmartListingViewModel extends ChangeNotifier {
 
     _isPublishing = true;
     _publishError = null;
+    _publishedOffline = false;
     notifyListeners();
 
     String? error;
     try {
-      await publisher!(NewListingData(
-        title: title,
-        description: description,
-        courseCode: courseCode,
-        price: amount!,
-        condition: MaterialConditionEnum.values.byName(_selectedCondition!),
-        category: MaterialCategoryEnum.values.byName(_selectedCategory!),
-        images: List.of(_photos),
-      ));
+      if (publisher != null) {
+        await publisher(NewListingData(
+          title: title,
+          description: description,
+          courseCode: courseCode,
+          price: amount!,
+          condition: MaterialConditionEnum.values.byName(_selectedCondition!),
+          category: MaterialCategoryEnum.values.byName(_selectedCategory!),
+          images: List.of(_photos),
+        ));
+      } else {
+        throw const NoConnectionException();
+      }
+    } on NoConnectionException {
+      // Offline fallback: compress photos in isolate, save files, and queue in OutboxStore
+      final userId = currentUserId;
+      if (outboxStore != null && userId != null && userId.isNotEmpty) {
+        try {
+          final photoPaths = <String>[];
+          final tempDir = Directory.systemTemp;
+          for (var i = 0; i < _photos.length; i++) {
+            final compressed = await PhotoCompressor.compressBytes(_photos[i].bytes);
+            final filePath = '${tempDir.path}/pending_photo_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+            final file = File(filePath);
+            await file.writeAsBytes(compressed, flush: true);
+            photoPaths.add(filePath);
+          }
+
+          await outboxStore!.enqueueListing(
+            ownerId: userId,
+            payload: {
+              'title': title.trim(),
+              'description': description.trim(),
+              if (courseCode.trim().isNotEmpty) 'courseCode': courseCode.trim(),
+              'price': amount!.toStringAsFixed(2),
+              'condition': _selectedCondition!,
+              'category': _selectedCategory!,
+            },
+            photoPaths: photoPaths,
+          );
+          _publishedOffline = true;
+        } catch (e) {
+          error = 'Could not save listing offline: $e';
+        }
+      } else {
+        error = 'Publishing is not available offline right now.';
+      }
     } on DataException catch (e) {
       error = e.message;
     } catch (_) {
@@ -306,6 +428,9 @@ class SmartListingViewModel extends ChangeNotifier {
     _isPublishing = false;
     _publishError = error;
     _published = error == null;
+    if (_published) {
+      await clearDraft();
+    }
     notifyListeners();
     return _published;
   }
@@ -320,6 +445,7 @@ class SmartListingViewModel extends ChangeNotifier {
     _photoMessage = null;
     _publishError = null;
     _published = false;
+    _publishedOffline = false;
     _request++; // drop any answer still on its way
     _selectedCategory = null;
     _selectedCondition = null;
@@ -340,6 +466,7 @@ class SmartListingViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
     _disposed = true;
     super.dispose();
   }

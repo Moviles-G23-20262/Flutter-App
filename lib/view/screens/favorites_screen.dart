@@ -1,3 +1,4 @@
+import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/wishlist_item_entity.dart';
@@ -91,10 +92,7 @@ class FavoritesScreen extends StatelessWidget {
                                               borderRadius: BorderRadius.circular(10),
                                               child: SizedBox(
                                                 width: 60, height: 60,
-                                                child: material.primaryImageUrl.isNotEmpty
-                                                    ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                                                        errorBuilder: (_, _, _) => Container(color: elevated))
-                                                    : Container(color: elevated, child: const Icon(Icons.image_outlined)),
+                                                child: CachedPhoto(imageUrl: material.primaryImageUrl, category: material.category.name, fit: BoxFit.cover),
                                               ),
                                             ),
                                             const SizedBox(width: 12),

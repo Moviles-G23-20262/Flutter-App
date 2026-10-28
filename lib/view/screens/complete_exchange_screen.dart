@@ -1,3 +1,4 @@
+import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/exchange_entity.dart';
@@ -338,10 +339,7 @@ class _ItemCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
                   width: 52, height: 52,
-                  child: (material?.primaryImageUrl ?? '').isNotEmpty
-                      ? Image.network(material!.primaryImageUrl, fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(color: tagBg, child: Icon(Icons.inventory_2_outlined, color: accentHi)))
-                      : Container(color: tagBg, child: Icon(Icons.inventory_2_outlined, color: accentHi)),
+                  child: CachedPhoto(imageUrl: material?.primaryImageUrl ?? '', category: material?.category.name, fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(width: 12),

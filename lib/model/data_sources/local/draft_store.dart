@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +8,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Losing a draft only means retyping it, so storage errors are swallowed.
 class DraftStore {
+  static const String keyRegisterDraft = 'register_draft';
+  static const String keySellDraft = 'sell_draft';
+  static const Duration debounceDuration = Duration(milliseconds: 400);
+
   final Future<SharedPreferences> Function() _preferences;
+  Timer? _debounceTimer;
 
   DraftStore([Future<SharedPreferences> Function()? preferences])
       : _preferences = preferences ?? SharedPreferences.getInstance;
@@ -37,5 +43,75 @@ class DraftStore {
     } on Exception {
       // A stale draft is harmless; the next save replaces it.
     }
+  }
+
+  // ── Registration Draft (EC5) ────────────────────────────────────────────────
+
+  void debouncedSaveRegisterDraft({
+    required String fullName,
+    required String major,
+    required String email,
+    String? faculty,
+  }) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(debounceDuration, () {
+      saveRegisterDraft(
+        fullName: fullName,
+        major: major,
+        email: email,
+        faculty: faculty,
+      );
+    });
+  }
+
+  Future<void> saveRegisterDraft({
+    required String fullName,
+    required String major,
+    required String email,
+    String? faculty,
+  }) async {
+    await write(keyRegisterDraft, {
+      'fullName': fullName,
+      'major': major,
+      'email': email,
+      if (faculty != null) 'faculty': faculty,
+      'savedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<Map<String, dynamic>?> getRegisterDraft() => read(keyRegisterDraft);
+
+  Future<void> clearRegisterDraft() async {
+    _debounceTimer?.cancel();
+    await remove(keyRegisterDraft);
+  }
+
+  // ── Sell Draft (EC4) ───────────────────────────────────────────────────────
+
+  void debouncedSaveSellDraft({
+    required String userId,
+    required Map<String, dynamic> draftData,
+  }) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(debounceDuration, () {
+      saveSellDraft(userId: userId, draftData: draftData);
+    });
+  }
+
+  Future<void> saveSellDraft({
+    required String userId,
+    required Map<String, dynamic> draftData,
+  }) async {
+    final copy = Map<String, dynamic>.from(draftData);
+    copy['savedAt'] = DateTime.now().toIso8601String();
+    await write('sell_draft:$userId', copy);
+  }
+
+  Future<Map<String, dynamic>?> getSellDraft({required String userId}) =>
+      read('sell_draft:$userId');
+
+  Future<void> clearSellDraft({required String userId}) async {
+    _debounceTimer?.cancel();
+    await remove('sell_draft:$userId');
   }
 }
