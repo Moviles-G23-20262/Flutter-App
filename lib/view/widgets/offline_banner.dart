@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../app/theme/app_theme.dart';
 
 /// Amber banner displayed at the top of screens when offline.
 ///

@@ -111,7 +111,7 @@ class _ExchangeHistoryScreenState
                         child: ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: exchanges.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (_, index) {
                             return _ExchangeCard(

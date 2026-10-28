@@ -144,12 +144,20 @@ class RateUserUseCase {
   final ExchangeRepository repository;
   RateUserUseCase(this.repository);
 
-  Future<void> execute(NewRating rating) {
+  static NewRating validated(NewRating rating) {
     if (rating.stars < 1 || rating.stars > 5) {
       throw const DataException('Pick a rating between 1 and 5 stars.');
     }
-    return repository.rate(rating);
+    final review = rating.review?.trim();
+    return NewRating(
+      exchangeId: rating.exchangeId,
+      ratedId: rating.ratedId,
+      stars: rating.stars,
+      review: (review != null && review.isNotEmpty) ? review : null,
+    );
   }
+
+  Future<void> execute(NewRating rating) => repository.rate(validated(rating));
 }
 
 class GetNotificationsUseCase {

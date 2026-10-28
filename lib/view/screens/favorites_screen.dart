@@ -31,7 +31,6 @@ class FavoritesScreen extends StatelessWidget {
     final txMuted     = dark ? AppColors.darkTextMuted     : AppColors.lightTextMuted;
     final txSecondary = dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final accentHi    = dark ? AppColors.darkAccentHi      : AppColors.lightAccentHi;
-    final elevated    = dark ? AppColors.darkElevated      : AppColors.lightElevated;
 
     return Scaffold(
       body: SafeArea(

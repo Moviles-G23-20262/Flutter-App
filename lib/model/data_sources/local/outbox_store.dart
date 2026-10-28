@@ -19,6 +19,23 @@ class OutboxStore {
   /// Fires after every write, so screens can show "waiting" / "sent" without polling.
   Stream<void> get changes => _changes.stream;
 
+  Stream<int> get pendingCountStream async* {
+    yield await pendingCount();
+    await for (final _ in _changes.stream) {
+      yield await pendingCount();
+    }
+  }
+
+  Future<int> pendingCount([String? ownerId]) async {
+    final db = await _db.database;
+    final where = ownerId != null ? ' WHERE owner_id = ?' : '';
+    final args = ownerId != null ? [ownerId] : null;
+    final m = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_messages$where', args)).first['c'] as int? ?? 0;
+    final l = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_listings$where', args)).first['c'] as int? ?? 0;
+    final a = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_actions$where', args)).first['c'] as int? ?? 0;
+    return m + l + a;
+  }
+
   // Messages
 
   Future<PendingMessage> enqueueMessage({
@@ -95,6 +112,12 @@ class OutboxStore {
     );
     return rows.map(_listingFromRow).toList();
   }
+
+  /// Alias for [listings].
+  Future<List<PendingListing>> pendingListings(String ownerId) => listings(ownerId);
+
+  /// Discards a queued listing.
+  Future<void> deleteListing(String id) => discard(PendingKind.listing, id);
 
   // Exchange steps (completion, rating, meeting proposal)
 

@@ -413,7 +413,6 @@ class _SearchProductCard extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final accentHi  = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
-    final elevated  = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
     return GestureDetector(
       onTap: onTap,

@@ -280,6 +280,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         _LabeledField(
           label: 'Password',
+          footer: _PasswordHint(length: _passwordCtrl.text.length),
           child: AppTextField(
             placeholder: 'Create a password',
             controller: _passwordCtrl,
@@ -296,7 +297,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
-          footer: _PasswordHint(length: _passwordCtrl.text.length),
         ),
         _LabeledField(
           label: 'Confirm password',

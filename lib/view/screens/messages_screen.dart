@@ -132,7 +132,7 @@ class _ConversationList extends StatelessWidget {
             ],
           ),
         ),
-        PowerSavingNote(isSaving: chats.isPowerSaving),
+        if (chats.isPowerSaving) const PowerSavingNote(),
         Divider(color: border, height: 1),
 
         // List
@@ -141,25 +141,35 @@ class _ConversationList extends StatelessWidget {
               ? const LoadingView()
               : chats.roomsError != null && chats.rooms.isEmpty
                   ? (isOffline
-                      ? Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: EmptyView(
-                            icon: Icons.wifi_off_rounded,
-                            title: 'No saved conversations',
-                            subtitle: 'Connect once to load your messages.',
-                            action: AppButton(label: 'Retry', onPressed: chats.loadRooms),
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const EmptyView(
+                                icon: Icons.wifi_off_rounded,
+                                title: 'No saved conversations',
+                                subtitle: 'Connect once to load your messages.',
+                              ),
+                              const SizedBox(height: 12),
+                              PrimaryButton(label: 'Retry', onPressed: chats.loadRooms),
+                            ],
                           ),
                         )
                       : ErrorView(message: chats.roomsError!, onRetry: chats.loadRooms))
                   : chats.rooms.isEmpty
                       ? (isOffline
-                          ? Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: EmptyView(
-                                icon: Icons.wifi_off_rounded,
-                                title: 'No saved conversations',
-                                subtitle: 'Connect once to load your messages.',
-                                action: AppButton(label: 'Retry', onPressed: chats.loadRooms),
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const EmptyView(
+                                    icon: Icons.wifi_off_rounded,
+                                    title: 'No saved conversations',
+                                    subtitle: 'Connect once to load your messages.',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  PrimaryButton(label: 'Retry', onPressed: chats.loadRooms),
+                                ],
                               ),
                             )
                           : const EmptyView(

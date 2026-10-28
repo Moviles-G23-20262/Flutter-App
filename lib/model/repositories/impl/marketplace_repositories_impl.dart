@@ -89,6 +89,7 @@ class MaterialRepositoryImpl implements MaterialRepository {
 
   @override
   Future<List<MaterialEntity>> getMaterials() async {
+    if (cache == null) return guardRequest(remote.getMaterials);
     final cached = await getMaterialsCached();
     return cached.items;
   }
@@ -121,7 +122,7 @@ class MaterialRepositoryImpl implements MaterialRepository {
         final material = await remote.createMaterial({
           'title': data.title.trim(),
           'description': data.description.trim(),
-          if (data.courseCode != null) 'courseCode': data.courseCode!.trim(),
+          if (data.courseCode != null && data.courseCode!.trim().isNotEmpty) 'courseCode': data.courseCode!.trim(),
           'price': data.price.toStringAsFixed(2),
           'condition': data.condition.name,
           'category': data.category.name,
@@ -294,13 +295,7 @@ class ExchangeRepositoryImpl implements ExchangeRepository {
     NewRating rating,
   ) =>
       guardRequest(
-        () => remote.createRating({
-          'ratedUserId': rating.ratedUserId,
-          'exchangeId': rating.exchangeId,
-          'stars': rating.stars,
-          'tags': rating.tags,
-          'review': rating.review,
-        }),
+        () => remote.createRating(newRatingToJson(rating)),
       );
 }
 

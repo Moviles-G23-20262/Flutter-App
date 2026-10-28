@@ -322,7 +322,6 @@ class _ItemCard extends StatelessWidget {
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final accentHi   = brightness == Brightness.dark ? AppColors.darkAccentHi    : AppColors.lightAccentHi;
-    final tagBg      = brightness == Brightness.dark ? AppColors.darkTagBg       : AppColors.lightTagBg;
     final material = exchange.material;
     final start = exchange.meetingStartsAt;
     final end = exchange.meetingEndsAt;
