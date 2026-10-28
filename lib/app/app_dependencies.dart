@@ -64,6 +64,8 @@ import '../model/use_cases/pending_listing_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
+
+//Singleton Sabrina
   final LoginUseCase login;
   final RegisterStudentUseCase registerStudent;
   final RestoreSessionUseCase restoreSession;
@@ -256,6 +258,7 @@ class AppDependencies {
       );
 
   factory AppDependencies.create() {
+    //Singleton Sabrina - Singleton Pattern via a Composition Root 
     const baseUrl = String.fromEnvironment('API_BASE_URL');
     if (baseUrl.isEmpty) {
       throw StateError(
