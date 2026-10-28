@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'material_entity.dart';
 
-/// Average ticket (BQ13): what a completed campus sale is worth, in COP, overall and per
+/// Average ticket (BQ14): what a completed campus sale is worth, in COP, overall and per
 /// item condition. Lets a seller see how much the condition of an item moves its price.
 @immutable
 class AverageTicket {
