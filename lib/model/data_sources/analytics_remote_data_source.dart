@@ -5,6 +5,7 @@ import '../dto/chat_agreement_model.dart';
 import '../dto/conversation_insight_model.dart';
 import '../dto/price_stats_model.dart';
 import '../dto/meeting_point_density_model.dart';
+import '../dto/time_to_sell_model.dart';
 
 /// Talks to the Django analytics service (a different base URL than the NestJS API).
 class AnalyticsRemoteDataSource {
@@ -34,5 +35,11 @@ class AnalyticsRemoteDataSource {
     final query = Uri(queryParameters: {'category': category, 'condition': condition}).query;
     final json = await apiClient.get('/analytics/price-stats/?$query');
     return PriceStatsModel.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// BQ11: average time (in days) it takes for a newly listed academic item to be marked as sold.
+  Future<TimeToSellModel> getTimeToSell() async {
+    final json = await apiClient.get('/analytics/time-to-sell/');
+    return TimeToSellModel.fromJson(json as Map<String, dynamic>);
   }
 }

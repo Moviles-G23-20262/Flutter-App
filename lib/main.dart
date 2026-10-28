@@ -55,6 +55,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       removeFromWishlist: _deps.removeFromWishlist,
       watchPendingListings: _deps.watchPendingListings,
       discardPendingListing: _deps.discardPendingListing,
+      getTimeToSell: _deps.getTimeToSell,
     ),
     chats: ChatViewModel(
       getChatRooms: _deps.getChatRooms,
