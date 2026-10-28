@@ -538,6 +538,22 @@ class _EstimateCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (viewModel.estimatedDaysToSell != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.hourglass_top_rounded, size: 14, color: onHero.withValues(alpha: 0.8)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Typically sells in ~${viewModel.estimatedDaysToSell!.toStringAsFixed(1)} days (BQ11)',
+                    key: const Key('estimate-time-to-sell'),
+                    style: AppTextStyles.body(onHero.withValues(alpha: 0.8), fontSize: AppTextStyles.size2xs),
+                  ),
+                ),
+              ],
+            ),
+          ],
           SecondaryButton(
             key: const Key('apply-suggested-price'),
             label: 'Apply this price',

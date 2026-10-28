@@ -14,6 +14,7 @@ import '../model/use_cases/connectivity_use_cases.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
 import '../model/use_cases/pending_listing_use_cases.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
+import '../model/use_cases/get_time_to_sell_use_case.dart';
 
 /// Takes or picks a photo and returns its bytes; null if the user cancelled.
 /// Throws when the camera or gallery cannot be used.
@@ -69,6 +70,7 @@ class SmartListingViewModel extends ChangeNotifier {
   final LoadListingDraftUseCase? loadDraft;
   final SaveListingDraftUseCase? saveDraft;
   final ClearListingDraftUseCase? clearDraft;
+  final GetTimeToSellUseCase? getTimeToSell;
 
   SmartListingViewModel({
     required this.estimator,
@@ -83,6 +85,7 @@ class SmartListingViewModel extends ChangeNotifier {
     this.loadDraft,
     this.saveDraft,
     this.clearDraft,
+    this.getTimeToSell,
   }) : newListingId = newListingId ?? newClientId;
 
   String? _selectedCategory;
@@ -90,6 +93,7 @@ class SmartListingViewModel extends ChangeNotifier {
   PriceEstimate? _estimate;
   bool _isLoading = false;
   String? _errorMessage;
+  double? _estimatedDaysToSell;
 
   final List<PendingImage> _photos = [];
   int _photoCounter = 0;
@@ -141,6 +145,7 @@ class SmartListingViewModel extends ChangeNotifier {
   double? get suggestedPrice => _estimate?.suggestedPrice;
   double? get p25 => _estimate?.p25;
   double? get p75 => _estimate?.p75;
+  double? get estimatedDaysToSell => _estimatedDaysToSell;
 
   /// Completed sales behind the estimate; 0 for a heuristic one.
   int get sampleSize => _estimate?.sampleSize ?? 0;
@@ -252,6 +257,12 @@ class SmartListingViewModel extends ChangeNotifier {
     String? error;
     try {
       estimate = await estimator.execute(category: category, condition: condition);
+      if (getTimeToSell != null) {
+        try {
+          final insight = await getTimeToSell!.execute();
+          _estimatedDaysToSell = insight.daysForCategory(category.name);
+        } catch (_) {}
+      }
     } catch (_) {
       error = 'Could not estimate a price. Please try again.';
     }
