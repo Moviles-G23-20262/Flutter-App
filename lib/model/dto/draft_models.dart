@@ -1,5 +1,8 @@
+import '../entities/listing_draft.dart';
 import '../entities/material_entity.dart';
+import '../entities/new_listing_data.dart';
 import '../entities/rating_draft.dart';
+import '../entities/registration_draft.dart';
 
 // Drafts ↔ the JSON kept in shared_preferences.
 
@@ -20,22 +23,6 @@ RatingDraft ratingDraftFromJson(Map<String, dynamic> json) => RatingDraft(
       review: json['review'] as String? ?? '',
     );
 
-class RegistrationDraft {
-  final String fullName;
-  final String email;
-  final String major;
-  final String? faculty;
-
-  const RegistrationDraft({
-    this.fullName = '',
-    this.email = '',
-    this.major = '',
-    this.faculty,
-  });
-
-  bool get isEmpty => fullName.isEmpty && email.isEmpty && major.isEmpty;
-}
-
 Map<String, dynamic> registrationDraftToJson(RegistrationDraft draft) => {
       'fullName': draft.fullName,
       'email': draft.email,
@@ -51,54 +38,27 @@ RegistrationDraft registrationDraftFromJson(Map<String, dynamic> json) => Regist
       faculty: json['faculty'] as String?,
     );
 
-class SellDraft {
-  final String title;
-  final String description;
-  final String? courseCode;
-  final double? price;
-  final MaterialConditionEnum? condition;
-  final MaterialCategoryEnum? category;
-  final List<String> photoPaths;
-
-  const SellDraft({
-    this.title = '',
-    this.description = '',
-    this.courseCode,
-    this.price,
-    this.condition,
-    this.category,
-    this.photoPaths = const [],
-  });
-
-  bool get isEmpty =>
-      title.isEmpty &&
-      description.isEmpty &&
-      (courseCode == null || courseCode!.isEmpty) &&
-      price == null &&
-      photoPaths.isEmpty;
-}
-
-Map<String, dynamic> sellDraftToJson(SellDraft draft) => {
+/// The photos are files; the JSON only names them by [photoPaths].
+Map<String, dynamic> listingDraftToJson(ListingDraft draft, List<String> photoPaths) => {
       'title': draft.title,
       'description': draft.description,
-      'courseCode': draft.courseCode,
+      'course': draft.courseCode,
       'price': draft.price,
-      'condition': draft.condition?.name,
-      'category': draft.category?.name,
-      'photoPaths': draft.photoPaths,
-      'savedAt': DateTime.now().toIso8601String(),
+      'condition': draft.condition,
+      'category': draft.category,
+      'photoPaths': photoPaths,
     };
 
-SellDraft sellDraftFromJson(Map<String, dynamic> json) => SellDraft(
+List<String> listingDraftPhotoPaths(Map<String, dynamic> json) =>
+    [for (final path in json['photoPaths'] as List? ?? const []) path as String];
+
+/// Unknown condition or category names (written by another app version) are dropped.
+ListingDraft listingDraftFromJson(Map<String, dynamic> json, List<PendingImage> photos) => ListingDraft(
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      courseCode: json['courseCode'] as String?,
-      price: (json['price'] as num?)?.toDouble(),
-      condition: MaterialConditionEnum.values
-          .where((c) => c.name == json['condition'])
-          .firstOrNull,
-      category: MaterialCategoryEnum.values
-          .where((c) => c.name == json['category'])
-          .firstOrNull,
-      photoPaths: (json['photoPaths'] as List?)?.map((e) => e as String).toList() ?? const [],
+      courseCode: json['course'] as String? ?? '',
+      price: json['price'] as String? ?? '',
+      condition: MaterialConditionEnum.values.where((c) => c.name == json['condition']).firstOrNull?.name,
+      category: MaterialCategoryEnum.values.where((c) => c.name == json['category']).firstOrNull?.name,
+      photos: photos,
     );

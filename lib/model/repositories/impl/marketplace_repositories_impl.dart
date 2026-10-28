@@ -119,15 +119,7 @@ class MaterialRepositoryImpl implements MaterialRepository {
           );
         }
 
-        final material = await remote.createMaterial({
-          'title': data.title.trim(),
-          'description': data.description.trim(),
-          if (data.courseCode != null && data.courseCode!.trim().isNotEmpty) 'courseCode': data.courseCode!.trim(),
-          'price': data.price.toStringAsFixed(2),
-          'condition': data.condition.name,
-          'category': data.category.name,
-          'imageUrls': imageUrls,
-        });
+        final material = await remote.createMaterial({...newListingToJson(data), 'imageUrls': imageUrls});
 
         if (cache != null) unawaited(getMaterialsCached().then((_) {}, onError: (_) {}));
         return material;

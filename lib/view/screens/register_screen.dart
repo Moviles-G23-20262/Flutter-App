@@ -46,50 +46,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDraft();
-    _nameCtrl.addListener(_onFieldChanged);
-    _emailCtrl.addListener(_onFieldChanged);
-    _majorCtrl.addListener(_onFieldChanged);
-  }
-
-  void _onFieldChanged() {
-    widget.appState.draftStore?.debouncedSaveRegisterDraft(
-      fullName: _nameCtrl.text,
-      major: _majorCtrl.text,
-      email: _emailCtrl.text,
-      faculty: _vm.faculty,
-    );
-  }
-
-  Future<void> _loadDraft() async {
-    final draft = await widget.appState.draftStore?.getRegisterDraft();
-    if (draft != null && mounted) {
-      setState(() {
-        if (_nameCtrl.text.isEmpty && draft['fullName'] != null) {
-          _nameCtrl.text = draft['fullName'] as String;
-          _vm.update(RegisterField.name, _nameCtrl.text);
-        }
-        if (_emailCtrl.text.isEmpty && draft['email'] != null) {
-          _emailCtrl.text = draft['email'] as String;
-          _vm.update(RegisterField.email, _emailCtrl.text);
-        }
-        if (_majorCtrl.text.isEmpty && draft['major'] != null) {
-          _majorCtrl.text = draft['major'] as String;
-          _vm.update(RegisterField.major, _majorCtrl.text);
-        }
-        if (draft['faculty'] != null && draft['faculty'] is String) {
-          _vm.setFaculty(draft['faculty'] as String);
-          _facultyCtrl.text = draft['faculty'] as String;
-        }
-      });
-    }
+    // The view-model restores the draft; the text fields only show it.
+    _vm.init().then((restored) {
+      if (!restored || !mounted) return;
+      if (_nameCtrl.text.isEmpty) _nameCtrl.text = _vm.valueOf(RegisterField.name);
+      if (_emailCtrl.text.isEmpty) _emailCtrl.text = _vm.valueOf(RegisterField.email);
+      if (_majorCtrl.text.isEmpty) _majorCtrl.text = _vm.valueOf(RegisterField.major);
+      _facultyCtrl.text = _vm.faculty ?? '';
+    });
   }
 
   @override
   void dispose() {
-    _nameCtrl.removeListener(_onFieldChanged);
-    _emailCtrl.removeListener(_onFieldChanged);
-    _majorCtrl.removeListener(_onFieldChanged);
     _vm.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
@@ -103,9 +71,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     await _vm.submit();
-    if (widget.appState.isLoggedIn) {
-      await widget.appState.draftStore?.clearRegisterDraft();
-    }
   }
 
   Future<void> _pickFaculty() async {
@@ -123,7 +88,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (selected == null || !mounted) return;
     _vm.setFaculty(selected == _noFaculty ? null : selected);
     _facultyCtrl.text = _vm.faculty ?? '';
-    _onFieldChanged();
   }
 
   void _goToLogin() {

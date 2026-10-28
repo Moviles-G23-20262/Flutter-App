@@ -9,6 +9,7 @@ import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
 import '../model/repositories/impl/analytics_event_repository_impl.dart';
 import '../model/data_sources/analytics_event_remote_data_source.dart';
+import '../model/services/analytics_sync_service.dart';
 import '../model/use_cases/track_event_use_case.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 import '../view_model/smart_listing_view_model.dart';
@@ -41,18 +42,23 @@ import '../model/use_cases/register_student_use_case.dart';
 import '../model/use_cases/restore_session_use_case.dart';
 import '../model/data_sources/local/app_database.dart';
 import '../model/data_sources/local/outbox_store.dart';
-import '../model/data_sources/local/pending_listing_store.dart';
 import '../model/data_sources/local/response_cache.dart';
 import '../model/data_sources/remote_outbox_sender.dart';
 import '../model/services/outbox_sync_service.dart';
 import '../model/services/session_owner.dart';
 import '../model/use_cases/outbox_use_cases.dart';
 import '../model/data_sources/local/draft_store.dart';
-import '../model/repositories/draft_repositories.dart';
 import '../model/repositories/impl/draft_repositories_impl.dart';
 import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
 import '../model/use_cases/rating_draft_use_cases.dart';
+import '../model/use_cases/registration_draft_use_cases.dart';
+import '../model/use_cases/pending_message_use_cases.dart';
+import '../model/data_sources/local/draft_photo_store.dart';
+import '../core/isolates/photo_compressor.dart';
+import '../model/repositories/impl/pending_listing_repository_impl.dart';
+import '../model/use_cases/listing_draft_use_cases.dart';
+import '../model/use_cases/pending_listing_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -86,6 +92,9 @@ class AppDependencies {
   /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
   final TrackEventUseCase trackEvent;
 
+  /// Uploads the queued telemetry in the background; started with the app.
+  final AnalyticsSyncService analyticsSync;
+
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
 
@@ -93,19 +102,30 @@ class AppDependencies {
   final ResponseCache responseCache;
   final OutboxStore outbox;
   final OutboxSyncService outboxSync;
-  final DraftStore draftStore;
-  final RegistrationDraftRepository registrationDrafts;
-  final SellDraftRepository sellDrafts;
-  final PendingListingStore pendingListings;
+  /// The unfinished sign-up form (no passwords).
+  final LoadRegistrationDraftUseCase loadRegistrationDraft;
+  final SaveRegistrationDraftUseCase saveRegistrationDraft;
+  final ClearRegistrationDraftUseCase clearRegistrationDraft;
   final SessionOwner sessionOwner;
   final StartOutboxSyncUseCase startOutboxSync;
   final StopOutboxSyncUseCase stopOutboxSync;
   final SyncOutboxUseCase syncOutbox;
 
+  /// Offline chat: queued messages and how many items are waiting.
+  final QueueMessageUseCase queueMessage;
+  final GetPendingMessagesUseCase getPendingMessages;
+  final WatchPendingCountUseCase watchPendingCount;
+
   /// The unfinished rating, saved while it is written.
   final LoadRatingDraftUseCase loadRatingDraft;
   final SaveRatingDraftUseCase saveRatingDraft;
   final ClearRatingDraftUseCase clearRatingDraft;
+  final LoadListingDraftUseCase loadListingDraft;
+  final SaveListingDraftUseCase saveListingDraft;
+  final ClearListingDraftUseCase clearListingDraft;
+  final QueueListingUseCase queueListing;
+  final WatchPendingListingsUseCase watchPendingListings;
+  final DiscardPendingListingUseCase discardPendingListing;
 
   /// Exchange steps done offline: queued in the outbox and sent later.
   final QueueExchangeCompletionUseCase queueExchangeCompletion;
@@ -136,6 +156,7 @@ class AppDependencies {
   final MarkNotificationOpenedUseCase markNotificationOpened;
   final MeetupUseCases meetups;
   final GetConversationInsightUseCase getConversationInsight;
+  final GetChatAgreementUseCase getChatAgreement;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -169,6 +190,7 @@ class AppDependencies {
     required this.markNotificationOpened,
     required this.meetups,
     required this.getConversationInsight,
+    required this.getChatAgreement,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -180,22 +202,31 @@ class AppDependencies {
     required this.classifyItemPhoto,
     required this.imagePicker,
     required this.trackEvent,
+    required this.analyticsSync,
     required this.getConnectivity,
     required this.watchConnectivity,
     required this.responseCache,
     required this.outbox,
     required this.outboxSync,
-    required this.draftStore,
-    required this.registrationDrafts,
-    required this.sellDrafts,
-    required this.pendingListings,
+    required this.loadRegistrationDraft,
+    required this.saveRegistrationDraft,
+    required this.clearRegistrationDraft,
     required this.sessionOwner,
     required this.startOutboxSync,
     required this.stopOutboxSync,
     required this.syncOutbox,
+    required this.queueMessage,
+    required this.getPendingMessages,
+    required this.watchPendingCount,
     required this.loadRatingDraft,
     required this.saveRatingDraft,
     required this.clearRatingDraft,
+    required this.loadListingDraft,
+    required this.saveListingDraft,
+    required this.clearListingDraft,
+    required this.queueListing,
+    required this.watchPendingListings,
+    required this.discardPendingListing,
     required this.queueExchangeCompletion,
     required this.queueRating,
     required this.queueMeetingProposal,
@@ -204,18 +235,19 @@ class AppDependencies {
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
-  SmartListingViewModel createSmartListingViewModel({
-    PublishListing? publish,
-    String? currentUserId,
-  }) =>
+  SmartListingViewModel createSmartListingViewModel({PublishListing? publish, String? userId}) =>
       SmartListingViewModel(
         estimator: estimatePrice,
         pickPhoto: imagePicker.pick,
         classifyPhoto: classifyItemPhoto,
         publishListing: publish,
-        sellDraftRepository: sellDrafts,
-        outboxStore: outbox,
-        currentUserId: currentUserId,
+        compressPhotos: compressPhotoBytes,
+        queueListing: queueListing,
+        connectivity: getConnectivity,
+        userId: userId,
+        loadDraft: loadListingDraft,
+        saveDraft: saveListingDraft,
+        clearDraft: clearListingDraft,
       );
 
   factory AppDependencies.create() {
@@ -281,10 +313,10 @@ class AppDependencies {
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
     final draftStore = DraftStore();
+    final pendingListings = PendingListingRepositoryImpl(outbox, sync: outboxSync);
     final ratingDrafts = RatingDraftRepositoryImpl(draftStore);
     final registrationDrafts = RegistrationDraftRepositoryImpl(draftStore);
-    final sellDrafts = SellDraftRepositoryImpl(draftStore);
-    final pendingListings = PendingListingStore(appDatabase: database, outboxStore: outbox);
+    final listingDrafts = ListingDraftRepositoryImpl(draftStore, DraftPhotoStore());
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -325,6 +357,7 @@ class AppDependencies {
         queuePropose: QueueMeetingProposalUseCase(pendingActions),
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
+      getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),
@@ -332,8 +365,10 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
-      trackEvent: TrackEventUseCase(
-        AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
+      trackEvent: TrackEventUseCase(AnalyticsEventRepositoryImpl()),
+      analyticsSync: AnalyticsSyncService(
+        remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
+        connectivity: connectivity,
       ),
       classifyItemPhoto: ClassifyItemPhotoUseCase(
         // Gemini API key, only from the run configuration (config/development.json:
@@ -347,17 +382,25 @@ class AppDependencies {
       responseCache: responseCache,
       outbox: outbox,
       outboxSync: outboxSync,
-      draftStore: draftStore,
-      registrationDrafts: registrationDrafts,
-      sellDrafts: sellDrafts,
-      pendingListings: pendingListings,
+      loadRegistrationDraft: LoadRegistrationDraftUseCase(registrationDrafts),
+      saveRegistrationDraft: SaveRegistrationDraftUseCase(registrationDrafts),
+      clearRegistrationDraft: ClearRegistrationDraftUseCase(registrationDrafts),
       sessionOwner: sessionOwner,
       startOutboxSync: StartOutboxSyncUseCase(outboxSync),
       stopOutboxSync: StopOutboxSyncUseCase(outboxSync),
       syncOutbox: SyncOutboxUseCase(outboxSync),
+      queueMessage: QueueMessageUseCase(outbox, outboxSync),
+      getPendingMessages: GetPendingMessagesUseCase(outbox),
+      watchPendingCount: WatchPendingCountUseCase(outbox),
       loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
       saveRatingDraft: SaveRatingDraftUseCase(ratingDrafts),
       clearRatingDraft: ClearRatingDraftUseCase(ratingDrafts),
+      loadListingDraft: LoadListingDraftUseCase(listingDrafts),
+      saveListingDraft: SaveListingDraftUseCase(listingDrafts),
+      clearListingDraft: ClearListingDraftUseCase(listingDrafts),
+      queueListing: QueueListingUseCase(pendingListings),
+      watchPendingListings: WatchPendingListingsUseCase(pendingListings),
+      discardPendingListing: DiscardPendingListingUseCase(pendingListings),
       queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
       queueRating: QueueRatingUseCase(pendingActions),
       queueMeetingProposal: QueueMeetingProposalUseCase(pendingActions),

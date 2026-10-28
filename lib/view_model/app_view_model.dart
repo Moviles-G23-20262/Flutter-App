@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../model/data_sources/local/draft_store.dart';
-import '../model/data_sources/local/pending_listing_store.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/exchange_entity.dart';
 import '../model/entities/enums.dart';
@@ -84,8 +82,6 @@ class AppViewModel extends ChangeNotifier {
   /// Checks a session that was opened offline once the server can be reached.
   final VerifySessionUseCase? verifySession;
 
-  final DraftStore? draftStore;
-  final PendingListingStore? pendingListingStore;
 
   AppViewModel({
     this.onLogout,
@@ -102,8 +98,6 @@ class AppViewModel extends ChangeNotifier {
     this.stopOutboxSync,
     this.syncOutbox,
     this.verifySession,
-    this.draftStore,
-    this.pendingListingStore,
   }) {
     // A theme change repaints the whole app, so it goes through the app-wide notifier.
     theme.addListener(notifyListeners);
@@ -257,6 +251,7 @@ class AppViewModel extends ChangeNotifier {
     chats.start(user.id);
     account.load();
     account.watchPending(user.id);
+    marketplace.watchPending(user.id);
     schedule.load();
     startOutboxSync?.execute(user.id);
   }
