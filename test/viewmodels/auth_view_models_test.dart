@@ -6,7 +6,11 @@ import 'package:flutter_front_end/model/use_cases/login_use_case.dart';
 import 'package:flutter_front_end/model/use_cases/register_student_use_case.dart';
 import 'package:flutter_front_end/view_model/login_view_model.dart';
 import 'package:flutter_front_end/view_model/register_view_model.dart';
+import 'package:flutter_front_end/model/data_sources/local/draft_store.dart';
+import 'package:flutter_front_end/model/repositories/impl/draft_repositories_impl.dart';
+import 'package:flutter_front_end/model/use_cases/registration_draft_use_cases.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final _ana = UserEntity(
   id: 'user-1',
@@ -162,6 +166,57 @@ void main() {
       await vm.submit();
 
       expect(vm.bannerError, 'Unexpected error. Please try again.');
+    });
+  });
+  group('RegisterViewModel draft', () {
+    late RegistrationDraftRepositoryImpl drafts;
+
+    RegisterViewModel newViewModel(_FakeAuth auth, List<UserEntity> signedIn) => RegisterViewModel(
+          registerStudent: RegisterStudentUseCase(auth),
+          onSignedIn: signedIn.add,
+          loadDraft: LoadRegistrationDraftUseCase(drafts),
+          saveDraft: SaveRegistrationDraftUseCase(drafts),
+          clearDraft: ClearRegistrationDraftUseCase(drafts),
+        );
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      drafts = RegistrationDraftRepositoryImpl(DraftStore());
+    });
+
+    test('name, email, major and faculty come back after the screen is closed; passwords never', () async {
+      final first = newViewModel(_FakeAuth(), [])
+        ..update(RegisterField.name, 'Ana Gomez')
+        ..update(RegisterField.email, 'ana@uniandes.edu.co')
+        ..update(RegisterField.major, 'ISIS')
+        ..update(RegisterField.password, 'secret-123')
+        ..setFaculty('Faculty of Engineering');
+      first.dispose(); // leaving before the 0.4 s still saves
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      final reopened = newViewModel(_FakeAuth(), []);
+      expect(await reopened.init(), isTrue);
+      expect(reopened.valueOf(RegisterField.name), 'Ana Gomez');
+      expect(reopened.valueOf(RegisterField.email), 'ana@uniandes.edu.co');
+      expect(reopened.valueOf(RegisterField.major), 'ISIS');
+      expect(reopened.faculty, 'Faculty of Engineering');
+      expect(reopened.valueOf(RegisterField.password), isEmpty);
+    });
+
+    test('creating the account deletes the draft', () async {
+      final signedIn = <UserEntity>[];
+      final vm = newViewModel(_FakeAuth(), signedIn)
+        ..update(RegisterField.name, 'Ana Gomez')
+        ..update(RegisterField.email, 'ana@uniandes.edu.co')
+        ..update(RegisterField.major, 'Systems Engineering')
+        ..update(RegisterField.password, 'correct-horse-1')
+        ..update(RegisterField.confirm, 'correct-horse-1');
+      await Future<void>.delayed(RegisterViewModel.draftDelay + const Duration(milliseconds: 100));
+
+      await vm.submit();
+
+      expect(signedIn, hasLength(1));
+      expect(await newViewModel(_FakeAuth(), []).init(), isFalse);
     });
   });
 }

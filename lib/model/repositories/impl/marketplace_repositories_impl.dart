@@ -52,37 +52,6 @@ Future<T> guardRequest<T>(
   }
 }
 
-class MaterialRepositoryImpl implements MaterialRepository {
-  final MarketplaceRemoteDataSource remote;
-
-  MaterialRepositoryImpl(this.remote);
-
-  @override
-  Future<List<MaterialEntity>> getMaterials() =>
-      guardRequest(
-        remote.getMaterials,
-      );
-
-  @override
-  Future<MaterialEntity> createListing(
-    NewListingData data,
-  ) =>
-      guardRequest(() async {
-        final imageUrls = <String>[];
-
-        for (final image in data.images) {
-          imageUrls.add(
-            await remote.uploadImage(
-              bytes: image.bytes,
-              filename: image.filename,
-            ),
-          );
-        }
-
-        return remote.createMaterial({...newListingToJson(data), 'imageUrls': imageUrls});
-      });
-}
-
 /// Network falling back to the copy saved for the signed-in user.
 ///
 /// Without a [cache] (or nobody signed in) it is just the network. After a change the copy is
@@ -107,6 +76,54 @@ Future<CachedList<T>> _cachedList<T>({
     );
     return CachedList(result.data, savedAt: result.savedAt);
   });
+}
+
+class MaterialRepositoryImpl implements MaterialRepository {
+  static const String cacheKey = 'materials';
+
+  final MarketplaceRemoteDataSource remote;
+  final ResponseCache? cache;
+  final SessionOwner? owner;
+
+  MaterialRepositoryImpl(this.remote, {this.cache, this.owner});
+
+  @override
+  Future<List<MaterialEntity>> getMaterials() async {
+    if (cache == null) return guardRequest(remote.getMaterials);
+    final cached = await getMaterialsCached();
+    return cached.items;
+  }
+
+  @override
+  Future<CachedList<MaterialEntity>> getMaterialsCached() => _cachedList(
+        cache: cache,
+        owner: owner,
+        key: cacheKey,
+        fetch: remote.getMaterialsJson,
+        parse: materialFromJson,
+      );
+
+  @override
+  Future<MaterialEntity> createListing(
+    NewListingData data,
+  ) =>
+      guardRequest(() async {
+        final imageUrls = <String>[];
+
+        for (final image in data.images) {
+          imageUrls.add(
+            await remote.uploadImage(
+              bytes: image.bytes,
+              filename: image.filename,
+            ),
+          );
+        }
+
+        final material = await remote.createMaterial({...newListingToJson(data), 'imageUrls': imageUrls});
+
+        if (cache != null) unawaited(getMaterialsCached().then((_) {}, onError: (_) {}));
+        return material;
+      });
 }
 
 class WishlistRepositoryImpl implements WishlistRepository {
@@ -156,13 +173,24 @@ class WishlistRepositoryImpl implements WishlistRepository {
 
 class ChatRepositoryImpl implements ChatRepository {
   final MarketplaceRemoteDataSource remote;
+  final ResponseCache? cache;
+  final SessionOwner? owner;
 
-  ChatRepositoryImpl(this.remote);
+  ChatRepositoryImpl(this.remote, {this.cache, this.owner});
 
   @override
-  Future<List<ChatRoomEntity>> getChatRooms() =>
-      guardRequest(
-        remote.getChatRooms,
+  Future<List<ChatRoomEntity>> getChatRooms() async {
+    final cached = await getChatRoomsCached();
+    return cached.items;
+  }
+
+  @override
+  Future<CachedList<ChatRoomEntity>> getChatRoomsCached() => _cachedList(
+        cache: cache,
+        owner: owner,
+        key: 'chat_rooms',
+        fetch: remote.getChatRoomsJson,
+        parse: chatRoomFromJson,
       );
 
   @override
@@ -176,20 +204,33 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<List<MessageEntity>> getMessages(
     String chatRoomId,
-  ) =>
-      guardRequest(
-        () => remote.getMessages(chatRoomId),
+  ) async {
+    final cached = await getMessagesCached(chatRoomId);
+    return cached.items;
+  }
+
+  @override
+  Future<CachedList<MessageEntity>> getMessagesCached(String chatRoomId) => _cachedList(
+        cache: cache,
+        owner: owner,
+        key: 'messages:$chatRoomId',
+        fetch: () => remote.getMessagesJson(chatRoomId),
+        parse: messageFromJson,
       );
 
   @override
   Future<MessageEntity> sendMessage(
     String chatRoomId,
-    String content,
-  ) =>
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  }) =>
       guardRequest(
         () => remote.sendMessage(
           chatRoomId,
           content,
+          id: id,
+          clientCreatedAt: clientCreatedAt,
         ),
       );
 

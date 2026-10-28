@@ -315,7 +315,6 @@ class AppTextField extends StatelessWidget {
     final accent = brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent;
     final textColor = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final hintColor = brightness == Brightness.dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
-    final shadow = brightness == Brightness.dark ? AppColors.darkShadowAccent : AppColors.lightShadowAccent;
 
     return TextField(
       controller: controller,

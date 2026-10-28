@@ -17,7 +17,12 @@ class RemoteOutboxSender implements OutboxSender {
 
   @override
   Future<void> sendMessage(PendingMessage message) async {
-    await remote.sendMessage(message.chatRoomId, message.content);
+    await remote.sendMessage(
+      message.chatRoomId,
+      message.content,
+      id: message.id,
+      clientCreatedAt: message.createdAt,
+    );
   }
 
   @override

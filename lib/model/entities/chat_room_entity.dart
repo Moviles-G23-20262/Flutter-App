@@ -66,6 +66,7 @@ class ChatRoomEntity {
     String? buyerId,
     String? sellerId,
     DateTime? createdAt,
+    int? unreadCount,
   }) {
     return ChatRoomEntity(
       id:         id         ?? this.id,
@@ -73,6 +74,11 @@ class ChatRoomEntity {
       buyerId:    buyerId    ?? this.buyerId,
       sellerId:   sellerId   ?? this.sellerId,
       createdAt:  createdAt  ?? this.createdAt,
+      material:   material,
+      buyer:      buyer,
+      seller:     seller,
+      lastMessage: lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
     );
   }
 
@@ -127,6 +133,12 @@ class MessageEntity {
   /// Timestamp when the message was created / sent.
   final DateTime createdAt;
 
+  /// Whether this message is waiting in the local outbox.
+  final bool isPending;
+
+  /// Whether delivery was refused by the server.
+  final bool isFailed;
+
   const MessageEntity({
     required this.id,
     required this.chatRoomId,
@@ -136,6 +148,8 @@ class MessageEntity {
     this.meetingProposal,
     required this.isRead,
     required this.createdAt,
+    this.isPending = false,
+    this.isFailed = false,
   });
 
   // ── copyWith ─────────────────────────────────────────────────────────────────
@@ -148,6 +162,8 @@ class MessageEntity {
     String? content,
     bool? isRead,
     DateTime? createdAt,
+    bool? isPending,
+    bool? isFailed,
   }) {
     return MessageEntity(
       id:         id         ?? this.id,
@@ -158,6 +174,8 @@ class MessageEntity {
       meetingProposal: meetingProposal,
       isRead:     isRead     ?? this.isRead,
       createdAt:  createdAt  ?? this.createdAt,
+      isPending:  isPending  ?? this.isPending,
+      isFailed:   isFailed   ?? this.isFailed,
     );
   }
 
@@ -172,5 +190,5 @@ class MessageEntity {
 
   @override
   String toString() =>
-      'MessageEntity(id: $id, chatRoomId: $chatRoomId, isRead: $isRead)';
+      'MessageEntity(id: $id, chatRoomId: $chatRoomId, isRead: $isRead, isPending: $isPending)';
 }

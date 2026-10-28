@@ -1,17 +1,15 @@
 import '../../app/network/api_client.dart';
+import '../dto/marketplace_models.dart';
 import '../entities/chat_room_entity.dart';
 import '../entities/exchange_entity.dart';
-import '../entities/rating_entity.dart';
 import '../entities/material_entity.dart';
 import '../entities/notification_entity.dart';
+import '../entities/rating_entity.dart';
 import '../entities/wishlist_item_entity.dart';
-import '../dto/marketplace_models.dart';
 
-/// Every call the signed-in user makes against the marketplace endpoints.
-/// Errors surface as [ApiException] / [NetworkException];
-/// the repositories translate them.
 abstract class MarketplaceRemoteDataSource {
   Future<List<MaterialEntity>> getMaterials();
+  Future<Object?> getMaterialsJson();
 
   Future<MaterialEntity> createMaterial(
     Map<String, dynamic> body,
@@ -37,6 +35,7 @@ abstract class MarketplaceRemoteDataSource {
   );
 
   Future<List<ChatRoomEntity>> getChatRooms();
+  Future<Object?> getChatRoomsJson();
 
   Future<ChatRoomEntity> openChatRoom(
     String materialId,
@@ -45,11 +44,16 @@ abstract class MarketplaceRemoteDataSource {
   Future<List<MessageEntity>> getMessages(
     String chatRoomId,
   );
+  Future<Object?> getMessagesJson(
+    String chatRoomId,
+  );
 
   Future<MessageEntity> sendMessage(
     String chatRoomId,
-    String content,
-  );
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  });
 
   Future<void> markChatRead(
     String chatRoomId,
@@ -70,12 +74,10 @@ abstract class MarketplaceRemoteDataSource {
     String exchangeId,
   );
 
-  // Crear una valoración
   Future<void> createRating(
     Map<String, dynamic> body,
   );
 
-  // Obtener las valoraciones de un usuario
   Future<List<RatingEntity>> getRatingsForUser(
     String userId,
   );
@@ -101,9 +103,12 @@ class MarketplaceRemoteDataSourceImpl
   @override
   Future<List<MaterialEntity>> getMaterials() async =>
       parseList(
-        await apiClient.get('/materials'),
+        await getMaterialsJson(),
         materialFromJson,
       );
+
+  @override
+  Future<Object?> getMaterialsJson() => apiClient.get('/materials');
 
   @override
   Future<MaterialEntity> createMaterial(
@@ -166,9 +171,12 @@ class MarketplaceRemoteDataSourceImpl
   @override
   Future<List<ChatRoomEntity>> getChatRooms() async =>
       parseList(
-        await apiClient.get('/chatrooms'),
+        await getChatRoomsJson(),
         chatRoomFromJson,
       );
+
+  @override
+  Future<Object?> getChatRoomsJson() => apiClient.get('/chatrooms');
 
   @override
   Future<ChatRoomEntity> openChatRoom(
@@ -188,23 +196,30 @@ class MarketplaceRemoteDataSourceImpl
     String chatRoomId,
   ) async =>
       parseList(
-        await apiClient.get(
-          '/messages?chatRoomId=$chatRoomId',
-        ),
+        await getMessagesJson(chatRoomId),
         messageFromJson,
       );
 
   @override
+  Future<Object?> getMessagesJson(String chatRoomId) =>
+      apiClient.get('/messages?chatRoomId=$chatRoomId');
+
+  @override
   Future<MessageEntity> sendMessage(
     String chatRoomId,
-    String content,
-  ) async =>
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  }) async =>
       messageFromJson(
         await apiClient.post(
           '/messages',
           body: {
+            if (id != null) 'id': id,
             'chatRoomId': chatRoomId,
             'content': content,
+            if (clientCreatedAt != null)
+              'clientCreatedAt': clientCreatedAt.toIso8601String(),
           },
         ) as Json,
       );

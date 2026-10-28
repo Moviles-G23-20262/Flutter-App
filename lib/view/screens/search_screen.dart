@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../widgets/async_views.dart';
+import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
@@ -412,7 +413,6 @@ class _SearchProductCard extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final accentHi  = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
-    final elevated  = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
 
     return GestureDetector(
       onTap: onTap,
@@ -425,10 +425,7 @@ class _SearchProductCard extends StatelessWidget {
             SizedBox(
               height: 120,
               width: double.infinity,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(color: elevated, child: const Icon(Icons.image_outlined)))
-                  : Container(color: elevated, child: const Icon(Icons.image_outlined)),
+              child: CachedPhoto(imageUrl: material.primaryImageUrl, category: material.category.name, fit: BoxFit.cover),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),

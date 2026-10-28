@@ -37,6 +37,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<MaterialEntity> _materials = const [];
   List<WishlistItemEntity> _wishlist = const [];
   DateTime? _wishlistSavedAt;
+  DateTime? _materialsSavedAt;
   bool _loading = false;
   bool _loadedOnce = false;
   String? _error;
@@ -52,6 +53,11 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   /// Set while the favorites shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get wishlistSavedAt => _wishlistSavedAt;
+
+  /// Set while the listings shown are the copy saved on the phone (offline): when it was saved.
+  DateTime? get materialsSavedAt => _materialsSavedAt;
+  bool get isOffline => _materialsSavedAt != null;
+
   bool get isLoading => _loading;
 
   /// True until the first load finished (successfully or not): show a spinner, not an empty state.
@@ -100,9 +106,10 @@ class MarketplaceViewModel extends ChangeNotifier {
     // listings cannot be loaded offline.
     final favorites = _loadWishlist(generation);
     try {
-      final materials = await getMaterials.execute();
+      final result = await getMaterials.executeCached();
       if (generation != _generation) return;
-      _materials = materials;
+      _materials = result.items;
+      _materialsSavedAt = result.savedAt;
     } on DataException catch (e) {
       if (generation != _generation) return;
       _error = e.message;
@@ -137,28 +144,32 @@ class MarketplaceViewModel extends ChangeNotifier {
     if (!_togglingFavorites.add(materialId)) return null;
     final generation = _generation;
     final before = _wishlist;
-    final existing = before.where((w) => w.materialId == materialId).firstOrNull;
+    final was = isFavorite(materialId);
+
+    // Optimistic: toggle right away.
+    if (was) {
+      _wishlist = _wishlist.where((w) => w.materialId != materialId).toList(growable: false);
+    } else {
+      _wishlist = [
+        WishlistItemEntity(
+          id: 'temp-$materialId',
+          userId: '',
+          materialId: materialId,
+          createdAt: DateTime.now(),
+        ),
+        ..._wishlist,
+      ];
+    }
+    notifyListeners();
 
     try {
-      if (existing != null) {
-        _wishlist = before.where((w) => w.id != existing.id).toList();
-        notifyListeners();
+      if (was) {
+        final existing = before.firstWhere((w) => w.materialId == materialId);
         await removeFromWishlist.execute(existing.id);
       } else {
-        _wishlist = [
-          WishlistItemEntity(
-            id: 'pending:$materialId',
-            userId: '',
-            materialId: materialId,
-            material: _materials.where((m) => m.id == materialId).firstOrNull,
-            createdAt: DateTime.now(),
-          ),
-          ...before,
-        ];
-        notifyListeners();
-        final saved = await addToWishlist.execute(materialId);
+        final created = await addToWishlist.execute(materialId);
         if (generation == _generation) {
-          _wishlist = _wishlist.map((w) => w.materialId == materialId ? saved : w).toList();
+          _wishlist = [created, ..._wishlist.where((w) => w.materialId != materialId)];
           notifyListeners();
         }
       }
@@ -174,6 +185,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     }
   }
 
+  // ── Search State ──────────────────────────────────────────────────────────
 
   String _searchQuery = '';
   MaterialCategoryEnum? _searchCategory;
@@ -187,60 +199,27 @@ class MarketplaceViewModel extends ChangeNotifier {
   double get maxSearchPrice => _maxSearchPrice;
   SortStrategy get searchSort => _searchSort;
 
-  bool get hasSearchFilters =>
-      _searchQuery.trim().isNotEmpty ||
-      _searchCategory != null ||
-      _searchCondition != null ||
-      _maxSearchPrice < 200 ||
-      _searchSort.id != 'relevance';
-
-  List<MaterialEntity> get filteredMaterials {
-    final query = _searchQuery.trim().toLowerCase();
-
-    final filtered = availableMaterials.where((material) {
-      if (_searchCategory != null &&
-          material.category != _searchCategory) {
-        return false;
+  List<MaterialEntity> get filteredSearchResults {
+    final list = _materials.where((m) {
+      if (!m.isAvailable) return false;
+      if (_searchCategory != null && m.category != _searchCategory) return false;
+      if (_searchCondition != null && m.condition != _searchCondition) return false;
+      if (m.price > _maxSearchPrice) return false;
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final matchTitle = m.title.toLowerCase().contains(q);
+        final matchDesc  = m.description.toLowerCase().contains(q);
+        final matchCourse = m.courseCode?.toLowerCase().contains(q) ?? false;
+        if (!matchTitle && !matchDesc && !matchCourse) return false;
       }
-
-      if (_searchCondition != null &&
-          material.condition != _searchCondition) {
-        return false;
-      }
-
-      if (material.price > _maxSearchPrice) {
-        return false;
-      }
-
-      if (query.isNotEmpty) {
-        final matchesTitle =
-            material.title.toLowerCase().contains(query);
-
-        final matchesDescription =
-            material.description.toLowerCase().contains(query);
-
-        final matchesCourse =
-            material.courseCode?.toLowerCase().contains(query) ?? false;
-
-        final matchesCategory =
-            material.category.displayName.toLowerCase().contains(query);
-
-        if (!matchesTitle &&
-            !matchesDescription &&
-            !matchesCourse &&
-            !matchesCategory) {
-          return false;
-        }
-      }
-
       return true;
     }).toList();
 
-    return _searchSort.sort(filtered);
+    return _searchSort.sort(list);
   }
 
-  void setSearchQuery(String value) {
-    _searchQuery = value;
+  void setSearchQuery(String query) {
+    _searchQuery = query;
     notifyListeners();
   }
 
@@ -273,7 +252,6 @@ class MarketplaceViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
   /// Uploads the photos and creates the listing. Throws [DataException] with a message to show.
   Future<MaterialEntity> publish(NewListingData data) async {
     final created = await createListing.execute(data);
@@ -291,6 +269,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _materials = const [];
     _wishlist = const [];
     _wishlistSavedAt = null;
+    _materialsSavedAt = null;
     _loading = false;
     _loadedOnce = false;
     _error = null;

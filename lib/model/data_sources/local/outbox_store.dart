@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import '../../entities/pending_items.dart';
+import '../../rules/client_id.dart';
 import 'app_database.dart';
+
+export '../../rules/client_id.dart' show newClientId;
 
 /// The outbox: `pending_messages`, `pending_listings` and `pending_actions`. The user's action is written here
 /// first and shown at once; [OutboxSyncService] sends it later.
@@ -18,6 +20,23 @@ class OutboxStore {
 
   /// Fires after every write, so screens can show "waiting" / "sent" without polling.
   Stream<void> get changes => _changes.stream;
+
+  Stream<int> get pendingCountStream async* {
+    yield await pendingCount();
+    await for (final _ in _changes.stream) {
+      yield await pendingCount();
+    }
+  }
+
+  Future<int> pendingCount([String? ownerId]) async {
+    final db = await _db.database;
+    final where = ownerId != null ? ' WHERE owner_id = ?' : '';
+    final args = ownerId != null ? [ownerId] : null;
+    final m = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_messages$where', args)).first['c'] as int? ?? 0;
+    final l = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_listings$where', args)).first['c'] as int? ?? 0;
+    final a = (await db.rawQuery('SELECT COUNT(*) as c FROM pending_actions$where', args)).first['c'] as int? ?? 0;
+    return m + l + a;
+  }
 
   // Messages
 
@@ -119,6 +138,12 @@ class OutboxStore {
     );
     return rows.map(_listingFromRow).toList();
   }
+
+  /// Alias for [listings].
+  Future<List<PendingListing>> pendingListings(String ownerId) => listings(ownerId);
+
+  /// Discards a queued listing.
+  Future<void> deleteListing(String id) => discard(PendingKind.listing, id);
 
   // Exchange steps (completion, rating, meeting proposal)
 
@@ -256,14 +281,3 @@ enum PendingKind {
   const PendingKind(this.table);
 }
 
-final Random _random = Random.secure();
-
-/// A random (version 4) UUID, used as the client id of every queued item.
-String newClientId() {
-  final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-      '${hex.substring(16, 20)}-${hex.substring(20)}';
-}

@@ -5,6 +5,7 @@ import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/pending_items.dart';
+import '../widgets/cached_photo.dart';
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
@@ -308,10 +309,11 @@ class _ListingRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: SizedBox(
               width: 58, height: 58,
-              child: material.primaryImageUrl.isNotEmpty
-                  ? Image.network(material.primaryImageUrl, fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(color: elevated))
-                  : Container(color: elevated),
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 10),

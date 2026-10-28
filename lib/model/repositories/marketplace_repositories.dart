@@ -13,6 +13,9 @@ abstract class MaterialRepository {
   /// Every listing, newest first.
   Future<List<MaterialEntity>> getMaterials();
 
+  /// Offline, the copy saved at the last successful load.
+  Future<CachedList<MaterialEntity>> getMaterialsCached();
+
   /// Uploads the photos, then creates the listing as the signed-in user.
   Future<MaterialEntity> createListing(NewListingData data);
 }
@@ -30,13 +33,20 @@ abstract class WishlistRepository {
 abstract class ChatRepository {
   /// The signed-in user's conversations, with last message and unread count.
   Future<List<ChatRoomEntity>> getChatRooms();
+  Future<CachedList<ChatRoomEntity>> getChatRoomsCached();
 
   /// The conversation with the seller of [materialId]; reuses it if it already exists.
   Future<ChatRoomEntity> openChatRoom(String materialId);
 
   Future<List<MessageEntity>> getMessages(String chatRoomId);
+  Future<CachedList<MessageEntity>> getMessagesCached(String chatRoomId);
 
-  Future<MessageEntity> sendMessage(String chatRoomId, String content);
+  Future<MessageEntity> sendMessage(
+    String chatRoomId,
+    String content, {
+    String? id,
+    DateTime? clientCreatedAt,
+  });
 
   /// Marks the other person's messages as read.
   Future<void> markRead(String chatRoomId);
