@@ -9,6 +9,7 @@ import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
 import '../model/repositories/impl/analytics_event_repository_impl.dart';
 import '../model/data_sources/analytics_event_remote_data_source.dart';
+import '../model/services/analytics_sync_service.dart';
 import '../model/use_cases/track_event_use_case.dart';
 import '../model/use_cases/price_estimator_use_case.dart';
 import '../view_model/smart_listing_view_model.dart';
@@ -51,6 +52,11 @@ import '../model/repositories/impl/draft_repositories_impl.dart';
 import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
 import '../model/use_cases/rating_draft_use_cases.dart';
+import '../model/data_sources/local/draft_photo_store.dart';
+import '../core/isolates/photo_compressor.dart';
+import '../model/repositories/impl/pending_listing_repository_impl.dart';
+import '../model/use_cases/listing_draft_use_cases.dart';
+import '../model/use_cases/pending_listing_use_cases.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -84,6 +90,9 @@ class AppDependencies {
   /// Telemetry: LISTING_VIEW, CONTACT_SELLER. Fire and forget.
   final TrackEventUseCase trackEvent;
 
+  /// Uploads the queued telemetry in the background; started with the app.
+  final AnalyticsSyncService analyticsSync;
+
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
 
@@ -98,6 +107,12 @@ class AppDependencies {
   final LoadRatingDraftUseCase loadRatingDraft;
   final SaveRatingDraftUseCase saveRatingDraft;
   final ClearRatingDraftUseCase clearRatingDraft;
+  final LoadListingDraftUseCase loadListingDraft;
+  final SaveListingDraftUseCase saveListingDraft;
+  final ClearListingDraftUseCase clearListingDraft;
+  final QueueListingUseCase queueListing;
+  final WatchPendingListingsUseCase watchPendingListings;
+  final DiscardPendingListingUseCase discardPendingListing;
 
   /// Exchange steps done offline: queued in the outbox and sent later.
   final QueueExchangeCompletionUseCase queueExchangeCompletion;
@@ -128,6 +143,7 @@ class AppDependencies {
   final MarkNotificationOpenedUseCase markNotificationOpened;
   final MeetupUseCases meetups;
   final GetConversationInsightUseCase getConversationInsight;
+  final GetChatAgreementUseCase getChatAgreement;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -161,6 +177,7 @@ class AppDependencies {
     required this.markNotificationOpened,
     required this.meetups,
     required this.getConversationInsight,
+    required this.getChatAgreement,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -172,6 +189,7 @@ class AppDependencies {
     required this.classifyItemPhoto,
     required this.imagePicker,
     required this.trackEvent,
+    required this.analyticsSync,
     required this.getConnectivity,
     required this.watchConnectivity,
     required this.responseCache,
@@ -182,6 +200,12 @@ class AppDependencies {
     required this.loadRatingDraft,
     required this.saveRatingDraft,
     required this.clearRatingDraft,
+    required this.loadListingDraft,
+    required this.saveListingDraft,
+    required this.clearListingDraft,
+    required this.queueListing,
+    required this.watchPendingListings,
+    required this.discardPendingListing,
     required this.queueExchangeCompletion,
     required this.queueRating,
     required this.queueMeetingProposal,
@@ -190,11 +214,19 @@ class AppDependencies {
   });
 
   /// A fresh ViewModel for each Smart Listing screen; the screen owns and disposes it.
-  SmartListingViewModel createSmartListingViewModel({PublishListing? publish}) => SmartListingViewModel(
+  SmartListingViewModel createSmartListingViewModel({PublishListing? publish, String? userId}) =>
+      SmartListingViewModel(
         estimator: estimatePrice,
         pickPhoto: imagePicker.pick,
         classifyPhoto: classifyItemPhoto,
         publishListing: publish,
+        compressPhotos: compressPhotoBytes,
+        queueListing: queueListing,
+        connectivity: getConnectivity,
+        userId: userId,
+        loadDraft: loadListingDraft,
+        saveDraft: saveListingDraft,
+        clearDraft: clearListingDraft,
       );
 
   factory AppDependencies.create() {
@@ -248,7 +280,9 @@ class AppDependencies {
       connectivity: connectivity,
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
+    final pendingListings = PendingListingRepositoryImpl(outbox, sync: outboxSync);
     final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
+    final listingDrafts = ListingDraftRepositoryImpl(DraftStore(), DraftPhotoStore());
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -289,6 +323,7 @@ class AppDependencies {
         queuePropose: QueueMeetingProposalUseCase(pendingActions),
       ),
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
+      getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),
@@ -296,8 +331,10 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
-      trackEvent: TrackEventUseCase(
-        AnalyticsEventRepositoryImpl(AnalyticsEventRemoteDataSource(apiClient: apiClient)),
+      trackEvent: TrackEventUseCase(AnalyticsEventRepositoryImpl()),
+      analyticsSync: AnalyticsSyncService(
+        remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
+        connectivity: connectivity,
       ),
       classifyItemPhoto: ClassifyItemPhotoUseCase(
         // Gemini API key, only from the run configuration (config/development.json:
@@ -316,6 +353,12 @@ class AppDependencies {
       loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
       saveRatingDraft: SaveRatingDraftUseCase(ratingDrafts),
       clearRatingDraft: ClearRatingDraftUseCase(ratingDrafts),
+      loadListingDraft: LoadListingDraftUseCase(listingDrafts),
+      saveListingDraft: SaveListingDraftUseCase(listingDrafts),
+      clearListingDraft: ClearListingDraftUseCase(listingDrafts),
+      queueListing: QueueListingUseCase(pendingListings),
+      watchPendingListings: WatchPendingListingsUseCase(pendingListings),
+      discardPendingListing: DiscardPendingListingUseCase(pendingListings),
       queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
       queueRating: QueueRatingUseCase(pendingActions),
       queueMeetingProposal: QueueMeetingProposalUseCase(pendingActions),

@@ -11,8 +11,8 @@ import '../../view_model/smart_listing_view_model.dart';
 //
 // Top to bottom: category and condition, optional photos, smart pricing, listing details and
 // Publish. MVVM: this View only renders SmartListingViewModel and forwards taps to it. The text
-// controllers stay here because they are widget state; their text is handed to the ViewModel
-// when publishing.
+// controllers stay here because they are widget state; their text is reported to the ViewModel
+// as it changes (for the draft) and handed to it when publishing.
 
 class NewListingSmartScreen extends StatefulWidget {
   final AppViewModel appState;
@@ -38,6 +38,78 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
   final _priceCtrl = TextEditingController();
   late final SmartListingViewModel _viewModel = widget.viewModelFactory();
 
+  /// Filling the fields from the draft must not count as the user typing.
+  bool _restoring = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [_titleCtrl, _descCtrl, _courseCtrl, _priceCtrl]) {
+      controller.addListener(_reportText);
+    }
+    _restoreDraft();
+  }
+
+  void _reportText() {
+    if (_restoring) return;
+    _viewModel.onFormChanged(
+      title: _titleCtrl.text,
+      description: _descCtrl.text,
+      courseCode: _courseCtrl.text,
+      price: _priceCtrl.text,
+    );
+  }
+
+  /// Puts back what the user left unfinished, and says so.
+  Future<void> _restoreDraft() async {
+    final draft = await _viewModel.restoreDraft();
+    if (draft == null || !mounted) return;
+    _restoring = true;
+    _titleCtrl.text = draft.title;
+    _descCtrl.text = draft.description;
+    _courseCtrl.text = draft.courseCode;
+    _priceCtrl.text = draft.price;
+    _restoring = false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('We restored the draft you left unfinished.')),
+    );
+  }
+
+  /// Leaving with something typed asks whether to keep the draft; closing the dialog stays here.
+  Future<void> _leave() async {
+    FocusScope.of(context).unfocus();
+    _reportText();
+    if (_viewModel.draftEnabled && _viewModel.hasUnpublishedWork) {
+      final keep = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Leave this listing?'),
+          content: const Text('What you entered is saved as a draft. Keep it to finish later, or discard it.'),
+          actions: [
+            TextButton(
+              key: const Key('discard-draft'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Discard draft'),
+            ),
+            TextButton(
+              key: const Key('keep-draft'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Keep draft'),
+            ),
+          ],
+        ),
+      );
+      if (keep == null || !mounted) return;
+      if (keep) {
+        await _viewModel.flushDraft();
+      } else {
+        await _viewModel.discardDraft();
+      }
+      if (!mounted) return;
+    }
+    widget.appState.navigateTo(AppScreen.home);
+  }
+
   /// One tap copies the ViewModel's suggested price into the price field.
   void _applySuggestion() {
     final price = _viewModel.suggestedPrice;
@@ -54,7 +126,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
       price: _priceCtrl.text,
     );
     if (!done || !mounted) return;
-    // Let the "published" banner be seen, then show the seller's listings.
+    // Let the "published" (or "saved on your phone") banner be seen, then show the seller's listings.
     await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
     widget.appState.navigateTo(AppScreen.sellerHub);
@@ -105,7 +177,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                 children: [
                   AppIconButton(
                     icon: Icon(Icons.arrow_back_rounded, color: txSecondary, size: 18),
-                    onTap: () => widget.appState.navigateTo(AppScreen.home),
+                    onTap: _leave,
                   ),
                   const SizedBox(width: 10),
                   Icon(Icons.add_circle_outline_rounded, color: accentHi, size: 20),
@@ -121,17 +193,21 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
 
             if (vm.published)
               Container(
-                key: const Key('published-banner'),
+                key: Key(vm.savedOffline ? 'saved-offline-banner' : 'published-banner'),
                 width: double.infinity,
                 color: elevated,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded, color: success, size: 15),
+                    Icon(vm.savedOffline ? Icons.cloud_off_rounded : Icons.check_circle_outline_rounded,
+                        color: success, size: 15),
                     const SizedBox(width: 8),
                     Flexible(
-                      child: Text('"${_titleCtrl.text}" is ready for campus buyers.',
+                      child: Text(
+                          vm.savedOffline
+                              ? SmartListingViewModel.savedOfflineMessage
+                              : '"${_titleCtrl.text}" is ready for campus buyers.',
                           style: AppTextStyles.body(success, fontSize: AppTextStyles.sizeXs)),
                     ),
                   ],

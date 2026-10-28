@@ -28,15 +28,20 @@ class PendingMessage {
   });
 }
 
-/// A new listing saved on the phone and not published yet. Its photos are files in the app's
-/// documents folder until they are uploaded.
+/// A new listing saved on the phone and not published yet. Its photos are compressed files in the
+/// app's documents folder until they are uploaded.
 class PendingListing {
+  /// The client id (UUID): made when the listing was queued.
   final String id;
   final String ownerId;
 
   /// The `POST /materials` body without `imageUrls`, which are known only after the upload.
   final Map<String, dynamic> payload;
   final List<String> photoPaths;
+
+  /// The server URL of each photo already uploaded, in the order of [photoPaths]: it is the first
+  /// `uploadedUrls.length` photos. A retry skips them, so a photo is never uploaded twice.
+  final List<String> uploadedUrls;
   final DateTime createdAt;
   final PendingStatus status;
   final int attempts;
@@ -47,6 +52,7 @@ class PendingListing {
     required this.ownerId,
     required this.payload,
     required this.photoPaths,
+    this.uploadedUrls = const [],
     required this.createdAt,
     this.status = PendingStatus.waiting,
     this.attempts = 0,
@@ -54,6 +60,11 @@ class PendingListing {
   });
 
   String get title => payload['title'] as String? ?? '';
+
+  /// The asking price as the server will receive it (e.g. "35000.00").
+  String get price => payload['price']?.toString() ?? '';
+
+  bool get isRefused => status == PendingStatus.refused;
 }
 
 /// The exchange steps that can be done offline.

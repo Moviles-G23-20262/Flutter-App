@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import '../../app/network/api_client.dart';
+import '../../core/isolates/photo_compressor.dart';
 import '../data_sources/local/outbox_store.dart';
 import '../entities/pending_items.dart';
 import '../repositories/connectivity_repository.dart';
@@ -10,7 +11,12 @@ import '../repositories/connectivity_repository.dart';
 /// Sends one queued item to the server. Throws [NetworkException] / [ApiException] like the
 /// remote data sources, so the sync service can tell "try later" from "refused".
 abstract class OutboxSender {
-  Future<void> sendListing(PendingListing listing);
+  /// `POST /uploads` for one photo file; returns its URL on the server.
+  Future<String> uploadPhoto(String path);
+
+  /// `POST /materials`: [body] already has the `imageUrls` of the uploaded photos.
+  Future<void> createListing(Map<String, dynamic> body);
+
   Future<void> sendMessage(PendingMessage message);
   Future<void> sendAction(PendingAction action);
 }
@@ -31,7 +37,8 @@ enum SyncOutcome {
 /// - when the connection returns, when the app comes back to the foreground ([flush]) and on a
 ///   retry timer with exponential backoff while something is still waiting;
 /// - one flush at a time: a second trigger while flushing waits for the running one;
-/// - listings first, then messages, oldest first. A refused message holds back the later
+/// - listings first (one `POST /uploads` per photo that is not on the server yet, then one
+///   `POST /materials`), then messages, oldest first. A refused message holds back the later
 ///   messages of the same conversation, so they never arrive out of order;
 /// - exchange steps last, the same way per exchange: a rating never goes before its completion.
 ///   A meeting proposal whose time has passed is refused on the phone instead of being sent.
@@ -149,7 +156,8 @@ class OutboxSyncService {
   Future<bool> _deliverAll(String ownerId) async {
     for (final listing in await store.listings(ownerId)) {
       if (listing.status != PendingStatus.waiting) continue;
-      final outcome = await _attempt(PendingKind.listing, listing.id, () => sender.sendListing(listing));
+      final outcome = await _attempt(PendingKind.listing, listing.id, () => _deliverListing(listing));
+      if (outcome == SyncOutcome.sent) await deleteCompressedPhotos(listing.photoPaths);
       if (outcome == SyncOutcome.retryLater || _ownerId != ownerId) return false;
     }
 
@@ -184,6 +192,20 @@ class OutboxSyncService {
       if (outcome == SyncOutcome.refused) heldGroups.add(action.groupId);
     }
     return true;
+  }
+
+  /// Uploads the photos that are not on the server yet, one request each, in order. Every URL is
+  /// saved as soon as it arrives, so a connection that drops half way costs only the photos
+  /// still missing. Then the listing itself is created.
+  Future<void> _deliverListing(PendingListing listing) async {
+    final urls = List<String>.of(listing.uploadedUrls);
+    for (var i = urls.length; i < listing.photoPaths.length; i++) {
+      urls.add(await sender.uploadPhoto(listing.photoPaths[i]));
+      await store.saveUploadedUrls(listing.id, urls);
+    }
+    // The listing's own id is its clientId: if an earlier attempt reached the server but its answer
+    // was lost, the server returns that listing instead of creating a second one.
+    await sender.createListing({...listing.payload, 'clientId': listing.id, 'imageUrls': urls});
   }
 
   Future<SyncOutcome> _attempt(PendingKind kind, String id, Future<void> Function() send) async {
