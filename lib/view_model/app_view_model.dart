@@ -82,6 +82,7 @@ class AppViewModel extends ChangeNotifier {
   /// Checks a session that was opened offline once the server can be reached.
   final VerifySessionUseCase? verifySession;
 
+
   AppViewModel({
     this.onLogout,
     required this.marketplace,
@@ -105,7 +106,13 @@ class AppViewModel extends ChangeNotifier {
   }
 
   void _onConnectivityChanged() {
-    if (connectivity.isOnline) _verifyOfflineSession();
+    marketplace.load();
+    if (connectivity.isOnline) {
+      _verifyOfflineSession();
+      chats.setOffline(false);
+    } else {
+      chats.setOffline(true);
+    }
   }
 
   /// A session restored offline shows the saved profile. Once the server answers, the profile is
@@ -321,4 +328,3 @@ class AppViewModel extends ChangeNotifier {
   /// The sun/moon button: pins light or dark. Auto is chosen again in Profile → Appearance.
   void toggleTheme() => theme.toggle();
 }
-

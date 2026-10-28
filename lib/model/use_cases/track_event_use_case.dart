@@ -1,4 +1,4 @@
-import '../data_sources/local/outbox_store.dart' show newClientId;
+import '../rules/client_id.dart';
 import '../entities/analytics_event.dart';
 import '../entities/enums.dart';
 import '../repositories/analytics_event_repository.dart';

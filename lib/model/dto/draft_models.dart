@@ -2,6 +2,7 @@ import '../entities/listing_draft.dart';
 import '../entities/material_entity.dart';
 import '../entities/new_listing_data.dart';
 import '../entities/rating_draft.dart';
+import '../entities/registration_draft.dart';
 
 // Drafts ↔ the JSON kept in shared_preferences.
 
@@ -20,6 +21,21 @@ RatingDraft ratingDraftFromJson(Map<String, dynamic> json) => RatingDraft(
       stars: (json['stars'] as int? ?? 0).clamp(0, 5),
       tags: {for (final t in json['tags'] as List? ?? const []) t as String},
       review: json['review'] as String? ?? '',
+    );
+
+Map<String, dynamic> registrationDraftToJson(RegistrationDraft draft) => {
+      'fullName': draft.fullName,
+      'email': draft.email,
+      'major': draft.major,
+      if (draft.faculty != null) 'faculty': draft.faculty,
+      'savedAt': DateTime.now().toIso8601String(),
+    };
+
+RegistrationDraft registrationDraftFromJson(Map<String, dynamic> json) => RegistrationDraft(
+      fullName: json['fullName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      major: json['major'] as String? ?? '',
+      faculty: json['faculty'] as String?,
     );
 
 /// The photos are files; the JSON only names them by [photoPaths].

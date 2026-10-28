@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
 import 'package:path/path.dart' as p;
 import '../core/isolates/photo_compressor.dart';
-import '../model/data_sources/local/outbox_store.dart' show newClientId;
+import '../model/rules/client_id.dart';
 import '../model/entities/listing_draft.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';

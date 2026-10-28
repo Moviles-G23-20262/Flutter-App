@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/register_view_model.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/offline_banner.dart';
 
 const List<String> _faculties = [
   'Faculty of Administration',
@@ -43,6 +44,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // The view-model restores the draft; the text fields only show it.
+    _vm.init().then((restored) {
+      if (!restored || !mounted) return;
+      if (_nameCtrl.text.isEmpty) _nameCtrl.text = _vm.valueOf(RegisterField.name);
+      if (_emailCtrl.text.isEmpty) _emailCtrl.text = _vm.valueOf(RegisterField.email);
+      if (_majorCtrl.text.isEmpty) _majorCtrl.text = _vm.valueOf(RegisterField.major);
+      _facultyCtrl.text = _vm.faculty ?? '';
+    });
+  }
+
+  @override
   void dispose() {
     _vm.dispose();
     _nameCtrl.dispose();
@@ -54,9 +68,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    _vm.submit();
+    await _vm.submit();
   }
 
   Future<void> _pickFaculty() async {
@@ -85,7 +99,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(listenable: _vm, builder: (context, _) => _buildView(context));
+    return ListenableBuilder(
+      listenable: Listenable.merge([_vm, widget.appState.connectivity]),
+      builder: (context, _) => _buildView(context),
+    );
   }
 
   Widget _buildView(BuildContext context) {
@@ -103,64 +120,74 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Scaffold(
         backgroundColor: bg,
         body: SafeArea(
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    tooltip: 'Back to log in',
-                    onPressed: _vm.isLoading ? null : _goToLogin,
-                    icon: Icon(Icons.arrow_back_rounded, color: txMuted),
-                  ),
+          child: Column(
+            children: [
+              if (widget.appState.connectivity.isOffline)
+                const OfflineBanner(
+                  message: 'Waiting for connection. Connect to the internet to create an account.',
                 ),
-                const SizedBox(height: 4),
-                const CampusSwapLogo(size: 56),
-                const SizedBox(height: 14),
-                Text(
-                  'Create your account',
-                  style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeLg),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Only verified Uniandes students can join.',
-                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 28),
-                AppCard(child: _buildForm()),
-                const SizedBox(height: 8),
-                Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _goToLogin,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      child: RichText(
-                        text: TextSpan(
-                          text: 'Already have an account? ',
-                          style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                          children: [
-                            TextSpan(
-                              text: 'Log in',
-                              style: AppTextStyles.body(
-                                accentHi,
-                                fontSize: AppTextStyles.sizeXs,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          tooltip: 'Back to log in',
+                          onPressed: _vm.isLoading ? null : _goToLogin,
+                          icon: Icon(Icons.arrow_back_rounded, color: txMuted),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      const CampusSwapLogo(size: 56),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Create your account',
+                        style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeLg),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Only verified Uniandes students can join.',
+                        style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      AppCard(child: _buildForm()),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _goToLogin,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            child: RichText(
+                              text: TextSpan(
+                                text: 'Already have an account? ',
+                                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                                children: [
+                                  TextSpan(
+                                    text: 'Log in',
+                                    style: AppTextStyles.body(
+                                      accentHi,
+                                      fontSize: AppTextStyles.sizeXs,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 32),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -217,6 +244,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         _LabeledField(
           label: 'Password',
+          footer: _PasswordHint(length: _passwordCtrl.text.length),
           child: AppTextField(
             placeholder: 'Create a password',
             controller: _passwordCtrl,
@@ -233,7 +261,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
-          footer: _PasswordHint(length: _passwordCtrl.text.length),
         ),
         _LabeledField(
           label: 'Confirm password',

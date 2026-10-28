@@ -52,6 +52,8 @@ import '../model/repositories/impl/draft_repositories_impl.dart';
 import '../model/repositories/impl/pending_action_repository_impl.dart';
 import '../model/use_cases/pending_action_use_cases.dart';
 import '../model/use_cases/rating_draft_use_cases.dart';
+import '../model/use_cases/registration_draft_use_cases.dart';
+import '../model/use_cases/pending_message_use_cases.dart';
 import '../model/data_sources/local/draft_photo_store.dart';
 import '../core/isolates/photo_compressor.dart';
 import '../model/repositories/impl/pending_listing_repository_impl.dart';
@@ -99,9 +101,20 @@ class AppDependencies {
   /// Local storage for offline use: saved server answers and the outbox (sqflite).
   final ResponseCache responseCache;
   final OutboxStore outbox;
+  final OutboxSyncService outboxSync;
+  /// The unfinished sign-up form (no passwords).
+  final LoadRegistrationDraftUseCase loadRegistrationDraft;
+  final SaveRegistrationDraftUseCase saveRegistrationDraft;
+  final ClearRegistrationDraftUseCase clearRegistrationDraft;
+  final SessionOwner sessionOwner;
   final StartOutboxSyncUseCase startOutboxSync;
   final StopOutboxSyncUseCase stopOutboxSync;
   final SyncOutboxUseCase syncOutbox;
+
+  /// Offline chat: queued messages and how many items are waiting.
+  final QueueMessageUseCase queueMessage;
+  final GetPendingMessagesUseCase getPendingMessages;
+  final WatchPendingCountUseCase watchPendingCount;
 
   /// The unfinished rating, saved while it is written.
   final LoadRatingDraftUseCase loadRatingDraft;
@@ -194,9 +207,17 @@ class AppDependencies {
     required this.watchConnectivity,
     required this.responseCache,
     required this.outbox,
+    required this.outboxSync,
+    required this.loadRegistrationDraft,
+    required this.saveRegistrationDraft,
+    required this.clearRegistrationDraft,
+    required this.sessionOwner,
     required this.startOutboxSync,
     required this.stopOutboxSync,
     required this.syncOutbox,
+    required this.queueMessage,
+    required this.getPendingMessages,
+    required this.watchPendingCount,
     required this.loadRatingDraft,
     required this.saveRatingDraft,
     required this.clearRatingDraft,
@@ -243,10 +264,13 @@ class AppDependencies {
     const analyticsBaseUrl = String.fromEnvironment('ANALYTICS_BASE_URL');
     final analyticsClient = ApiClient(baseUrl: analyticsBaseUrl, client: http.Client());
     final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
-    final conversationInsights = ConversationInsightRepositoryImpl(remoteDataSource: analyticsRemote);
-    final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final database = AppDatabase();
     final responseCache = ResponseCache(database);
+    final conversationInsights = ConversationInsightRepositoryImpl(
+      remoteDataSource: analyticsRemote,
+      cache: responseCache,
+    );
+    final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
@@ -260,9 +284,17 @@ class AppDependencies {
     final biometrics = BiometricAuthService();
 
     final marketplaceRemote = MarketplaceRemoteDataSourceImpl(apiClient: apiClient);
-    final materials = MaterialRepositoryImpl(marketplaceRemote);
+    final materials = MaterialRepositoryImpl(
+      marketplaceRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+    );
     final wishlist = WishlistRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
-    final chats = ChatRepositoryImpl(marketplaceRemote);
+    final chats = ChatRepositoryImpl(
+      marketplaceRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+    );
     final exchanges = ExchangeRepositoryImpl(marketplaceRemote);
     final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
@@ -280,9 +312,11 @@ class AppDependencies {
       connectivity: connectivity,
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
+    final draftStore = DraftStore();
     final pendingListings = PendingListingRepositoryImpl(outbox, sync: outboxSync);
-    final ratingDrafts = RatingDraftRepositoryImpl(DraftStore());
-    final listingDrafts = ListingDraftRepositoryImpl(DraftStore(), DraftPhotoStore());
+    final ratingDrafts = RatingDraftRepositoryImpl(draftStore);
+    final registrationDrafts = RegistrationDraftRepositoryImpl(draftStore);
+    final listingDrafts = ListingDraftRepositoryImpl(draftStore, DraftPhotoStore());
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -347,9 +381,17 @@ class AppDependencies {
       watchConnectivity: WatchConnectivityUseCase(connectivity),
       responseCache: responseCache,
       outbox: outbox,
+      outboxSync: outboxSync,
+      loadRegistrationDraft: LoadRegistrationDraftUseCase(registrationDrafts),
+      saveRegistrationDraft: SaveRegistrationDraftUseCase(registrationDrafts),
+      clearRegistrationDraft: ClearRegistrationDraftUseCase(registrationDrafts),
+      sessionOwner: sessionOwner,
       startOutboxSync: StartOutboxSyncUseCase(outboxSync),
       stopOutboxSync: StopOutboxSyncUseCase(outboxSync),
       syncOutbox: SyncOutboxUseCase(outboxSync),
+      queueMessage: QueueMessageUseCase(outbox, outboxSync),
+      getPendingMessages: GetPendingMessagesUseCase(outbox),
+      watchPendingCount: WatchPendingCountUseCase(outbox),
       loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
       saveRatingDraft: SaveRatingDraftUseCase(ratingDrafts),
       clearRatingDraft: ClearRatingDraftUseCase(ratingDrafts),
