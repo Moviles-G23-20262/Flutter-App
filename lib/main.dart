@@ -176,6 +176,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
         return LoginScreen(
           appState: _appState,
           createViewModel: () => LoginViewModel(
+            //MVVM
             login: _deps.login,
             canQuickUnlock: _deps.canQuickUnlock,
             quickUnlock: _deps.quickUnlock,

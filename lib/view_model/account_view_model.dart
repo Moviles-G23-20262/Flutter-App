@@ -24,6 +24,7 @@ class AccountViewModel extends ChangeNotifier {
   final DiscardPendingActionUseCase? discardPendingAction;
 
   AccountViewModel({
+    //ViewModel
     required this.getExchanges,
     required this.getNotifications,
     required this.markNotificationOpened,
