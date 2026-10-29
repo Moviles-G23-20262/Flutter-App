@@ -5,6 +5,7 @@ import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/pending_items.dart';
+import '../widgets/average_ticket_card.dart';
 import '../widgets/cached_photo.dart';
 import '../../model/entities/time_to_sell.dart';
 
@@ -118,6 +119,10 @@ class SellerHubScreen extends StatelessWidget {
                     txMuted: txMuted,
                     accentHi: accentHi,
                   ),
+                  const SizedBox(height: 20),
+                ],
+                if (appState.averageTicket != null) ...[
+                  AverageTicketCard(viewModel: appState.averageTicket!),
                   const SizedBox(height: 20),
                 ],
                 // Active listings

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app/app_dependencies.dart';
 import 'view_model/account_view_model.dart';
 import 'view_model/app_view_model.dart';
+import 'view_model/average_ticket_view_model.dart';
 import 'view_model/login_view_model.dart';
 import 'view_model/register_view_model.dart';
 import 'view_model/chat_view_model.dart';
@@ -88,6 +89,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       removeBlock: _deps.removeScheduleBlock,
     ),
     meetups: _deps.meetups,
+    averageTicket: AverageTicketViewModel(getAverageTicket: _deps.getAverageTicket),
     theme: ThemeViewModel(
       watchAmbientLight: _deps.watchAmbientLight,
       loadPreference: _deps.loadThemePreference,
