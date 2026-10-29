@@ -1,6 +1,7 @@
 import '../../app/network/api_client.dart';
 import '../entities/meeting_point_density.dart';
 import '../entities/price_stats.dart';
+import '../dto/average_ticket_model.dart';
 import '../dto/chat_agreement_model.dart';
 import '../dto/conversation_insight_model.dart';
 import '../dto/price_stats_model.dart';
@@ -35,6 +36,12 @@ class AnalyticsRemoteDataSource {
     final query = Uri(queryParameters: {'category': category, 'condition': condition}).query;
     final json = await apiClient.get('/analytics/price-stats/?$query');
     return PriceStatsModel.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Average ticket of completed sales, overall and per item condition (COP).
+  Future<AverageTicketModel> getAverageTicket() async {
+    final json = await apiClient.get('/analytics/average-ticket/');
+    return AverageTicketModel.fromJson(json as Map<String, dynamic>);
   }
 
   /// BQ11: average time (in days) it takes for a newly listed academic item to be marked as sold.

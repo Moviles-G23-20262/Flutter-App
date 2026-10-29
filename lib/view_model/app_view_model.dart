@@ -7,6 +7,7 @@ import '../model/use_cases/meetup_use_cases.dart';
 import '../model/entities/user_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import 'account_view_model.dart';
+import 'average_ticket_view_model.dart';
 import 'chat_view_model.dart';
 import 'marketplace_view_model.dart';
 import 'meeting_planner_view_model.dart';
@@ -62,6 +63,9 @@ class AppViewModel extends ChangeNotifier {
   final ScheduleViewModel schedule;
   final MeetupUseCases meetups;
 
+  /// The average ticket card in the Seller Hub; without it the card is not shown.
+  final AverageTicketViewModel? averageTicket;
+
   /// Light/dark, including the automatic ambient-light mode.
   final ThemeViewModel theme;
 
@@ -90,6 +94,7 @@ class AppViewModel extends ChangeNotifier {
     required this.account,
     required this.schedule,
     required this.meetups,
+    this.averageTicket,
     required this.theme,
     required this.power,
     required this.connectivity,
@@ -314,6 +319,7 @@ class AppViewModel extends ChangeNotifier {
     chats.dispose();
     account.dispose();
     schedule.dispose();
+    averageTicket?.dispose();
     theme.removeListener(notifyListeners);
     theme.dispose();
     power.removeListener(_applyPowerSaving);

@@ -44,6 +44,9 @@ import '../model/use_cases/register_student_use_case.dart';
 import '../model/use_cases/restore_session_use_case.dart';
 import '../model/data_sources/local/app_database.dart';
 import '../model/data_sources/local/outbox_store.dart';
+import '../model/data_sources/local/campus_zones_asset_data_source.dart';
+import '../model/repositories/impl/average_ticket_repository_impl.dart';
+import '../model/use_cases/get_average_ticket_use_case.dart';
 import '../model/data_sources/local/response_cache.dart';
 import '../model/data_sources/remote_outbox_sender.dart';
 import '../model/services/outbox_sync_service.dart';
@@ -160,6 +163,9 @@ class AppDependencies {
   final GetConversationInsightUseCase getConversationInsight;
   final GetChatAgreementUseCase getChatAgreement;
   final GetTimeToSellUseCase getTimeToSell;
+
+  /// Average ticket of completed sales, for the Seller Hub.
+  final GetAverageTicketUseCase getAverageTicket;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -195,6 +201,7 @@ class AppDependencies {
     required this.getConversationInsight,
     required this.getChatAgreement,
     required this.getTimeToSell,
+    required this.getAverageTicket,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -277,6 +284,7 @@ class AppDependencies {
     );
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final timeToSellRepository = TimeToSellRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final averageTicketRepository = AverageTicketRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
@@ -305,7 +313,12 @@ class AppDependencies {
     final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
     final meetupRemote = MeetupRemoteDataSourceImpl(apiClient: apiClient);
-    final meetupRepository = MeetupRepositoryImpl(meetupRemote);
+    final meetupRepository = MeetupRepositoryImpl(
+      meetupRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+      bundledZones: CampusZonesAssetDataSource(),
+    );
     final scheduleRepository = ScheduleRepositoryImpl(meetupRemote);
     final locationRepository = LocationRepositoryImpl(DeviceLocationDataSource());
     final themePreferences = ThemePreferenceRepositoryImpl();
@@ -365,6 +378,7 @@ class AppDependencies {
       getConversationInsight: GetConversationInsightUseCase(conversationInsights),
       getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
+      getAverageTicket: GetAverageTicketUseCase(averageTicketRepository),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),
