@@ -71,7 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.appState.marketplace, widget.appState.account]),
+      listenable: Listenable.merge([
+        widget.appState.marketplace,
+        widget.appState.account,
+        widget.appState.connectivity,
+      ]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -96,10 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Column(
       children: [
-        if (materialsSavedAt != null)
-          SavedCopyBanner(savedAt: materialsSavedAt, onRetry: _refresh)
-        else if (isOffline && market.materials.isEmpty)
-          OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh),
+        if (isOffline)
+          if (materialsSavedAt != null)
+            SavedCopyBanner(savedAt: materialsSavedAt, onRetry: _refresh)
+          else if (market.materials.isEmpty)
+            OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh)
+          else
+            OfflineBanner.forCache(formattedAge: null, noun: 'listings', onRetry: _refresh),
 
         // ── Header ─────────────────────────────────────────────────────────
         Container(
