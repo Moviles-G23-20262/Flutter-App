@@ -58,6 +58,8 @@ import 'package:flutter_front_end/model/repositories/power_repositories.dart';
 import 'package:flutter_front_end/model/use_cases/power_use_cases.dart';
 import 'package:flutter_front_end/view_model/power_view_model.dart';
 import 'package:flutter_front_end/view/widgets/formatters.dart';
+import 'package:flutter_front_end/view/widgets/offline_banner.dart';
+import 'package:flutter_front_end/view/widgets/saved_copy_banner.dart';
 import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -113,6 +115,7 @@ MaterialEntity _material({String id = 'm1', String sellerId = _other, double pri
 
 class _FakeMaterials implements MaterialRepository {
   List<MaterialEntity> materials = [];
+  DateTime? savedAt;
   Object? error;
 
   @override
@@ -124,7 +127,7 @@ class _FakeMaterials implements MaterialRepository {
   @override
   Future<CachedList<MaterialEntity>> getMaterialsCached() async {
     if (error != null) throw error!;
-    return CachedList(materials);
+    return CachedList(materials, savedAt: savedAt);
   }
 
   @override
@@ -1253,13 +1256,16 @@ void main() {
           createdAt: DateTime(2026, 1, 1),
         );
 
-    Future<_World> pumpHome(WidgetTester tester, List<MaterialEntity> materials) async {
+    Future<_World> pumpHome(WidgetTester tester, List<MaterialEntity> materials, {bool online = true, DateTime? savedAt}) async {
       ignoreFontOverflows();
       final world = _World();
+      world.network.online = online;
       world.materials.materials = materials;
+      world.materials.savedAt = savedAt;
       await tester.binding.setSurfaceSize(const Size(420, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       world.appState.login(user());
+      world.appState.connectivity.start();
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: HomeScreen(appState: world.appState))));
       await tester.pumpAndSettle();
       return world;
@@ -1303,6 +1309,44 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Recovered Item'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('no offline banner while online on home screen, even if savedAt is present', (tester) async {
+      final world = await pumpHome(
+        tester,
+        [_material(id: 'a').copyWith(title: 'Server Textbook')],
+        online: true,
+        savedAt: DateTime(2026, 10, 20),
+      );
+
+      expect(find.byType(SavedCopyBanner), findsNothing);
+      expect(find.byType(OfflineBanner), findsNothing);
+      expect(find.text('Server Textbook'), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('losing connection on home screen shows offline banner and reconnecting hides it', (tester) async {
+      final world = await pumpHome(
+        tester,
+        [_material(id: 'a').copyWith(title: 'Server Textbook')],
+        online: true,
+      );
+
+      expect(find.byType(OfflineBanner), findsNothing);
+      expect(find.byType(SavedCopyBanner), findsNothing);
+
+      world.network.controller.add(false);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OfflineBanner), findsOneWidget);
+      expect(find.text('Server Textbook'), findsOneWidget);
+
+      world.network.controller.add(true);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OfflineBanner), findsNothing);
+      expect(find.byType(SavedCopyBanner), findsNothing);
       world.chatState.clear();
     });
   });

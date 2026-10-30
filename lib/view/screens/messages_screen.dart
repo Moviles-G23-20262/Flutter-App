@@ -83,10 +83,13 @@ class _ConversationList extends StatelessWidget {
 
     return Column(
       children: [
-        if (savedAt != null)
-          SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
-        else if (isOffline && chats.rooms.isEmpty)
-          OfflineBanner.firstLaunchOffline(noun: 'conversations', onRetry: chats.loadRooms),
+        if (isOffline)
+          if (savedAt != null)
+            SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
+          else if (chats.rooms.isEmpty)
+            OfflineBanner.firstLaunchOffline(noun: 'conversations', onRetry: chats.loadRooms)
+          else
+            OfflineBanner.forCache(formattedAge: null, noun: 'conversations', onRetry: chats.loadRooms),
 
         // Header
         Container(
