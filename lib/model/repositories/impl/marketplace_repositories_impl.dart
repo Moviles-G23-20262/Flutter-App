@@ -17,6 +17,7 @@ import '../marketplace_repositories.dart';
 import '../../data_sources/marketplace_remote_data_source.dart';
 import '../../dto/marketplace_models.dart';
 import '../../data_sources/local/response_cache.dart';
+import '../../services/background_json.dart';
 import '../../services/session_owner.dart';
 
 /// Runs [request], turning transport and HTTP failures into a
@@ -56,6 +57,8 @@ Future<T> guardRequest<T>(
 ///
 /// Without a [cache] (or nobody signed in) it is just the network. After a change the copy is
 /// refreshed in the background, so a restart offline does not show what was just undone.
+/// The raw JSON is what gets saved; turning it into entities happens afterwards, in a background
+/// isolate when the list is long ([parseListInBackground]).
 Future<CachedList<T>> _cachedList<T>({
   required ResponseCache? cache,
   required SessionOwner? owner,
@@ -65,16 +68,16 @@ Future<CachedList<T>> _cachedList<T>({
 }) {
   final userId = owner?.userId;
   if (cache == null || userId == null) {
-    return guardRequest(() async => CachedList(parseList(await fetch(), parse)));
+    return guardRequest(() async => CachedList(await parseListInBackground(await fetch(), parse)));
   }
   return guardRequest(() async {
-    final result = await cache.networkFirst(
+    final result = await cache.networkFirst<Object?>(
       ownerId: userId,
       key: key,
       fetch: fetch,
-      parse: (json) => parseList(json, parse),
+      parse: (json) => json,
     );
-    return CachedList(result.data, savedAt: result.savedAt);
+    return CachedList(await parseListInBackground(result.data, parse), savedAt: result.savedAt);
   });
 }
 

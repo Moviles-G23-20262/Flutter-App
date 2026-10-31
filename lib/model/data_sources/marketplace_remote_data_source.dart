@@ -1,5 +1,6 @@
 import '../../app/network/api_client.dart';
 import '../dto/marketplace_models.dart';
+import '../services/background_json.dart';
 import '../entities/chat_room_entity.dart';
 import '../entities/exchange_entity.dart';
 import '../entities/material_entity.dart';
@@ -102,7 +103,7 @@ class MarketplaceRemoteDataSourceImpl
 
   @override
   Future<List<MaterialEntity>> getMaterials() async =>
-      parseList(
+      parseListInBackground(
         await getMaterialsJson(),
         materialFromJson,
       );
@@ -170,7 +171,7 @@ class MarketplaceRemoteDataSourceImpl
 
   @override
   Future<List<ChatRoomEntity>> getChatRooms() async =>
-      parseList(
+      parseListInBackground(
         await getChatRoomsJson(),
         chatRoomFromJson,
       );
@@ -195,7 +196,7 @@ class MarketplaceRemoteDataSourceImpl
   Future<List<MessageEntity>> getMessages(
     String chatRoomId,
   ) async =>
-      parseList(
+      parseListInBackground(
         await getMessagesJson(chatRoomId),
         messageFromJson,
       );
