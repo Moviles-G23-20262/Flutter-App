@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../model/services/background_json.dart';
+
 /// The server answered with a non-2xx status.
 class ApiException implements Exception {
   final int statusCode;
@@ -102,10 +104,12 @@ class ApiClient {
     return _processResponse(response);
   }
 
-  dynamic _processResponse(http.Response response) {
+  /// A successful body is decoded with [decodeJson]: long answers (all the listings, a long
+  /// chat) are decoded in a background isolate so the UI keeps drawing while they arrive.
+  Future<dynamic> _processResponse(http.Response response) async {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isNotEmpty) {
-        return jsonDecode(response.body);
+        return decodeJson(response.body);
       }
       return null;
     }
