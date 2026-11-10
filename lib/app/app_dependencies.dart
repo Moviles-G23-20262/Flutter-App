@@ -64,6 +64,7 @@ import '../core/isolates/photo_compressor.dart';
 import '../model/repositories/impl/pending_listing_repository_impl.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
 import '../model/use_cases/pending_listing_use_cases.dart';
+import '../model/repositories/impl/mobile_data_preference_repository_impl.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -102,6 +103,11 @@ class AppDependencies {
 
   final GetConnectivityUseCase getConnectivity;
   final WatchConnectivityUseCase watchConnectivity;
+  final GetNetworkTransportUseCase getNetworkTransport;
+  final WatchNetworkTransportUseCase watchNetworkTransport;
+  final LoadAllowMobileDataUseCase loadAllowMobileData;
+  final SaveAllowMobileDataUseCase saveAllowMobileData;
+  final WatchWaitingForWifiUseCase watchWaitingForWifi;
 
   /// Local storage for offline use: saved server answers and the outbox (sqflite).
   final ResponseCache responseCache;
@@ -118,6 +124,8 @@ class AppDependencies {
 
   /// Offline chat: queued messages and how many items are waiting.
   final QueueMessageUseCase queueMessage;
+  final RetryPendingMessageUseCase retryPendingMessage;
+  final DeletePendingMessageUseCase deletePendingMessage;
   final GetPendingMessagesUseCase getPendingMessages;
   final WatchPendingCountUseCase watchPendingCount;
 
@@ -130,6 +138,7 @@ class AppDependencies {
   final ClearListingDraftUseCase clearListingDraft;
   final QueueListingUseCase queueListing;
   final WatchPendingListingsUseCase watchPendingListings;
+  final RetryPendingListingUseCase retryPendingListing;
   final DiscardPendingListingUseCase discardPendingListing;
 
   /// Exchange steps done offline: queued in the outbox and sent later.
@@ -216,6 +225,11 @@ class AppDependencies {
     required this.analyticsSync,
     required this.getConnectivity,
     required this.watchConnectivity,
+    required this.getNetworkTransport,
+    required this.watchNetworkTransport,
+    required this.loadAllowMobileData,
+    required this.saveAllowMobileData,
+    required this.watchWaitingForWifi,
     required this.responseCache,
     required this.outbox,
     required this.outboxSync,
@@ -227,6 +241,8 @@ class AppDependencies {
     required this.stopOutboxSync,
     required this.syncOutbox,
     required this.queueMessage,
+    required this.retryPendingMessage,
+    required this.deletePendingMessage,
     required this.getPendingMessages,
     required this.watchPendingCount,
     required this.loadRatingDraft,
@@ -237,6 +253,7 @@ class AppDependencies {
     required this.clearListingDraft,
     required this.queueListing,
     required this.watchPendingListings,
+    required this.retryPendingListing,
     required this.discardPendingListing,
     required this.queueExchangeCompletion,
     required this.queueRating,
@@ -324,10 +341,13 @@ class AppDependencies {
     final themePreferences = ThemePreferenceRepositoryImpl();
     final connectivity = ConnectivityDataSource();
 
+    final mobileDataPreferences = MobileDataPreferenceRepositoryImpl();
     final outbox = OutboxStore(database);
     final outboxSync = OutboxSyncService(
       store: outbox,
       sender: RemoteOutboxSender(marketplaceRemote, meetupRemote),
+      transport: connectivity,
+      mobileDataPreference: mobileDataPreferences,
       connectivity: connectivity,
     );
     final pendingActions = PendingActionRepositoryImpl(outbox, sync: outboxSync);
@@ -400,6 +420,11 @@ class AppDependencies {
       estimatePrice: PriceEstimatorUseCase(repository: PriceStatsRepositoryImpl(analyticsRemote)),
       getConnectivity: GetConnectivityUseCase(connectivity),
       watchConnectivity: WatchConnectivityUseCase(connectivity),
+      getNetworkTransport: GetNetworkTransportUseCase(connectivity),
+      watchNetworkTransport: WatchNetworkTransportUseCase(connectivity),
+      loadAllowMobileData: LoadAllowMobileDataUseCase(mobileDataPreferences),
+      saveAllowMobileData: SaveAllowMobileDataUseCase(mobileDataPreferences),
+      watchWaitingForWifi: WatchWaitingForWifiUseCase(outboxSync),
       responseCache: responseCache,
       outbox: outbox,
       outboxSync: outboxSync,
@@ -411,6 +436,8 @@ class AppDependencies {
       stopOutboxSync: StopOutboxSyncUseCase(outboxSync),
       syncOutbox: SyncOutboxUseCase(outboxSync),
       queueMessage: QueueMessageUseCase(outbox, outboxSync),
+      retryPendingMessage: RetryPendingMessageUseCase(outbox, outboxSync),
+      deletePendingMessage: DeletePendingMessageUseCase(outbox, outboxSync),
       getPendingMessages: GetPendingMessagesUseCase(outbox),
       watchPendingCount: WatchPendingCountUseCase(outbox),
       loadRatingDraft: LoadRatingDraftUseCase(ratingDrafts),
@@ -421,6 +448,7 @@ class AppDependencies {
       clearListingDraft: ClearListingDraftUseCase(listingDrafts),
       queueListing: QueueListingUseCase(pendingListings),
       watchPendingListings: WatchPendingListingsUseCase(pendingListings),
+      retryPendingListing: RetryPendingListingUseCase(pendingListings),
       discardPendingListing: DiscardPendingListingUseCase(pendingListings),
       queueExchangeCompletion: QueueExchangeCompletionUseCase(pendingActions),
       queueRating: QueueRatingUseCase(pendingActions),

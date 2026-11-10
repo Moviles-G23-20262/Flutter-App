@@ -8,6 +8,7 @@ import '../../model/entities/pending_items.dart';
 import '../widgets/average_ticket_card.dart';
 import '../widgets/cached_photo.dart';
 import '../../model/entities/time_to_sell.dart';
+import '../widgets/offline_banner.dart';
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ class SellerHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([appState.marketplace, appState.chats, appState.account]),
+      listenable: Listenable.merge([appState.marketplace, appState.chats, appState.account, appState.connectivity]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -90,6 +91,8 @@ class SellerHubScreen extends StatelessWidget {
           ),
         ),
         Divider(color: border, height: 1),
+        if (!appState.connectivity.isOffline && appState.connectivity.isWaitingForWifi)
+          OfflineBanner.waitingForWifi(onSendNow: appState.syncOverMobileData),
 
         Expanded(
           child: SingleChildScrollView(
@@ -138,6 +141,7 @@ class SellerHubScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _PendingListingRow(
                     listing: l,
+                    onRetry: () => appState.marketplace.retryPending(l.id),
                     onDiscard: () => appState.marketplace.discardPending(l.id),
                     brightness: brightness,
                     elevated: elevated,
@@ -443,6 +447,7 @@ class _ListingRow extends StatelessWidget {
 /// "Not published" with the server's reason and a Discard button if the server refused it.
 class _PendingListingRow extends StatelessWidget {
   final PendingListing listing;
+  final VoidCallback? onRetry;
   final VoidCallback onDiscard;
   final Brightness brightness;
   final Color elevated;
@@ -453,6 +458,7 @@ class _PendingListingRow extends StatelessWidget {
 
   const _PendingListingRow({
     required this.listing,
+    this.onRetry,
     required this.onDiscard,
     required this.brightness,
     required this.elevated,
@@ -508,6 +514,17 @@ class _PendingListingRow extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              if (refused && onRetry != null)
+                TextButton(
+                  key: Key('retry-pending-listing-${listing.id}'),
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(
+                    foregroundColor: accentHi,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 28),
+                  ),
+                  child: const Text('Retry'),
+                ),
               if (refused)
                 TextButton(
                   key: Key('discard-pending-listing-${listing.id}'),

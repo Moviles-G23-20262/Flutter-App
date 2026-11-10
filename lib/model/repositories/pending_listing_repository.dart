@@ -14,6 +14,9 @@ abstract class PendingListingRepository {
   /// published, refused or discarded.
   Stream<List<PendingListing>> watch(String ownerId);
 
+  /// Moves a refused listing back to waiting and asks the sync service to try publishing it again.
+  Future<void> retry(String listingId);
+
   /// The user gives up on a listing; its photos are deleted from the phone.
   Future<void> discard(String listingId);
 }

@@ -212,6 +212,16 @@ class OutboxStore {
     _changed();
   }
 
+  /// Moves a refused item back to `waiting` so the next sync tries sending it again.
+  Future<void> retry(PendingKind kind, String id) async {
+    final db = await _db.database;
+    await db.rawUpdate(
+      'UPDATE ${kind.table} SET status = ?, last_error = NULL WHERE id = ?',
+      [PendingStatus.waiting.name, id],
+    );
+    _changed();
+  }
+
   /// The user gave up on a queued item.
   Future<void> discard(PendingKind kind, String id) => _delete(kind, id);
 

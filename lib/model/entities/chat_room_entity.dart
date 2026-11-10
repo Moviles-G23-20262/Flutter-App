@@ -139,6 +139,9 @@ class MessageEntity {
   /// Whether delivery was refused by the server.
   final bool isFailed;
 
+  /// Reason the server refused delivery, when [isFailed] is `true`.
+  final String? failureReason;
+
   const MessageEntity({
     required this.id,
     required this.chatRoomId,
@@ -150,6 +153,7 @@ class MessageEntity {
     required this.createdAt,
     this.isPending = false,
     this.isFailed = false,
+    this.failureReason,
   });
 
   // ── copyWith ─────────────────────────────────────────────────────────────────
@@ -164,6 +168,8 @@ class MessageEntity {
     DateTime? createdAt,
     bool? isPending,
     bool? isFailed,
+    String? failureReason,
+    bool clearFailureReason = false,
   }) {
     return MessageEntity(
       id:         id         ?? this.id,
@@ -176,6 +182,7 @@ class MessageEntity {
       createdAt:  createdAt  ?? this.createdAt,
       isPending:  isPending  ?? this.isPending,
       isFailed:   isFailed   ?? this.isFailed,
+      failureReason: clearFailureReason ? null : (failureReason ?? this.failureReason),
     );
   }
 

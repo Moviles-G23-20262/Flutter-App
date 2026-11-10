@@ -89,7 +89,9 @@ class _ConversationList extends StatelessWidget {
           else if (chats.rooms.isEmpty)
             OfflineBanner.firstLaunchOffline(noun: 'conversations', onRetry: chats.loadRooms)
           else
-            OfflineBanner.forCache(formattedAge: null, noun: 'conversations', onRetry: chats.loadRooms),
+            OfflineBanner.forCache(formattedAge: null, noun: 'conversations', onRetry: chats.loadRooms)
+        else if (appState.connectivity.isWaitingForWifi)
+          OfflineBanner.waitingForWifi(onSendNow: appState.syncOverMobileData),
 
         // Header
         Container(

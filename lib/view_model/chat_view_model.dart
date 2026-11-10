@@ -38,6 +38,8 @@ class ChatViewModel extends ChangeNotifier {
   final GetConversationInsightUseCase getConversationInsight;
   /// Offline chat: messages go to the outbox first. Without them, sending needs a connection.
   final QueueMessageUseCase? queueMessage;
+  final RetryPendingMessageUseCase? retryPendingMessage;
+  final DeletePendingMessageUseCase? deletePendingMessage;
   final GetPendingMessagesUseCase? getPendingMessages;
   final WatchPendingCountUseCase? watchPendingCount;
   final GetChatAgreementUseCase getChatAgreement;
@@ -52,6 +54,8 @@ class ChatViewModel extends ChangeNotifier {
     required this.answerProposal,
     required this.getConversationInsight,
     this.queueMessage,
+    this.retryPendingMessage,
+    this.deletePendingMessage,
     this.getPendingMessages,
     this.watchPendingCount,
     required this.getChatAgreement,
@@ -284,6 +288,38 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
+  /// Moves a refused message back to `waiting` and retries delivering it through the outbox.
+  Future<void> retryFailedMessage(String messageId) async {
+    final retry = retryPendingMessage;
+    if (retry == null) return;
+    final roomId = _activeRoomId;
+    if (roomId != null) {
+      _messages[roomId] = [
+        for (final m in messagesOf(roomId))
+          if (m.id == messageId)
+            m.copyWith(isPending: true, isFailed: false, clearFailureReason: true)
+          else
+            m,
+      ];
+      notifyListeners();
+    }
+    await retry.execute(messageId);
+    await refreshMessages();
+  }
+
+  /// Removes a refused message from the outbox and flushes any messages held behind it.
+  Future<void> deleteFailedMessage(String messageId) async {
+    final del = deletePendingMessage;
+    if (del == null) return;
+    final roomId = _activeRoomId;
+    if (roomId != null) {
+      _messages[roomId] = messagesOf(roomId).where((m) => m.id != messageId).toList(growable: false);
+      notifyListeners();
+    }
+    await del.execute(messageId);
+    await refreshMessages();
+  }
+
   /// Accepts, declines or withdraws a meetup proposal shown in the open chat.
   Future<String?> acceptProposal(String proposalId) => answer(proposalId, ProposalAnswer.accept);
 
@@ -347,6 +383,7 @@ class ChatViewModel extends ChangeNotifier {
           createdAt: p.createdAt,
           isPending: p.status == PendingStatus.waiting,
           isFailed: p.status == PendingStatus.refused,
+          failureReason: p.lastError,
         )).toList();
       }
 

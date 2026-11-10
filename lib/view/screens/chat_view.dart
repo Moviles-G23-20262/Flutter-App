@@ -200,6 +200,8 @@ class _ChatViewState extends State<ChatView> {
             onRetry: () => chats.refreshMessages(),
           ),
         Divider(color: border, height: 1),
+        if (!appState.connectivity.isOffline && appState.connectivity.isWaitingForWifi)
+          OfflineBanner.waitingForWifi(onSendNow: appState.syncOverMobileData),
 
         // ── The listing being discussed ──
         if (room.material != null)
@@ -264,7 +266,12 @@ class _ChatViewState extends State<ChatView> {
                               onWithdraw: () => _answer(chats.withdrawProposal(messages[i].meetingProposal!.id)),
                             )
                           else
-                            _Bubble(message: messages[i], isMe: messages[i].senderId == me),
+                            _Bubble(
+                              message: messages[i],
+                              isMe: messages[i].senderId == me,
+                              onRetry: messages[i].isFailed ? () => chats.retryFailedMessage(messages[i].id) : null,
+                              onDelete: messages[i].isFailed ? () => chats.deleteFailedMessage(messages[i].id) : null,
+                            ),
                         ],
                       ],
                     ),
@@ -550,8 +557,10 @@ class _SystemNote extends StatelessWidget {
 class _Bubble extends StatelessWidget {
   final MessageEntity message;
   final bool isMe;
+  final VoidCallback? onRetry;
+  final VoidCallback? onDelete;
 
-  const _Bubble({required this.message, required this.isMe});
+  const _Bubble({required this.message, required this.isMe, this.onRetry, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -561,6 +570,20 @@ class _Bubble extends StatelessWidget {
     final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final onMe = Colors.white.withValues(alpha: 0.75);
+
+    if (message.isFailed) {
+      return _FailedBubble(
+        message: message,
+        isMe: isMe,
+        accent: accent,
+        elevated: elevated,
+        txPrimary: txPrimary,
+        txMuted: txMuted,
+        onMe: onMe,
+        onRetry: onRetry,
+        onDelete: onDelete,
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -627,6 +650,134 @@ class _Bubble extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A meetup proposal inside the chat, with its live status and the answer buttons.
+class _FailedBubble extends StatelessWidget {
+  final MessageEntity message;
+  final bool isMe;
+  final Color accent;
+  final Color elevated;
+  final Color txPrimary;
+  final Color txMuted;
+  final Color onMe;
+  final VoidCallback? onRetry;
+  final VoidCallback? onDelete;
+
+  const _FailedBubble({
+    required this.message,
+    required this.isMe,
+    required this.accent,
+    required this.elevated,
+    required this.txPrimary,
+    required this.txMuted,
+    required this.onMe,
+    this.onRetry,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final errorColor = Theme.of(context).brightness == Brightness.dark
+        ? AppColors.darkError
+        : AppColors.lightError;
+    final statusText = (message.failureReason != null && message.failureReason!.isNotEmpty)
+        ? 'Not sent · ${message.failureReason!}'
+        : 'Not sent';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              Container(
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+                padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
+                decoration: BoxDecoration(
+                  color: isMe ? accent : elevated,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(20),
+                    topRight: const Radius.circular(20),
+                    bottomLeft: Radius.circular(isMe ? 20 : 6),
+                    bottomRight: Radius.circular(isMe ? 6 : 20),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        message.content,
+                        style: AppTextStyles.body(isMe ? Colors.white : txPrimary, fontSize: AppTextStyles.sizeSm),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          hourMinute(message.createdAt),
+                          style: AppTextStyles.mono(isMe ? onMe : txMuted, fontSize: AppTextStyles.sizeXs),
+                        ),
+                        if (isMe) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.error_outline_rounded, size: 15, color: errorColor),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            alignment: isMe ? WrapAlignment.end : WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              Text(
+                statusText,
+                style: AppTextStyles.body(errorColor, fontSize: AppTextStyles.size2xs, fontWeight: FontWeight.w600),
+              ),
+              if (onRetry != null)
+                TextButton(
+                  key: Key('retry-message-${message.id}'),
+                  onPressed: onRetry,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkAccentHi
+                        : AppColors.lightAccentHi,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              if (onDelete != null)
+                TextButton(
+                  key: Key('delete-message-${message.id}'),
+                  onPressed: onDelete,
+                  style: TextButton.styleFrom(
+                    foregroundColor: errorColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    minimumSize: const Size(0, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Delete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _MeetingCard extends StatelessWidget {
   final MeetingProposalEntity proposal;
   final bool mine;

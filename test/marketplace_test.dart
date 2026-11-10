@@ -351,6 +351,10 @@ class _FakeDensity implements MeetingDensityRepository {
 class _FakePendingListings implements PendingListingRepository {
   final _controller = StreamController<List<PendingListing>>.broadcast();
   final discarded = <String>[];
+  final retried = <String>[];
+
+  @override
+  Future<void> retry(String listingId) async => retried.add(listingId);
 
   void emit(List<PendingListing> listings) => _controller.add(listings);
 
