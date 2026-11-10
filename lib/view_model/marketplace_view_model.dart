@@ -20,6 +20,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   final AddToWishlistUseCase addToWishlist;
   final RemoveFromWishlistUseCase removeFromWishlist;
   final WatchPendingListingsUseCase? watchPendingListings;
+  final RetryPendingListingUseCase? retryPendingListing;
   final DiscardPendingListingUseCase? discardPendingListing;
   final GetTimeToSellUseCase? getTimeToSell;
 
@@ -30,6 +31,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     required this.addToWishlist,
     required this.removeFromWishlist,
     this.watchPendingListings,
+    this.retryPendingListing,
     this.discardPendingListing,
     this.getTimeToSell,
   });
@@ -89,6 +91,11 @@ class MarketplaceViewModel extends ChangeNotifier {
       notifyListeners();
       if (published) load();
     }, onError: (_) {});
+  }
+
+  /// Moves a refused listing back to `waiting` and tries publishing it again.
+  Future<void> retryPending(String listingId) async {
+    await retryPendingListing?.execute(listingId);
   }
 
   /// The user gives up on a listing that is waiting or was refused.

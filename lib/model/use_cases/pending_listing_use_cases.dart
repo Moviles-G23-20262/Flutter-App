@@ -23,6 +23,14 @@ class WatchPendingListingsUseCase {
   Stream<List<PendingListing>> execute(String ownerId) => repository.watch(ownerId);
 }
 
+/// Retries publishing a refused listing.
+class RetryPendingListingUseCase {
+  final PendingListingRepository repository;
+  RetryPendingListingUseCase(this.repository);
+
+  Future<void> execute(String listingId) => repository.retry(listingId);
+}
+
 /// The user gives up on a listing that is waiting or that the server refused.
 class DiscardPendingListingUseCase {
   final PendingListingRepository repository;

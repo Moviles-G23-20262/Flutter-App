@@ -261,6 +261,9 @@ class AppViewModel extends ChangeNotifier {
     startOutboxSync?.execute(user.id);
   }
 
+  /// Sends waiting outbox items immediately over mobile data for a single sync (EC13).
+  Future<void> syncOverMobileData() => syncOutbox?.execute(overMobileData: true) ?? Future.value();
+
   /// The app came back to the foreground: send what was queued while it was in the background.
   void appResumed() {
     if (!_isLoggedIn) return;

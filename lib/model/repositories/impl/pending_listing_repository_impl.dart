@@ -56,6 +56,12 @@ class PendingListingRepositoryImpl implements PendingListingRepository {
   }
 
   @override
+  Future<void> retry(String listingId) async {
+    await store.retry(PendingKind.listing, listingId);
+    await sync?.flush();
+  }
+
+  @override
   Future<void> discard(String listingId) async {
     final photos = await store.photoPathsOf(listingId);
     await store.discard(PendingKind.listing, listingId);

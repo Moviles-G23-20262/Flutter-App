@@ -20,6 +20,30 @@ class QueueMessageUseCase {
   Future<void> send() => sync.flush();
 }
 
+/// Retries a refused chat message by moving it back to `waiting` and flushing the outbox.
+class RetryPendingMessageUseCase {
+  final OutboxStore outbox;
+  final OutboxSyncService sync;
+  RetryPendingMessageUseCase(this.outbox, this.sync);
+
+  Future<void> execute(String messageId) async {
+    await outbox.retry(PendingKind.message, messageId);
+    await sync.flush();
+  }
+}
+
+/// Deletes a refused (or queued) chat message and lets later messages in the room sync.
+class DeletePendingMessageUseCase {
+  final OutboxStore outbox;
+  final OutboxSyncService sync;
+  DeletePendingMessageUseCase(this.outbox, this.sync);
+
+  Future<void> execute(String messageId) async {
+    await outbox.discard(PendingKind.message, messageId);
+    await sync.flush();
+  }
+}
+
 /// [ownerId]'s messages of [chatRoomId] still in the outbox, oldest first.
 class GetPendingMessagesUseCase {
   final OutboxStore outbox;

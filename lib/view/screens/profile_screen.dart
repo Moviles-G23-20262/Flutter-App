@@ -24,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.appState.account, widget.appState.schedule]),
+      listenable: Listenable.merge([widget.appState.account, widget.appState.schedule, widget.appState.connectivity]),
       builder: (context, _) => _buildBody(context),
     );
   }
@@ -209,6 +209,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? 'Add your classes to get meetup time suggestions'
                             : '${widget.appState.schedule.blocks.length} classes · used to suggest meetup times',
                         onTap: widget.appState.openSchedule,
+                        brightness: brightness,
+                      ),
+                      _SettingsRow(
+                        icon: Icons.cell_tower_rounded,
+                        title: 'Use mobile data',
+                        detail: 'Send queued messages, listings and exchanges without Wi-Fi',
+                        trailing: _Toggle(
+                          key: const Key('allow-mobile-data-toggle'),
+                          enabled: widget.appState.connectivity.allowMobileData,
+                          onToggle: () => widget.appState.connectivity.setAllowMobileData(!widget.appState.connectivity.allowMobileData),
+                          brightness: brightness,
+                        ),
                         brightness: brightness,
                       ),
                       _SettingsRow(icon: Icons.account_balance_wallet_outlined, title: 'Payment Methods',    detail: 'GCash, Maya, cash preferences', brightness: brightness),
@@ -442,7 +454,7 @@ class _Toggle extends StatelessWidget {
   final VoidCallback onToggle;
   final Brightness brightness;
 
-  const _Toggle({required this.enabled, required this.onToggle, required this.brightness});
+  const _Toggle({super.key, required this.enabled, required this.onToggle, required this.brightness});
 
   @override
   Widget build(BuildContext context) {

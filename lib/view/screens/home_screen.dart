@@ -106,7 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
           else if (market.materials.isEmpty)
             OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh)
           else
-            OfflineBanner.forCache(formattedAge: null, noun: 'listings', onRetry: _refresh),
+            OfflineBanner.forCache(formattedAge: null, noun: 'listings', onRetry: _refresh)
+        else if (widget.appState.connectivity.isWaitingForWifi)
+          OfflineBanner.waitingForWifi(onSendNow: widget.appState.syncOverMobileData),
 
         // ── Header ─────────────────────────────────────────────────────────
         Container(
