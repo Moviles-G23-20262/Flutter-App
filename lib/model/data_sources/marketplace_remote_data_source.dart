@@ -16,6 +16,11 @@ abstract class MarketplaceRemoteDataSource {
     Map<String, dynamic> body,
   );
 
+  Future<MaterialEntity> updateMaterialPrice(
+    String materialId,
+    double price,
+  );
+
   /// Uploads a photo and returns its public URL.
   Future<String> uploadImage({
     required List<int> bytes,
@@ -119,6 +124,18 @@ class MarketplaceRemoteDataSourceImpl
         await apiClient.post(
           '/materials',
           body: body,
+        ) as Json,
+      );
+
+  @override
+  Future<MaterialEntity> updateMaterialPrice(
+    String materialId,
+    double price,
+  ) async =>
+      materialFromJson(
+        await apiClient.patch(
+          '/materials/$materialId',
+          body: {'price': price.toStringAsFixed(2)},
         ) as Json,
       );
 

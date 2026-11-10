@@ -68,7 +68,7 @@ class PendingListing {
 }
 
 /// The exchange steps that can be done offline.
-enum PendingActionKind { completeExchange, rate, proposeMeeting }
+enum PendingActionKind { completeExchange, rate, proposeMeeting, updateListingPrice }
 
 /// An exchange step saved on the phone and not confirmed by the server yet.
 class PendingAction {

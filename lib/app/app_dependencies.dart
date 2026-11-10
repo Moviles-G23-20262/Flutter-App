@@ -8,7 +8,12 @@ import '../model/data_sources/analytics_remote_data_source.dart';
 import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
 import '../model/repositories/impl/time_to_sell_repository_impl.dart';
+import '../model/entities/material_entity.dart';
+import '../model/repositories/impl/listing_health_preferences_repository_impl.dart';
+import '../model/repositories/impl/listing_health_repository_impl.dart';
 import '../model/use_cases/get_time_to_sell_use_case.dart';
+import '../model/use_cases/listing_health_use_cases.dart';
+import '../view_model/listing_health_view_model.dart';
 import '../model/repositories/impl/analytics_event_repository_impl.dart';
 import '../model/data_sources/analytics_event_remote_data_source.dart';
 import '../model/services/analytics_sync_service.dart';
@@ -153,6 +158,12 @@ class AppDependencies {
 
   final GetMaterialsUseCase getMaterials;
   final CreateListingUseCase createListing;
+  final UpdateListingPriceUseCase updateListingPrice;
+  final QueuePriceUpdateUseCase queueListingPriceUpdate;
+  final GetDeadListingsInsightUseCase getDeadListingsInsight;
+  final LoadListingHealthPreferencesUseCase loadListingHealthPreferences;
+  final SaveListingHealthStaleDaysUseCase saveListingHealthStaleDays;
+  final SaveDismissedHealthAlertsUseCase saveDismissedHealthAlerts;
   final GetWishlistUseCase getWishlist;
   final AddToWishlistUseCase addToWishlist;
   final RemoveFromWishlistUseCase removeFromWishlist;
@@ -191,6 +202,12 @@ class AppDependencies {
     required this.apiClient,
     required this.getMaterials,
     required this.createListing,
+    required this.updateListingPrice,
+    required this.queueListingPriceUpdate,
+    required this.getDeadListingsInsight,
+    required this.loadListingHealthPreferences,
+    required this.saveListingHealthStaleDays,
+    required this.saveDismissedHealthAlerts,
     required this.getWishlist,
     required this.addToWishlist,
     required this.removeFromWishlist,
@@ -279,6 +296,28 @@ class AppDependencies {
         getTimeToSell: getTimeToSell,
       );
 
+  /// A fresh ViewModel for the Listing Health Advisor (BQ 10) screen; owned and disposed by the screen.
+  ListingHealthViewModel createListingHealthViewModel({
+    required String userId,
+    required List<MaterialEntity> Function() getMarketplaceListings,
+    void Function(MaterialEntity updated)? onMaterialUpdated,
+    double? Function(String category)? baselineSellDays,
+  }) =>
+      ListingHealthViewModel(
+        userId: userId,
+        getInsight: getDeadListingsInsight,
+        loadPreferences: loadListingHealthPreferences,
+        saveStaleDays: saveListingHealthStaleDays,
+        saveDismissedIds: saveDismissedHealthAlerts,
+        updateListingPrice: updateListingPrice,
+        queuePriceUpdate: queueListingPriceUpdate,
+        watchPendingActions: watchPendingActions,
+        discardPendingAction: discardPendingAction,
+        getMarketplaceListings: getMarketplaceListings,
+        onMaterialUpdated: onMaterialUpdated,
+        baselineSellDays: baselineSellDays,
+      );
+
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
     if (baseUrl.isEmpty) {
@@ -302,6 +341,8 @@ class AppDependencies {
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final timeToSellRepository = TimeToSellRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final averageTicketRepository = AverageTicketRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final listingHealthRepository = ListingHealthRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final listingHealthPrefsRepository = ListingHealthPreferencesRepositoryImpl();
     final sessionOwner = SessionOwner();
     final authRepository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(apiClient: apiClient),
@@ -369,6 +410,12 @@ class AppDependencies {
       apiClient: apiClient,
       getMaterials: GetMaterialsUseCase(materials),
       createListing: CreateListingUseCase(materials),
+      updateListingPrice: UpdateListingPriceUseCase(materials),
+      queueListingPriceUpdate: QueuePriceUpdateUseCase(pendingActions),
+      getDeadListingsInsight: GetDeadListingsInsightUseCase(listingHealthRepository),
+      loadListingHealthPreferences: LoadListingHealthPreferencesUseCase(listingHealthPrefsRepository),
+      saveListingHealthStaleDays: SaveListingHealthStaleDaysUseCase(listingHealthPrefsRepository),
+      saveDismissedHealthAlerts: SaveDismissedHealthAlertsUseCase(listingHealthPrefsRepository),
       getWishlist: GetWishlistUseCase(wishlist),
       addToWishlist: AddToWishlistUseCase(wishlist),
       removeFromWishlist: RemoveFromWishlistUseCase(wishlist),

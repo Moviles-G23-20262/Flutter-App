@@ -20,6 +20,13 @@ abstract class PendingActionRepository {
     required DateTime endsAt,
   });
 
+  Future<PendingAction> queuePriceUpdate({
+    required String ownerId,
+    required String materialId,
+    required double newPrice,
+    String? listingTitle,
+  });
+
   /// [ownerId]'s queued steps now, and again after every change (queued, sent, refused, discarded).
   Stream<List<PendingAction>> watch(String ownerId);
 

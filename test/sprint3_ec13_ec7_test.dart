@@ -119,6 +119,8 @@ class _NoMaterials implements MaterialRepository {
 
   @override
   Future<MaterialEntity> createListing(NewListingData data) => throw UnimplementedError();
+  @override
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice) => throw UnimplementedError();
 }
 
 class _NoWishlist implements WishlistRepository {

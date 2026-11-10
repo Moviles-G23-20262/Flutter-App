@@ -38,6 +38,8 @@ class _FakeMaterialsRepository implements MaterialRepository {
       const CachedList([]);
   @override
   Future<MaterialEntity> createListing(NewListingData data) => throw UnimplementedError();
+  @override
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice) => throw UnimplementedError();
 }
 
 class _FakeWishlistRepository implements WishlistRepository {

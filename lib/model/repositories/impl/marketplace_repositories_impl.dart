@@ -127,6 +127,14 @@ class MaterialRepositoryImpl implements MaterialRepository {
         if (cache != null) unawaited(getMaterialsCached().then((_) {}, onError: (_) {}));
         return material;
       });
+
+  @override
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice) =>
+      guardRequest(() async {
+        final updated = await remote.updateMaterialPrice(materialId, newPrice);
+        if (cache != null) unawaited(getMaterialsCached().then((_) {}, onError: (_) {}));
+        return updated;
+      });
 }
 
 class WishlistRepositoryImpl implements WishlistRepository {

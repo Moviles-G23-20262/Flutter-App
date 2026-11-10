@@ -286,6 +286,16 @@ class MarketplaceViewModel extends ChangeNotifier {
     return created;
   }
 
+  /// Replaces an existing listing in memory after a price drop or offline edit.
+  void replaceMaterial(MaterialEntity updated) {
+    final idx = _materials.indexWhere((m) => m.id == updated.id);
+    if (idx < 0) return;
+    final copy = List<MaterialEntity>.of(_materials);
+    copy[idx] = updated;
+    _materials = copy;
+    notifyListeners();
+  }
+
   void clear() {
     _generation++;
     _pendingSubscription?.cancel();

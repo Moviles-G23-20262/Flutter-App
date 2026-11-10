@@ -128,6 +128,14 @@ class SellerHubScreen extends StatelessWidget {
                   AverageTicketCard(viewModel: appState.averageTicket!),
                   const SizedBox(height: 20),
                 ],
+                _ListingHealthEntryCard(
+                  activeCount: activeCount,
+                  onTap: () => appState.navigateTo(AppScreen.listingHealth),
+                  txPrimary: txPrimary,
+                  txMuted: txMuted,
+                  accentHi: accentHi,
+                ),
+                const SizedBox(height: 20),
                 // Active listings
                 Row(
                   children: [
@@ -336,6 +344,64 @@ class _MarketLiquidityCard extends StatelessWidget {
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
+
+class _ListingHealthEntryCard extends StatelessWidget {
+  final int activeCount;
+  final VoidCallback onTap;
+  final Color txPrimary;
+  final Color txMuted;
+  final Color accentHi;
+
+  const _ListingHealthEntryCard({
+    required this.activeCount,
+    required this.onTap,
+    required this.txPrimary,
+    required this.txMuted,
+    required this.accentHi,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      key: const Key('open-listing-health-advisor'),
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accentHi.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.monitor_heart_outlined, color: accentHi, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Listing Health Advisor (BQ10)',
+                  style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  activeCount == 0
+                      ? 'Inspect stagnation clusters & pricing patterns'
+                      : 'Check $activeCount active listing${activeCount == 1 ? '' : 's'} for stale risk & price drops',
+                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: txMuted, size: 20),
+        ],
+      ),
+    );
+  }
+}
 
 class _StatCard extends StatelessWidget {
   final IconData icon;

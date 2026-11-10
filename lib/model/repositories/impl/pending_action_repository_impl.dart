@@ -51,6 +51,19 @@ class PendingActionRepositoryImpl implements PendingActionRepository {
         ),
       );
 
+  @override
+  Future<PendingAction> queuePriceUpdate({
+    required String ownerId,
+    required String materialId,
+    required double newPrice,
+    String? listingTitle,
+  }) =>
+      _queue(ownerId, PendingActionKind.updateListingPrice, materialId, {
+        'materialId': materialId,
+        'price': newPrice.toStringAsFixed(2),
+        'title': ?listingTitle,
+      });
+
   Future<PendingAction> _queue(
     String ownerId,
     PendingActionKind kind,

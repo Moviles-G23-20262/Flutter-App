@@ -28,6 +28,16 @@ class CreateListingUseCase {
   }
 }
 
+class UpdateListingPriceUseCase {
+  final MaterialRepository repository;
+  UpdateListingPriceUseCase(this.repository);
+
+  Future<MaterialEntity> execute(String materialId, double newPrice) {
+    if (newPrice <= 0) throw const DataException('Enter a price greater than zero.');
+    return repository.updatePrice(materialId, newPrice);
+  }
+}
+
 class GetWishlistUseCase {
   final WishlistRepository repository;
   GetWishlistUseCase(this.repository);
