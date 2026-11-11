@@ -116,8 +116,14 @@ class AppViewModel extends ChangeNotifier {
     connectivity.addListener(_onConnectivityChanged);
   }
 
+  bool _wasOnline = true;
+
   void _onConnectivityChanged() {
     marketplace.load();
+    final reconnected = connectivity.isOnline && !_wasOnline;
+    _wasOnline = connectivity.isOnline;
+    // BQ15 refreshes by itself when the network comes back (it may be showing a saved copy or an error).
+    if (reconnected) averageTicket?.load(force: true);
     if (connectivity.isOnline) {
       _verifyOfflineSession();
       chats.setOffline(false);

@@ -41,7 +41,7 @@ class _ScriptedRepository implements AverageTicketRepository {
     calls++;
     await gate?.future;
     final next = results.removeAt(0);
-    if (next is DataException) throw next;
+    if (next is Exception || next is Error) throw next;
     return next as AverageTicket;
   }
 }
@@ -175,6 +175,35 @@ void main() {
 
       await vm.load(force: true);
       expect(vm.error, isNull, reason: 'the figures already on screen stay');
+      expect(vm.ticket?.globalAverage, 45000);
+    });
+  });
+
+  group('AverageTicketViewModel: unexpected failures', () {
+    final ticket = AverageTicketModel.fromJson(_answer);
+
+    test('an exception that is not a DataException still ends the loading, with a retryable error', () async {
+      final repo = _ScriptedRepository([const FormatException('not json'), ticket]);
+      final vm = AverageTicketViewModel(getAverageTicket: GetAverageTicketUseCase(repo));
+
+      await vm.load();
+
+      expect(vm.isLoading, isFalse, reason: 'no endless spinner');
+      expect(vm.error, isNotNull);
+
+      await vm.load(force: true);
+      expect(vm.error, isNull);
+      expect(vm.ticket?.globalAverage, 45000);
+    });
+
+    test('a TypeError while parsing keeps the figures already on screen', () async {
+      final repo = _ScriptedRepository([ticket, TypeError()]);
+      final vm = AverageTicketViewModel(getAverageTicket: GetAverageTicketUseCase(repo));
+
+      await vm.load();
+      await vm.load(force: true);
+
+      expect(vm.error, isNull);
       expect(vm.ticket?.globalAverage, 45000);
     });
   });

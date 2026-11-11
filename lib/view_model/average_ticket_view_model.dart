@@ -32,6 +32,10 @@ class AverageTicketViewModel extends ChangeNotifier {
     } on DataException catch (e) {
       // Keep what was already on screen; only show the error when there is nothing else.
       if (_ticket == null) _error = e.message;
+    } catch (_) {
+      // Anything else (a bad base URL, a TLS failure, an unexpected answer) must not leave the
+      // card spinning forever: show a message with "Try again" instead.
+      if (_ticket == null) _error = "Couldn't load the average ticket. Please try again.";
     } finally {
       _loading = false;
       _notify();

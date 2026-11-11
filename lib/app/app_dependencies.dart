@@ -341,6 +341,12 @@ class AppDependencies {
     final apiClient = ApiClient(baseUrl: baseUrl, client: http.Client());
 
     const analyticsBaseUrl = String.fromEnvironment('ANALYTICS_BASE_URL');
+    if (analyticsBaseUrl.isEmpty) {
+      throw StateError(
+        'ANALYTICS_BASE_URL is not defined. Run the app with '
+        '--dart-define-from-file=config/development.json',
+      );
+    }
     final analyticsClient = ApiClient(baseUrl: analyticsBaseUrl, client: http.Client());
     final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
     final database = AppDatabase();
