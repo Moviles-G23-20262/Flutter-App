@@ -132,6 +132,8 @@ class _FakeMaterials implements MaterialRepository {
 
   @override
   Future<MaterialEntity> createListing(NewListingData data) async => _material(id: 'new');
+  @override
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice) async => _material(id: materialId, price: newPrice);
 }
 
 class _FakeWishlist implements WishlistRepository {

@@ -33,6 +33,7 @@ enum AppScreen {
   favorites,
   notifications,
   sellerHub,
+  listingHealth,
   newListing,
 
   /// "Order Placed", right after buying.

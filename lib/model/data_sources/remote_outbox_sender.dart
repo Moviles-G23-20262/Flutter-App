@@ -47,6 +47,10 @@ class RemoteOutboxSender implements OutboxSender {
         await remote.createRating(body);
       case PendingActionKind.proposeMeeting:
         await meetups.createProposal(body);
+      case PendingActionKind.updateListingPrice:
+        final rawPrice = body['price'];
+        final price = rawPrice is num ? rawPrice.toDouble() : double.parse(rawPrice.toString());
+        await remote.updateMaterialPrice(body['materialId'] as String, price);
     }
   }
 }

@@ -18,6 +18,9 @@ abstract class MaterialRepository {
 
   /// Uploads the photos, then creates the listing as the signed-in user.
   Future<MaterialEntity> createListing(NewListingData data);
+
+  /// Updates an existing listing price (PATCH /materials/:id) and refreshes the cache.
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice);
 }
 
 abstract class WishlistRepository {

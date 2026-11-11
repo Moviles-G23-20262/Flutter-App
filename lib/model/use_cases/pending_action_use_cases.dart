@@ -60,6 +60,27 @@ class QueueMeetingProposalUseCase {
   }
 }
 
+/// A listing price adjustment made offline: validated before being queued in the outbox.
+class QueuePriceUpdateUseCase {
+  final PendingActionRepository repository;
+  QueuePriceUpdateUseCase(this.repository);
+
+  Future<PendingAction> execute({
+    required String ownerId,
+    required String materialId,
+    required double newPrice,
+    String? listingTitle,
+  }) {
+    if (newPrice <= 0) throw const DataException('Enter a price greater than zero.');
+    return repository.queuePriceUpdate(
+      ownerId: ownerId,
+      materialId: materialId,
+      newPrice: newPrice,
+      listingTitle: listingTitle,
+    );
+  }
+}
+
 /// The signed-in user's queued exchange steps, updated whenever the outbox changes.
 class WatchPendingActionsUseCase {
   final PendingActionRepository repository;

@@ -1,12 +1,14 @@
 import '../../app/network/api_client.dart';
-import '../entities/meeting_point_density.dart';
-import '../entities/price_stats.dart';
+import '../../core/isolates/listing_health_analyzer.dart';
 import '../dto/average_ticket_model.dart';
 import '../dto/chat_agreement_model.dart';
 import '../dto/conversation_insight_model.dart';
-import '../dto/price_stats_model.dart';
+import '../dto/dead_listings_model.dart';
 import '../dto/meeting_point_density_model.dart';
+import '../dto/price_stats_model.dart';
 import '../dto/time_to_sell_model.dart';
+import '../entities/meeting_point_density.dart';
+import '../entities/price_stats.dart';
 
 /// Talks to the Django analytics service (a different base URL than the NestJS API).
 class AnalyticsRemoteDataSource {
@@ -48,5 +50,19 @@ class AnalyticsRemoteDataSource {
   Future<TimeToSellModel> getTimeToSell() async {
     final json = await apiClient.get('/analytics/time-to-sell/');
     return TimeToSellModel.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// BQ10: Dead / unsold listings survival curve, K-Means pattern clusters, and seller risk alerts.
+  Future<DeadListingsModel> getDeadListings({
+    int staleDays = 14,
+    String? sellerId,
+  }) async {
+    final params = <String, String>{
+      'staleDays': '$staleDays',
+      if (sellerId != null && sellerId.isNotEmpty) 'sellerId': sellerId,
+    };
+    final query = Uri(queryParameters: params).query;
+    final json = await apiClient.get('/analytics/dead-listings/?$query');
+    return parseDeadListingsInBackground(json as Map<String, dynamic>);
   }
 }

@@ -21,6 +21,7 @@ import 'view/screens/material_detail_screen.dart';
 import 'view/screens/messages_screen.dart';
 import 'view/screens/profile_screen.dart';
 import 'view/screens/seller_hub_screen.dart';
+import 'view/screens/listing_health_screen.dart';
 import 'view/screens/new_listing_smart_screen.dart';
 import 'view/screens/complete_exchange_screen.dart';
 import 'view/screens/confirmation_screen.dart';
@@ -216,6 +217,16 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
         return NotificationsScreen(appState: _appState);
       case AppScreen.sellerHub:
         return SellerHubScreen(appState: _appState);
+      case AppScreen.listingHealth:
+        return ListingHealthScreen(
+          appState: _appState,
+          createViewModel: () => _deps.createListingHealthViewModel(
+            userId: _appState.currentUser?.id ?? '',
+            getMarketplaceListings: () => _appState.marketplace.materials,
+            onMaterialUpdated: _appState.marketplace.replaceMaterial,
+            baselineSellDays: (category) => _appState.marketplace.timeToSell?.daysForCategory(category),
+          ),
+        );
       case AppScreen.newListing:
         return NewListingSmartScreen(
           appState: _appState,
