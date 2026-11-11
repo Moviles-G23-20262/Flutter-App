@@ -80,11 +80,24 @@ class RegisterViewModel extends ChangeNotifier {
   void update(RegisterField field, String value) {
     _values[field] = value;
     if (draftFields.contains(field)) _scheduleDraftSave();
-    if (_errors.containsKey(field) || _bannerError.isNotEmpty) {
-      _errors.remove(field);
+
+    var changed = _errors.remove(field) != null;
+    if (_bannerError.isNotEmpty) {
       _bannerError = '';
-      _notify();
+      changed = true;
     }
+    // Editing the password after the confirmation was typed: the confirmation is checked again now.
+    if (field == RegisterField.password && _values[RegisterField.confirm]!.isNotEmpty) {
+      final before = _errors[RegisterField.confirm];
+      final after = RegistrationRules.validateConfirmation(value, _values[RegisterField.confirm]);
+      if (after == null) {
+        _errors.remove(RegisterField.confirm);
+      } else {
+        _errors[RegisterField.confirm] = after;
+      }
+      if (before != after) changed = true;
+    }
+    if (changed) _notify();
   }
 
   /// `null` means "no faculty".
@@ -149,7 +162,14 @@ class RegisterViewModel extends ChangeNotifier {
     check(RegisterField.name, RegistrationRules.validateFullName(v[RegisterField.name]));
     check(RegisterField.email, RegistrationRules.validateEmail(v[RegisterField.email]));
     check(RegisterField.major, RegistrationRules.validateMajor(v[RegisterField.major]));
-    check(RegisterField.password, RegistrationRules.validatePassword(v[RegisterField.password]));
+    check(
+      RegisterField.password,
+      RegistrationRules.validatePassword(
+        v[RegisterField.password],
+        email: v[RegisterField.email],
+        fullName: v[RegisterField.name],
+      ),
+    );
     check(
       RegisterField.confirm,
       RegistrationRules.validateConfirmation(v[RegisterField.password]!, v[RegisterField.confirm]!),

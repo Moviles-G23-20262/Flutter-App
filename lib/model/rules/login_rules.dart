@@ -1,3 +1,4 @@
+import 'input_rules.dart';
 import 'registration_rules.dart';
 
 /// Input rules of the login form. Stricter than the server (which only needs a valid email
@@ -6,16 +7,10 @@ import 'registration_rules.dart';
 abstract final class LoginRules {
   static const int minPasswordLength = RegistrationRules.minPasswordLength;
   static const int maxPasswordLength = RegistrationRules.maxPasswordLength;
-  static const int maxEmailLength = 254;
+  static const int maxEmailLength = InputRules.maxEmailLength;
 
-  /// Emoji and pictographic symbols: the emoji planes (U+1F000-1FAFF, which include flags and
-  /// skin tones), miscellaneous symbols and dingbats, technical symbols such as watches,
-  /// arrows-and-stars blocks, variation selectors, zero-width joiner, keycap and tag characters.
-  static final RegExp emoji = RegExp(
-    r'[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}'
-    r'\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]',
-    unicode: true,
-  );
+  /// The emoji set lives in [InputRules] (shared with sign-up); kept here for the login form.
+  static final RegExp emoji = InputRules.emoji;
 
   /// `user@domain.tld`: a plain local part, dot-separated domain labels and a letters-only
   /// top-level domain of 2+ characters.
@@ -24,7 +19,7 @@ abstract final class LoginRules {
     r'(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,}$',
   );
 
-  static bool containsEmoji(String text) => emoji.hasMatch(text);
+  static bool containsEmoji(String text) => InputRules.containsEmoji(text);
 
   /// The email as it is sent: no surrounding whitespace, lower case.
   static String normalizeEmail(String raw) => raw.trim().toLowerCase();

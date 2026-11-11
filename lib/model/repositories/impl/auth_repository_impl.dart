@@ -2,6 +2,7 @@ import '../../../app/network/api_client.dart';
 import '../../entities/registration_data.dart';
 import '../../entities/user_entity.dart';
 import '../../exceptions/auth_exceptions.dart';
+import '../../rules/api_validation_messages.dart';
 import '../auth_repository.dart';
 import '../../data_sources/auth_remote_data_source.dart';
 import '../../data_sources/session_storage.dart';
@@ -43,7 +44,7 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       return await _startSession(await remote.register(data));
     } on ApiException catch (e) {
-      throw _mapApiError(e);
+      throw _mapApiError(e, registration: true);
     } on NetworkException {
       throw const AuthNetworkException();
     }
@@ -230,10 +231,11 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (_) {}
   }
 
-  AuthException _mapApiError(ApiException e) {
+  AuthException _mapApiError(ApiException e, {bool registration = false}) {
     switch (e.statusCode) {
       case 400:
-        return InvalidRegistrationException(e.message);
+        // The server's validator text ("email must be an email") is not for the user.
+        return InvalidRegistrationException(ApiValidationMessages.friendly(e.message, registration: registration));
       case 401:
         return const InvalidCredentialsException();
       case 409:

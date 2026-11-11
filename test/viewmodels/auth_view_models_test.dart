@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_front_end/model/entities/registration_data.dart';
 import 'package:flutter_front_end/model/entities/user_entity.dart';
 import 'package:flutter_front_end/model/exceptions/auth_exceptions.dart';
@@ -25,6 +27,10 @@ class _FakeAuth implements AuthRepository {
   Exception? loginError;
   Exception? registerError;
   RegistrationData? registered;
+  int registerCalls = 0;
+
+  /// While set, [register] waits for it: the form stays in its loading state.
+  Completer<void>? registerGate;
 
   @override
   Future<UserEntity> login({required String email, required String password}) async {
@@ -34,6 +40,8 @@ class _FakeAuth implements AuthRepository {
 
   @override
   Future<UserEntity> register(RegistrationData data) async {
+    registerCalls++;
+    await registerGate?.future;
     if (registerError != null) throw registerError!;
     registered = data;
     return _ana;
@@ -110,8 +118,8 @@ void main() {
       vm.update(RegisterField.name, 'Ana Gomez');
       vm.update(RegisterField.email, 'ana@uniandes.edu.co');
       vm.update(RegisterField.major, 'Systems Engineering');
-      vm.update(RegisterField.password, 'correct-horse-1');
-      vm.update(RegisterField.confirm, 'correct-horse-1');
+      vm.update(RegisterField.password, 'CampusSwap1!');
+      vm.update(RegisterField.confirm, 'CampusSwap1!');
     }
 
     setUp(() {
@@ -159,6 +167,61 @@ void main() {
       expect(signedIn, isEmpty);
     });
 
+    test('a weak password blocks the submit and nothing is sent', () async {
+      fillValidForm();
+      vm.update(RegisterField.password, 'password123');
+      vm.update(RegisterField.confirm, 'password123');
+
+      await vm.submit();
+
+      expect(vm.errorFor(RegisterField.password), 'Add an uppercase letter and a symbol.');
+      expect(auth.registerCalls, 0);
+    });
+
+    test('a password equal to the email is refused on the password field', () async {
+      fillValidForm();
+      vm.update(RegisterField.email, 'Ana@Uniandes.edu.co');
+      vm.update(RegisterField.password, 'Ana@Uniandes.edu.co');
+      vm.update(RegisterField.confirm, 'Ana@Uniandes.edu.co');
+
+      await vm.submit();
+
+      expect(vm.errorFor(RegisterField.password), "The password can't be the same as your email.");
+      expect(auth.registerCalls, 0);
+    });
+
+    test('editing the password after the confirmation re-checks the confirmation right away', () async {
+      fillValidForm();
+      expect(vm.errorFor(RegisterField.confirm), isNull);
+
+      vm.update(RegisterField.password, 'CampusSwap2!');
+      expect(vm.errorFor(RegisterField.confirm), 'Passwords do not match.');
+
+      vm.update(RegisterField.password, 'CampusSwap1!');
+      expect(vm.errorFor(RegisterField.confirm), isNull);
+    });
+
+    test('an untouched confirmation shows no error while the password is typed', () {
+      vm.update(RegisterField.password, 'Cam');
+      expect(vm.errorFor(RegisterField.confirm), isNull);
+    });
+
+    test('a second tap while the account is being created does not send it twice', () async {
+      auth.registerGate = Completer<void>();
+      fillValidForm();
+
+      final first = vm.submit();
+      await Future<void>.delayed(Duration.zero);
+      expect(vm.isLoading, isTrue);
+      await vm.submit();
+      auth.registerGate!.complete();
+      await first;
+
+      expect(auth.registerCalls, 1);
+      expect(vm.isLoading, isFalse);
+      expect(signedIn, hasLength(1));
+    });
+
     test('other failures show in the banner', () async {
       auth.registerError = Exception('boom');
       fillValidForm();
@@ -189,7 +252,7 @@ void main() {
         ..update(RegisterField.name, 'Ana Gomez')
         ..update(RegisterField.email, 'ana@uniandes.edu.co')
         ..update(RegisterField.major, 'ISIS')
-        ..update(RegisterField.password, 'secret-123')
+        ..update(RegisterField.password, 'CampusSwap1!')
         ..setFaculty('Faculty of Engineering');
       first.dispose(); // leaving before the 0.4 s still saves
 
@@ -209,8 +272,8 @@ void main() {
         ..update(RegisterField.name, 'Ana Gomez')
         ..update(RegisterField.email, 'ana@uniandes.edu.co')
         ..update(RegisterField.major, 'Systems Engineering')
-        ..update(RegisterField.password, 'correct-horse-1')
-        ..update(RegisterField.confirm, 'correct-horse-1');
+        ..update(RegisterField.password, 'CampusSwap1!')
+        ..update(RegisterField.confirm, 'CampusSwap1!');
       await Future<void>.delayed(RegisterViewModel.draftDelay + const Duration(milliseconds: 100));
 
       await vm.submit();
