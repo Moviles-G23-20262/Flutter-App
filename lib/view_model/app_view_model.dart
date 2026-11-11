@@ -265,6 +265,9 @@ class AppViewModel extends ChangeNotifier {
     marketplace.watchPending(user.id);
     schedule.load();
     startOutboxSync?.execute(user.id);
+    // Recent searches belong to the account: show this user's (a switch of account, by password
+    // or Quick Unlock, never shows the previous user's).
+    recentSearches?.load(user.id);
   }
 
   /// Sends waiting outbox items immediately over mobile data for a single sync (EC13).
@@ -316,6 +319,7 @@ class AppViewModel extends ChangeNotifier {
     _selectedExchange = null;
     _plannerRoom = null;
     _currentUser = null;
+    recentSearches?.load(null); // nobody signed in: nothing shown, nothing saved
     _isLoggedIn = false;
     _currentScreen = AppScreen.login;
     notifyListeners();

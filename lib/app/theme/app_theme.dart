@@ -158,101 +158,160 @@ class AppTextStyles {
 class AppDecorations {
   AppDecorations._();
 
-  /// Hero card gradient banner.
-  static BoxDecoration heroGradient(Brightness brightness) => BoxDecoration(
-    gradient: LinearGradient(
+  static final List<BoxShadow> _darkAccentShadow = List<BoxShadow>.unmodifiable(const [
+    BoxShadow(color: AppColors.darkShadowAccent, blurRadius: 10, offset: Offset(0, 2)),
+  ]);
+  static final List<BoxShadow> _lightAccentShadow = List<BoxShadow>.unmodifiable(const [
+    BoxShadow(color: AppColors.lightShadowAccent, blurRadius: 10, offset: Offset(0, 2)),
+  ]);
+
+  static final BoxDecoration _darkHeroGradient = BoxDecoration(
+    gradient: const LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
-      colors: brightness == Brightness.dark
-          ? [AppColors.darkHeroFrom, AppColors.darkHeroTo]
-          : [AppColors.lightHeroFrom, AppColors.lightHeroTo],
+      colors: [AppColors.darkHeroFrom, AppColors.darkHeroTo],
     ),
     borderRadius: BorderRadius.circular(18),
-    border: Border.all(
-      color: brightness == Brightness.dark ? AppColors.darkAccentLo : AppColors.lightAccentLo,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: brightness == Brightness.dark ? AppColors.darkShadowAccent : AppColors.lightShadowAccent,
-        blurRadius: 24,
-        offset: const Offset(0, 6),
-      ),
+    border: Border.all(color: AppColors.darkAccentLo),
+    boxShadow: const [
+      BoxShadow(color: AppColors.darkShadowAccent, blurRadius: 24, offset: Offset(0, 6)),
     ],
   );
+  static final BoxDecoration _lightHeroGradient = BoxDecoration(
+    gradient: const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [AppColors.lightHeroFrom, AppColors.lightHeroTo],
+    ),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: AppColors.lightAccentLo),
+    boxShadow: const [
+      BoxShadow(color: AppColors.lightShadowAccent, blurRadius: 24, offset: Offset(0, 6)),
+    ],
+  );
+
+  static final BoxDecoration _darkCard = BoxDecoration(
+    color: AppColors.darkSurface,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: AppColors.darkBorder),
+    boxShadow: const [
+      BoxShadow(color: AppColors.darkShadowCard, blurRadius: 10, offset: Offset(0, 2)),
+    ],
+  );
+  static final BoxDecoration _lightCard = BoxDecoration(
+    color: AppColors.lightSurface,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: AppColors.lightBorder),
+    boxShadow: const [
+      BoxShadow(color: AppColors.lightShadowCard, blurRadius: 10, offset: Offset(0, 2)),
+    ],
+  );
+
+  static final BoxDecoration _darkProductCard = BoxDecoration(
+    color: AppColors.darkSurface,
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(color: AppColors.darkBorder),
+    boxShadow: const [
+      BoxShadow(color: AppColors.darkShadowCard, blurRadius: 8, offset: Offset(0, 2)),
+    ],
+  );
+  static final BoxDecoration _lightProductCard = BoxDecoration(
+    color: AppColors.lightSurface,
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(color: AppColors.lightBorder),
+    boxShadow: const [
+      BoxShadow(color: AppColors.lightShadowCard, blurRadius: 8, offset: Offset(0, 2)),
+    ],
+  );
+
+  static final BoxDecoration _darkElevated = BoxDecoration(
+    color: AppColors.darkElevated,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: AppColors.darkBorderSubtle),
+  );
+  static final BoxDecoration _lightElevated = BoxDecoration(
+    color: AppColors.lightElevated,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(color: AppColors.lightBorderSubtle),
+  );
+
+  static final BoxDecoration _darkBadge = BoxDecoration(
+    color: AppColors.darkTagBg,
+    borderRadius: BorderRadius.circular(6),
+    border: Border.all(color: AppColors.darkBorderSubtle),
+  );
+  static final BoxDecoration _darkBadgeHighlighted = BoxDecoration(
+    color: AppColors.darkAccent,
+    borderRadius: BorderRadius.circular(6),
+    border: Border.all(color: AppColors.darkBorderSubtle),
+  );
+  static final BoxDecoration _lightBadge = BoxDecoration(
+    color: AppColors.lightTagBg,
+    borderRadius: BorderRadius.circular(6),
+    border: Border.all(color: AppColors.lightBorderSubtle),
+  );
+  static final BoxDecoration _lightBadgeHighlighted = BoxDecoration(
+    color: AppColors.lightAccent,
+    borderRadius: BorderRadius.circular(6),
+    border: Border.all(color: AppColors.lightBorderSubtle),
+  );
+
+  static final BoxDecoration _darkPillActive = BoxDecoration(
+    color: AppColors.darkAccent,
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: AppColors.darkAccentLo),
+  );
+  static final BoxDecoration _darkPillInactive = BoxDecoration(
+    color: AppColors.darkElevated,
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: AppColors.darkBorderSubtle),
+  );
+  static final BoxDecoration _lightPillActive = BoxDecoration(
+    color: AppColors.lightAccent,
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: AppColors.lightAccentLo),
+  );
+  static final BoxDecoration _lightPillInactive = BoxDecoration(
+    color: AppColors.lightElevated,
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(color: AppColors.lightBorderSubtle),
+  );
+
+  /// Hero card gradient banner.
+  static BoxDecoration heroGradient(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkHeroGradient : _lightHeroGradient;
 
   /// Standard card decoration.
-  static BoxDecoration card(Brightness brightness) => BoxDecoration(
-    color: brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface,
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(
-      color: brightness == Brightness.dark ? AppColors.darkBorder : AppColors.lightBorder,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: brightness == Brightness.dark ? AppColors.darkShadowCard : AppColors.lightShadowCard,
-        blurRadius: 10,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  );
+  static BoxDecoration card(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkCard : _lightCard;
 
   /// Product card decoration (smaller radius, subtle shadow).
-  static BoxDecoration productCard(Brightness brightness) => BoxDecoration(
-    color: brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface,
-    borderRadius: BorderRadius.circular(14),
-    border: Border.all(
-      color: brightness == Brightness.dark ? AppColors.darkBorder : AppColors.lightBorder,
-    ),
-    boxShadow: [
-      BoxShadow(
-        color: brightness == Brightness.dark ? AppColors.darkShadowCard : AppColors.lightShadowCard,
-        blurRadius: 8,
-        offset: const Offset(0, 2),
-      ),
-    ],
-  );
+  static BoxDecoration productCard(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkProductCard : _lightProductCard;
 
   /// Elevated container (filter panels, sticky notes).
-  static BoxDecoration elevated(Brightness brightness) => BoxDecoration(
-    color: brightness == Brightness.dark ? AppColors.darkElevated : AppColors.lightElevated,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(
-      color: brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle,
-    ),
-  );
+  static BoxDecoration elevated(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkElevated : _lightElevated;
 
   /// Accent button glow shadow.
-  static List<BoxShadow> accentShadow(Brightness brightness) => [
-    BoxShadow(
-      color: brightness == Brightness.dark ? AppColors.darkShadowAccent : AppColors.lightShadowAccent,
-      blurRadius: 10,
-      offset: const Offset(0, 2),
-    ),
-  ];
+  static List<BoxShadow> accentShadow(Brightness brightness) =>
+      brightness == Brightness.dark ? _darkAccentShadow : _lightAccentShadow;
 
   /// Tag / badge decoration.
-  static BoxDecoration badge(Brightness brightness, {bool highlighted = false}) => BoxDecoration(
-    color: highlighted
-        ? (brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent)
-        : (brightness == Brightness.dark ? AppColors.darkTagBg : AppColors.lightTagBg),
-    borderRadius: BorderRadius.circular(6),
-    border: Border.all(
-      color: brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle,
-    ),
-  );
+  static BoxDecoration badge(Brightness brightness, {bool highlighted = false}) {
+    if (brightness == Brightness.dark) {
+      return highlighted ? _darkBadgeHighlighted : _darkBadge;
+    }
+    return highlighted ? _lightBadgeHighlighted : _lightBadge;
+  }
 
   /// Pill chip decoration (active / inactive).
-  static BoxDecoration pill(Brightness brightness, {required bool active}) => BoxDecoration(
-    color: active
-        ? (brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent)
-        : (brightness == Brightness.dark ? AppColors.darkElevated : AppColors.lightElevated),
-    borderRadius: BorderRadius.circular(999),
-    border: Border.all(
-      color: active
-          ? (brightness == Brightness.dark ? AppColors.darkAccentLo : AppColors.lightAccentLo)
-          : (brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle),
-    ),
-  );
+  static BoxDecoration pill(Brightness brightness, {required bool active}) {
+    if (brightness == Brightness.dark) {
+      return active ? _darkPillActive : _darkPillInactive;
+    }
+    return active ? _lightPillActive : _lightPillInactive;
+  }
 }
 
 // ─── ThemeData ───────────────────────────────────────────────────────────────
@@ -261,8 +320,8 @@ class AppDecorations {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get darkTheme  => _build(Brightness.dark);
-  static ThemeData get lightTheme => _build(Brightness.light);
+  static final ThemeData darkTheme  = _build(Brightness.dark);
+  static final ThemeData lightTheme = _build(Brightness.light);
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;

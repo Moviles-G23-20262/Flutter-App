@@ -1424,6 +1424,34 @@ void main() {
       world.chatState.clear();
     });
 
+    testWidgets('signing out empties the list and another account only sees its own searches', (tester) async {
+      final world = await pumpSearch(tester, saved: ['calculus']);
+      world.recentSearches.saved['other-user'] = ['chemistry'];
+      final recent = world.appState.recentSearches!;
+      expect(recent.searches, ['calculus']);
+
+      world.appState.logout();
+      await tester.pumpAndSettle();
+      expect(recent.searches, isEmpty);
+      await recent.record('leaked?'); // nobody is signed in: must not be saved anywhere
+      expect(world.recentSearches.saved[_me], ['calculus']);
+      expect(world.recentSearches.saved.keys.toSet(), {_me, 'other-user'}, reason: 'no list was created for nobody');
+
+      world.appState.login(UserEntity(
+        id: 'other-user',
+        email: 'other@uniandes.edu.co',
+        fullName: 'Other User',
+        major: 'CS',
+        rating: 4.0,
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(recent.searches, ['chemistry']);
+      expect(world.recentSearches.saved[_me], ['calculus']);
+      world.chatState.clear();
+    });
+
     testWidgets('nothing saved: no recent searches block', (tester) async {
       final world = await pumpSearch(tester);
 

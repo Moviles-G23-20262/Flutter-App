@@ -463,6 +463,8 @@ class _ListingRow extends StatelessWidget {
               child: CachedPhoto(
                 imageUrl: material.primaryImageUrl,
                 category: material.category.name,
+                width: 58,
+                height: 58,
                 fit: BoxFit.cover,
               ),
             ),

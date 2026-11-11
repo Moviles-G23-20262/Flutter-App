@@ -26,29 +26,58 @@ class ChatView extends StatefulWidget {
   State<ChatView> createState() => _ChatViewState();
 }
 
+sealed class _ChatEntry {
+  const _ChatEntry();
+}
+
+class _DayEntry extends _ChatEntry {
+  final String label;
+  const _DayEntry(this.label);
+}
+
+class _NoteEntry extends _ChatEntry {
+  final String text;
+  const _NoteEntry(this.text);
+}
+
+class _MessageEntry extends _ChatEntry {
+  final MessageEntity message;
+  const _MessageEntry(this.message);
+}
+
 class _ChatViewState extends State<ChatView> {
   final _msgCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  bool _sending = false;
-  bool _hasText = false;
+  final ValueNotifier<bool> _sending = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _hasText = ValueNotifier<bool>(false);
   int _shownCount = 0;
+
+  List<MessageEntity>? _cachedMessages;
+  int _cachedMessageCount = -1;
+  String? _cachedRoomId;
+  List<_ChatEntry> _cachedEntries = const [];
 
   @override
   void initState() {
     super.initState();
-    _msgCtrl.addListener(() {
-      final hasText = _msgCtrl.text.trim().isNotEmpty;
-      if (hasText != _hasText) setState(() => _hasText = hasText);
-    });
+    _msgCtrl.addListener(_onComposerTextChanged);
     // The other side may have placed or completed an order since the list was loaded.
     widget.appState.account.refreshExchanges();
     widget.appState.chats.loadInsight();
   }
 
+  void _onComposerTextChanged() {
+    final hasText = _msgCtrl.text.trim().isNotEmpty;
+    if (hasText != _hasText.value) _hasText.value = hasText;
+  }
+
   @override
   void dispose() {
+    _msgCtrl.removeListener(_onComposerTextChanged);
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
+    _sending.dispose();
+    _hasText.dispose();
     super.dispose();
   }
 
@@ -58,16 +87,45 @@ class _ChatViewState extends State<ChatView> {
 
   Future<void> _send() async {
     final text = _msgCtrl.text;
-    if (_sending || text.trim().isEmpty) return;
-    setState(() => _sending = true);
+    if (_sending.value || text.trim().isEmpty) return;
+    _sending.value = true;
     final error = await widget.appState.chats.send(widget.room.id, text);
     if (!mounted) return;
-    setState(() => _sending = false);
+    _sending.value = false;
     if (error == null) {
       _msgCtrl.clear();
     } else {
       _showMessage(error);
     }
+  }
+
+  List<_ChatEntry> _timelineEntries(ChatRoomEntity room, List<MessageEntity> messages) {
+    if (identical(messages, _cachedMessages) &&
+        messages.length == _cachedMessageCount &&
+        room.id == _cachedRoomId) {
+      return _cachedEntries;
+    }
+    final entries = <_ChatEntry>[
+      _DayEntry(chatDayLabel(room.createdAt)),
+      _NoteEntry(
+        room.material == null
+            ? 'Your phone number is never shared.'
+            : 'Chat started about "${room.material!.title}". Your phone number is never shared.',
+      ),
+    ];
+    for (var i = 0; i < messages.length; i++) {
+      final msg = messages[i];
+      final prevDate = i == 0 ? room.createdAt : messages[i - 1].createdAt;
+      if (!isSameLocalDay(msg.createdAt, prevDate)) {
+        entries.add(_DayEntry(chatDayLabel(msg.createdAt)));
+      }
+      entries.add(_MessageEntry(msg));
+    }
+    _cachedMessages = messages;
+    _cachedMessageCount = messages.length;
+    _cachedRoomId = room.id;
+    _cachedEntries = entries;
+    return entries;
   }
 
   Future<void> _answer(Future<String?> answering, {bool accepted = false}) async {
@@ -238,43 +296,44 @@ class _ChatViewState extends State<ChatView> {
               ? const LoadingView()
               : messages.isEmpty && chats.messagesError != null
                   ? ErrorView(message: chats.messagesError!, onRetry: chats.refreshMessages)
-                  : ListView(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                      children: [
-                        _DayChip(label: chatDayLabel(room.createdAt)),
-                        _SystemNote(
-                          text: room.material == null
-                              ? 'Your phone number is never shared.'
-                              : 'Chat started about "${room.material!.title}". Your phone number is never shared.',
-                        ),
-                        for (var i = 0; i < messages.length; i++) ...[
-                          if (i == 0
-                              ? chatDayLabel(messages[i].createdAt) != chatDayLabel(room.createdAt)
-                              : chatDayLabel(messages[i].createdAt) != chatDayLabel(messages[i - 1].createdAt))
-                            _DayChip(label: chatDayLabel(messages[i].createdAt)),
-                          if (messages[i].meetingProposal != null)
-                            _MeetingCard(
-                              proposal: messages[i].meetingProposal!,
-                              mine: messages[i].senderId == me,
-                              otherFirstName: otherFirst,
-                              onAccept: () => _answer(
-                                chats.acceptProposal(messages[i].meetingProposal!.id),
-                                accepted: true,
-                              ),
-                              onDecline: () => _answer(chats.declineProposal(messages[i].meetingProposal!.id)),
-                              onWithdraw: () => _answer(chats.withdrawProposal(messages[i].meetingProposal!.id)),
-                            )
-                          else
-                            _Bubble(
-                              message: messages[i],
-                              isMe: messages[i].senderId == me,
-                              onRetry: messages[i].isFailed ? () => chats.retryFailedMessage(messages[i].id) : null,
-                              onDelete: messages[i].isFailed ? () => chats.deleteFailedMessage(messages[i].id) : null,
-                            ),
-                        ],
-                      ],
-                    ),
+                  : () {
+                      final entries = _timelineEntries(room, messages);
+                      return ListView.builder(
+                        controller: _scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          switch (entry) {
+                            case _DayEntry(:final label):
+                              return _DayChip(label: label);
+                            case _NoteEntry(:final text):
+                              return _SystemNote(text: text);
+                            case _MessageEntry(:final message):
+                              final proposal = message.meetingProposal;
+                              if (proposal != null) {
+                                return _MeetingCard(
+                                  proposal: proposal,
+                                  mine: message.senderId == me,
+                                  otherFirstName: otherFirst,
+                                  onAccept: () => _answer(
+                                    chats.acceptProposal(proposal.id),
+                                    accepted: true,
+                                  ),
+                                  onDecline: () => _answer(chats.declineProposal(proposal.id)),
+                                  onWithdraw: () => _answer(chats.withdrawProposal(proposal.id)),
+                                );
+                              }
+                              return _Bubble(
+                                message: message,
+                                isMe: message.senderId == me,
+                                onRetry: message.isFailed ? () => chats.retryFailedMessage(message.id) : null,
+                                onDelete: message.isFailed ? () => chats.deleteFailedMessage(message.id) : null,
+                              );
+                          }
+                        },
+                      );
+                    }(),
         ),
 
         if (chats.isPowerSaving) const PowerSavingNote(),
@@ -335,44 +394,55 @@ class _ChatViewState extends State<ChatView> {
           child: Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _msgCtrl,
-                  enabled: !_sending,
-                  maxLength: 2000,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _send(),
-                  style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
-                  decoration: InputDecoration(
-                    hintText: 'Message $otherFirst…',
-                    counterText: '',
-                    hintStyle: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
-                    filled: true,
-                    fillColor: surface,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: borderSubtle)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: borderSubtle)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: accent, width: 1.5)),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _sending,
+                  builder: (context, sending, _) => TextField(
+                    controller: _msgCtrl,
+                    enabled: !sending,
+                    maxLength: 2000,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
+                    decoration: InputDecoration(
+                      hintText: 'Message $otherFirst…',
+                      counterText: '',
+                      hintStyle: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                      filled: true,
+                      fillColor: surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: borderSubtle)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: borderSubtle)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: accent, width: 1.5)),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 10),
               GestureDetector(
                 onTap: _send,
-                child: Container(
-                  width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    color: _hasText && !_sending ? accent : accent.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: _sending
-                        ? const SizedBox(
-                            width: 16, height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _sending,
+                  builder: (context, sending, _) => ValueListenableBuilder<bool>(
+                    valueListenable: _hasText,
+                    builder: (context, hasText, _) => Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: hasText && !sending ? accent : accent.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: sending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -591,7 +661,7 @@ class _Bubble extends StatelessWidget {
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.74),
             padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
             decoration: BoxDecoration(
               color: isMe ? accent : elevated,
@@ -691,7 +761,7 @@ class _FailedBubble extends StatelessWidget {
             mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
             children: [
               Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.74),
                 padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
                 decoration: BoxDecoration(
                   color: isMe ? accent : elevated,

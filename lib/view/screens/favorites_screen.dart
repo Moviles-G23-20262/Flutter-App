@@ -91,7 +91,7 @@ class FavoritesScreen extends StatelessWidget {
                                               borderRadius: BorderRadius.circular(10),
                                               child: SizedBox(
                                                 width: 60, height: 60,
-                                                child: CachedPhoto(imageUrl: material.primaryImageUrl, category: material.category.name, fit: BoxFit.cover),
+                                                child: CachedPhoto(imageUrl: material.primaryImageUrl, category: material.category.name, width: 60, height: 60, fit: BoxFit.cover),
                                               ),
                                             ),
                                             const SizedBox(width: 12),

@@ -60,21 +60,13 @@ class AppBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final tagBg = highlighted
-        ? (brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent)
-        : (brightness == Brightness.dark ? AppColors.darkTagBg : AppColors.lightTagBg);
     final tagTx = highlighted
         ? AppColors.darkAccentTx
         : (brightness == Brightness.dark ? AppColors.darkTagTx : AppColors.lightTagTx);
-    final border = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: tagBg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: border),
-      ),
+      decoration: AppDecorations.badge(brightness, highlighted: highlighted),
       child: Text(
         label.toUpperCase(),
         style: AppTextStyles.label(tagTx, fontSize: AppTextStyles.size2xs),
@@ -416,9 +408,8 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-    final deco = AppDecorations.card(brightness).copyWith(
-      borderRadius: borderRadius ?? BorderRadius.circular(16),
-    );
+    final baseDeco = AppDecorations.card(brightness);
+    final deco = borderRadius == null ? baseDeco : baseDeco.copyWith(borderRadius: borderRadius);
 
     final container = Container(
       padding: padding,
