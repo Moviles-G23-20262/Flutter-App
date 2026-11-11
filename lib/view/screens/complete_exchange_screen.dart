@@ -338,7 +338,7 @@ class _ItemCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
                   width: 52, height: 52,
-                  child: CachedPhoto(imageUrl: material?.primaryImageUrl ?? '', category: material?.category.name, fit: BoxFit.cover),
+                  child: CachedPhoto(imageUrl: material?.primaryImageUrl ?? '', category: material?.category.name, width: 52, height: 52, fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(width: 12),

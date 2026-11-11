@@ -306,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: SizedBox(
                             width: 56, height: 56,
-                            child: CachedPhoto(imageUrl: p.material?.primaryImageUrl ?? '', category: p.material?.category.name, fit: BoxFit.cover),
+                            child: CachedPhoto(imageUrl: p.material?.primaryImageUrl ?? '', category: p.material?.category.name, width: 56, height: 56, fit: BoxFit.cover),
                           ),
                         ),
                         const SizedBox(width: 10),
