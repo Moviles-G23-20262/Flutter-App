@@ -24,12 +24,36 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _activeCategory = 'All';
+  final ValueNotifier<String> _activeCategory = ValueNotifier<String>('All');
 
-  List<MaterialEntity> get _filtered {
-    final available = widget.appState.marketplace.availableMaterials;
-    if (_activeCategory == 'All') return available;
-    return available.where((m) => m.category.displayName == _activeCategory).toList();
+  List<MaterialEntity>? _cachedAvailable;
+  String? _cachedCategory;
+  List<MaterialEntity> _cachedOffers = const [];
+  List<MaterialEntity> _cachedRecommended = const [];
+  List<_FeaturedSeller> _cachedSellers = const [];
+
+  @override
+  void dispose() {
+    _activeCategory.dispose();
+    super.dispose();
+  }
+
+  void _syncProjections(List<MaterialEntity> available, String activeCategory) {
+    final sourceChanged = !identical(available, _cachedAvailable);
+    if (sourceChanged) {
+      _cachedSellers = _computeFeaturedSellers(available);
+    }
+    if (sourceChanged || _cachedCategory != activeCategory) {
+      final offers = activeCategory == 'All'
+          ? available
+          : available.where((m) => m.category.displayName == activeCategory).toList(growable: false);
+      _cachedOffers = offers;
+      _cachedRecommended = offers.length <= 4
+          ? const []
+          : offers.skip(4).take(3).toList(growable: false);
+      _cachedAvailable = available;
+      _cachedCategory = activeCategory;
+    }
   }
 
   Future<void> _toggleFav(String materialId) async {
@@ -52,9 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
 
   /// Sellers with the most available items, computed from the listings themselves.
-  List<_FeaturedSeller> _featuredSellers() {
+  List<_FeaturedSeller> _computeFeaturedSellers(List<MaterialEntity> available) {
     final bySeller = <String, _FeaturedSeller>{};
-    for (final m in widget.appState.marketplace.availableMaterials) {
+    for (final m in available) {
       final seller = m.seller;
       if (seller == null) continue;
       final current = bySeller[seller.id];
@@ -65,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final byItems = b.items.compareTo(a.items);
         return byItems != 0 ? byItems : b.seller.rating.compareTo(a.seller.rating);
       });
-    return sellers.take(4).toList();
+    return sellers.take(4).toList(growable: false);
   }
 
   @override
@@ -73,7 +97,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         widget.appState.marketplace,
-        widget.appState.account,
         widget.appState.connectivity,
       ]),
       builder: (context, _) => _buildBody(context),
@@ -90,10 +113,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final accentHi    = brightness == Brightness.dark ? AppColors.darkAccentHi    : AppColors.lightAccentHi;
     final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
-    final offers      = _filtered;
-    final recommended = offers.skip(4).take(3).toList();
-    final sellers     = _featuredSellers();
-    final unreadAlerts = widget.appState.account.unreadNotifications;
+    final available = market.availableMaterials;
+    _syncProjections(available, _activeCategory.value);
+    final sellers = _cachedSellers;
 
     final isOffline = widget.appState.connectivity.isOffline;
     final materialsSavedAt = market.materialsSavedAt;
@@ -137,27 +159,33 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: widget.appState.toggleTheme,
                   ),
                   const SizedBox(width: 8),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AppIconButton(
-                        icon: Icon(Icons.notifications_outlined, color: txSecondary, size: 18),
-                        onTap: () => widget.appState.navigateTo(AppScreen.notifications),
-                      ),
-                      if (unreadAlerts > 0)
-                        Positioned(
-                          right: -2, top: -2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text('$unreadAlerts',
-                                style: AppTextStyles.mono(Colors.white, fontSize: AppTextStyles.size2xs)),
+                  ListenableBuilder(
+                    listenable: widget.appState.account,
+                    builder: (context, _) {
+                      final unreadAlerts = widget.appState.account.unreadNotifications;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AppIconButton(
+                            icon: Icon(Icons.notifications_outlined, color: txSecondary, size: 18),
+                            onTap: () => widget.appState.navigateTo(AppScreen.notifications),
                           ),
-                        ),
-                    ],
+                          if (unreadAlerts > 0)
+                            Positioned(
+                              right: -2, top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text('$unreadAlerts',
+                                    style: AppTextStyles.mono(Colors.white, fontSize: AppTextStyles.size2xs)),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(width: 8),
                   AppIconButton(
@@ -227,123 +255,143 @@ class _HomeScreenState extends State<HomeScreen> {
                             // Hero banner
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                              child: _HeroBanner(
-                                onBrowse: () => widget.appState.navigateTo(AppScreen.search),
-                                brightness: brightness,
-                              ),
-                            ),
-
-                            // Categories
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
-                              child: SectionTitle('Categories'),
-                            ),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              height: 36,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: kCategories.length,
-                                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                                itemBuilder: (_, i) => PillChip(
-                                  label: kCategories[i],
-                                  active: _activeCategory == kCategories[i],
-                                  onTap: () => setState(() => _activeCategory = kCategories[i]),
+                              child: RepaintBoundary(
+                                child: _HeroBanner(
+                                  onBrowse: () => widget.appState.navigateTo(AppScreen.search),
+                                  brightness: brightness,
                                 ),
                               ),
                             ),
 
-                            // Current Offers
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.local_fire_department_rounded, color: accentHi, size: 16),
-                                  const SizedBox(width: 6),
-                                  Expanded(child: SectionTitle('Current Offers')),
-                                  TextButton(
-                                    onPressed: () => widget.appState.navigateTo(AppScreen.search),
-                                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                                    child: Row(
-                                      children: [
-                                        Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
-                                        Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            if (offers.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 24),
-                                child: EmptyView(
-                                  icon: isOffline ? Icons.wifi_off_rounded : Icons.inventory_2_outlined,
-                                  title: (isOffline && market.materialsSavedAt == null)
-                                      ? 'Connect once to load listings'
-                                      : 'Nothing listed yet',
-                                  subtitle: (isOffline && market.materialsSavedAt == null)
-                                      ? 'An internet connection is required the first time.'
-                                      : _activeCategory == 'All'
-                                          ? 'Be the first to list something with the Sell button.'
-                                          : 'No items in $_activeCategory right now.',
-                                ),
-                              )
-                            else
-                              SizedBox(
-                                height: 240,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  itemCount: offers.take(4).length,
-                                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                                  itemBuilder: (_, i) {
-                                    final m = offers[i];
-                                    return _ProductCard(
-                                      material: m,
-                                      isFav: market.isFavorite(m.id),
-                                      onFavToggle: () => _toggleFav(m.id),
-                                      onTap: () => widget.appState.openMaterialDetail(m),
-                                      width: 155,
-                                    );
-                                  },
-                                ),
-                              ),
+                            // Categories + filtered Offers + Recommended (isolated from Header, Hero & Featured Sellers)
+                            ValueListenableBuilder<String>(
+                              valueListenable: _activeCategory,
+                              builder: (context, activeCategory, _) {
+                                _syncProjections(available, activeCategory);
+                                final offers = _cachedOffers;
+                                final recommended = _cachedRecommended;
 
-                            // Recommended
-                            if (recommended.isNotEmpty) ...[
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                                child: Row(
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.menu_book_rounded, color: accentHi, size: 16),
-                                    const SizedBox(width: 6),
-                                    Expanded(child: SectionTitle('Recommended')),
-                                    TextButton(
-                                      onPressed: () => widget.appState.navigateTo(AppScreen.search),
-                                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                    // Categories
+                                    const Padding(
+                                      padding: EdgeInsets.fromLTRB(16, 20, 0, 0),
+                                      child: SectionTitle('Categories'),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    SizedBox(
+                                      height: 36,
+                                      child: ListView.separated(
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        itemCount: kCategories.length,
+                                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                                        itemBuilder: (_, i) => PillChip(
+                                          label: kCategories[i],
+                                          active: activeCategory == kCategories[i],
+                                          onTap: () => _activeCategory.value = kCategories[i],
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Current Offers
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                                       child: Row(
                                         children: [
-                                          Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
-                                          Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
+                                          Icon(Icons.local_fire_department_rounded, color: accentHi, size: 16),
+                                          const SizedBox(width: 6),
+                                          const Expanded(child: SectionTitle('Current Offers')),
+                                          TextButton(
+                                            onPressed: () => widget.appState.navigateTo(AppScreen.search),
+                                            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                            child: Row(
+                                              children: [
+                                                Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                                                Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
+                                              ],
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
+                                    const SizedBox(height: 10),
+                                    if (offers.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 24),
+                                        child: EmptyView(
+                                          icon: isOffline ? Icons.wifi_off_rounded : Icons.inventory_2_outlined,
+                                          title: (isOffline && market.materialsSavedAt == null)
+                                              ? 'Connect once to load listings'
+                                              : 'Nothing listed yet',
+                                          subtitle: (isOffline && market.materialsSavedAt == null)
+                                              ? 'An internet connection is required the first time.'
+                                              : activeCategory == 'All'
+                                                  ? 'Be the first to list something with the Sell button.'
+                                                  : 'No items in $activeCategory right now.',
+                                        ),
+                                      )
+                                    else
+                                      SizedBox(
+                                        height: 240,
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          itemCount: offers.length > 4 ? 4 : offers.length,
+                                          separatorBuilder: (_, _) => const SizedBox(width: 12),
+                                          itemBuilder: (_, i) {
+                                            final m = offers[i];
+                                            return _ProductCard(
+                                              material: m,
+                                              isFav: market.isFavorite(m.id),
+                                              onFavToggle: () => _toggleFav(m.id),
+                                              onTap: () => widget.appState.openMaterialDetail(m),
+                                              width: 155,
+                                            );
+                                          },
+                                        ),
+                                      ),
+
+                                    // Recommended
+                                    if (recommended.isNotEmpty) ...[
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.menu_book_rounded, color: accentHi, size: 16),
+                                            const SizedBox(width: 6),
+                                            const Expanded(child: SectionTitle('Recommended')),
+                                            TextButton(
+                                              onPressed: () => widget.appState.navigateTo(AppScreen.search),
+                                              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                                              child: Row(
+                                                children: [
+                                                  Text('See all', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+                                                  Icon(Icons.chevron_right_rounded, color: txMuted, size: 14),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      for (final m in recommended)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                                          child: RepaintBoundary(
+                                            child: _RecommendedRow(
+                                              material: m,
+                                              onTap: () => widget.appState.openMaterialDetail(m),
+                                              onMessage: () => _messageSeller(m),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ],
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              ...recommended.map((m) => Padding(
-                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                                    child: _RecommendedRow(
-                                      material: m,
-                                      onTap: () => widget.appState.openMaterialDetail(m),
-                                      onMessage: () => _messageSeller(m),
-                                    ),
-                                  )),
-                            ],
+                                );
+                              },
+                            ),
 
                             // Featured sellers
                             if (sellers.isNotEmpty) ...[
@@ -353,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     Icon(Icons.star_rounded, color: accentHi, size: 16),
                                     const SizedBox(width: 6),
-                                    SectionTitle('Featured Sellers'),
+                                    const SectionTitle('Featured Sellers'),
                                   ],
                                 ),
                               ),
@@ -495,7 +543,7 @@ class _ProductCard extends StatelessWidget {
               child: CachedPhoto(
                 imageUrl: material.primaryImageUrl,
                 category: material.category.name,
-                width: double.infinity,
+                width: width.isFinite ? width : double.infinity,
                 height: 110,
                 fit: BoxFit.cover,
               ),

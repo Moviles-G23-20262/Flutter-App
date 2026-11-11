@@ -57,13 +57,22 @@ String minuteOfDay(int minutes) =>
 String weekdayName(int dayOfWeek) =>
     const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayOfWeek - 1];
 
+/// Fast calendar-day equality check without formatting strings.
+bool isSameLocalDay(DateTime a, DateTime b) {
+  final la = a.toLocal();
+  final lb = b.toLocal();
+  return la.year == lb.year && la.month == lb.month && la.day == lb.day;
+}
+
 /// "Today", "Yesterday" or "Wed 16 Sep", for date separators in a chat.
 String chatDayLabel(DateTime moment, {DateTime? now}) {
   final local = moment.toLocal();
   final today = now ?? DateTime.now();
+  if (local.year == today.year && local.month == today.month && local.day == today.day) {
+    return 'Today';
+  }
   final day = DateTime(local.year, local.month, local.day);
   final difference = DateTime(today.year, today.month, today.day).difference(day).inDays;
-  if (difference == 0) return 'Today';
   if (difference == 1) return 'Yesterday';
   return dayLabel(local);
 }

@@ -19,16 +19,86 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
+class _IndexedMaterial {
+  final MaterialEntity material;
+  final String titleLower;
+  final String? courseLower;
+  final String categoryLower;
+
+  _IndexedMaterial(this.material)
+      : titleLower = material.title.toLowerCase(),
+        courseLower = material.courseCode?.toLowerCase(),
+        categoryLower = material.category.displayName.toLowerCase();
+}
+
 class _SearchScreenState extends State<SearchScreen> {
   final _queryCtrl = TextEditingController();
-  String _query       = '';
+  final ValueNotifier<String> _query = ValueNotifier<String>('');
   _SearchFilters _filters = _SearchFilters();
   late bool _wasOffline = widget.appState.connectivity.isOffline;
+
+  List<MaterialEntity>? _indexedSource;
+  List<_IndexedMaterial> _searchIndex = const [];
+
+  List<MaterialEntity>? _cachedSource;
+  String? _cachedQuery;
+  MaterialCategoryEnum? _cachedCategory;
+  MaterialConditionEnum? _cachedCondition;
+  double? _cachedMaxPrice;
+  String? _cachedSortId;
+  List<MaterialEntity> _cachedResults = const [];
+
+  List<MaterialEntity>? _observedAvailable;
+  late bool _observedLoading = widget.appState.marketplace.isLoading;
+  late bool _observedFirstLoad = widget.appState.marketplace.isFirstLoad;
+  late String? _observedError = widget.appState.marketplace.error;
+  late bool _observedEmpty = widget.appState.marketplace.materials.isEmpty;
 
   @override
   void initState() {
     super.initState();
+    _observedAvailable = widget.appState.marketplace.availableMaterials;
     widget.appState.connectivity.addListener(_onConnectivityChanged);
+    widget.appState.marketplace.addListener(_onMarketplaceChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.appState != widget.appState) {
+      oldWidget.appState.connectivity.removeListener(_onConnectivityChanged);
+      oldWidget.appState.marketplace.removeListener(_onMarketplaceChanged);
+      widget.appState.connectivity.addListener(_onConnectivityChanged);
+      widget.appState.marketplace.addListener(_onMarketplaceChanged);
+      _syncObservedMarketplace();
+    }
+  }
+
+  bool _syncObservedMarketplace() {
+    final market = widget.appState.marketplace;
+    final available = market.availableMaterials;
+    final loading = market.isLoading;
+    final firstLoad = market.isFirstLoad;
+    final error = market.error;
+    final empty = market.materials.isEmpty;
+    final changed = !identical(available, _observedAvailable) ||
+        loading != _observedLoading ||
+        firstLoad != _observedFirstLoad ||
+        error != _observedError ||
+        empty != _observedEmpty;
+    _observedAvailable = available;
+    _observedLoading = loading;
+    _observedFirstLoad = firstLoad;
+    _observedError = error;
+    _observedEmpty = empty;
+    return changed;
+  }
+
+  void _onMarketplaceChanged() {
+    // Ignore unrelated marketplace updates (such as wishlist toggles) that leave search state untouched.
+    if (_syncObservedMarketplace() && mounted) {
+      setState(() {});
+    }
   }
 
   /// Back online after being offline: sync the listings again without the user asking.
@@ -37,24 +107,60 @@ class _SearchScreenState extends State<SearchScreen> {
     final restored = _wasOffline && !offline;
     _wasOffline = offline;
     if (restored) widget.appState.marketplace.load();
+    if (mounted) setState(() {});
   }
 
-  List<MaterialEntity> get _results {
-    var list = widget.appState.marketplace.availableMaterials.where((m) {
-      if (_filters.category != null && m.category != _filters.category) return false;
-      if (_filters.condition != null && m.condition != _filters.condition) return false;
-      if (_filters.hasPriceLimit && m.price > _filters.maxPrice) return false;
-      if (_query.isNotEmpty) {
-        final q = _query.toLowerCase();
-        return m.title.toLowerCase().contains(q) ||
-               (m.courseCode?.toLowerCase().contains(q) ?? false) ||
-               m.category.displayName.toLowerCase().contains(q);
+  List<_IndexedMaterial> _ensureIndex(List<MaterialEntity> available) {
+    if (identical(available, _indexedSource)) return _searchIndex;
+    _indexedSource = available;
+    return _searchIndex = [for (final m in available) _IndexedMaterial(m)];
+  }
+
+  List<MaterialEntity> _computeResults(String query) {
+    final available = widget.appState.marketplace.availableMaterials;
+    final sortId = _filters.sort.id;
+    if (identical(available, _cachedSource) &&
+        _cachedQuery == query &&
+        _cachedCategory == _filters.category &&
+        _cachedCondition == _filters.condition &&
+        _cachedMaxPrice == _filters.maxPrice &&
+        _cachedSortId == sortId) {
+      return _cachedResults;
+    }
+
+    final indexed = _ensureIndex(available);
+    final hasQuery = query.isNotEmpty;
+    final q = hasQuery ? query.toLowerCase() : '';
+    final cat = _filters.category;
+    final cond = _filters.condition;
+    final hasLimit = _filters.hasPriceLimit;
+    final maxPrice = _filters.maxPrice;
+
+    final list = <MaterialEntity>[];
+    for (var i = 0; i < indexed.length; i++) {
+      final entry = indexed[i];
+      final m = entry.material;
+      if (cat != null && m.category != cat) continue;
+      if (cond != null && m.condition != cond) continue;
+      if (hasLimit && m.price > maxPrice) continue;
+      if (hasQuery) {
+        final match = entry.titleLower.contains(q) ||
+            (entry.courseLower?.contains(q) ?? false) ||
+            entry.categoryLower.contains(q);
+        if (!match) continue;
       }
-      return true;
-    }).toList();
+      list.add(m);
+    }
+
+    _cachedSource = available;
+    _cachedQuery = query;
+    _cachedCategory = cat;
+    _cachedCondition = cond;
+    _cachedMaxPrice = maxPrice;
+    _cachedSortId = sortId;
 
     // the ui simply executes the return
-    return _filters.sort.sort(list); // There is absolutely no if-else or switch statement cluttering the view
+    return _cachedResults = _filters.sort.sort(list); // There is absolutely no if-else or switch statement cluttering the view
     // ->>>>>>> The algorithmic logic is entirely decoupled.from the UI in sort_strategy.dart, between lines 6 and 112, 
   }
 
@@ -71,27 +177,20 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     widget.appState.connectivity.removeListener(_onConnectivityChanged);
+    widget.appState.marketplace.removeListener(_onMarketplaceChanged);
+    _query.dispose();
     _queryCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: Listenable.merge([widget.appState.marketplace, widget.appState.connectivity]),
-      builder: (context, _) => _buildBody(context),
-    );
-  }
-
-  Widget _buildBody(BuildContext context) {
     final market      = widget.appState.marketplace;
     final brightness  = Theme.of(context).brightness;
     final surface     = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
     final border      = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
     final txMuted     = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
     final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-
-    final results = _results;
 
     return Column(
       children: [
@@ -117,7 +216,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: AppTextField(
                       placeholder: 'Search course materials…',
                       controller: _queryCtrl,
-                      onChanged: (v) => setState(() => _query = v),
+                      onChanged: (v) => _query.value = v,
                       prefixIcon: Icon(Icons.search_rounded, color: txMuted, size: 18),
                     ),
                   ),
@@ -131,8 +230,14 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text('${results.length} item${results.length != 1 ? 's' : ''} found',
-                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+              ValueListenableBuilder<String>(
+                valueListenable: _query,
+                builder: (context, query, _) {
+                  final count = _computeResults(query).length;
+                  return Text('$count item${count != 1 ? 's' : ''} found',
+                      style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs));
+                },
+              ),
             ],
           ),
         ),
@@ -140,33 +245,39 @@ class _SearchScreenState extends State<SearchScreen> {
 
         // ── Results grid ────────────────────────────────────────────────────
         Expanded(
-          child: market.isFirstLoad && market.isLoading
-              ? const LoadingView()
-              : market.error != null && market.materials.isEmpty
-                  ? ErrorView(message: market.error!, onRetry: market.load)
-                  : results.isEmpty
-              ? _EmptySearch()
-              : RefreshIndicator(
-                  onRefresh: market.load,
-                  child: GridView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(14),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemCount: results.length,
-                  itemBuilder: (_, i) {
-                    final m = results[i];
-                    return _SearchProductCard(
-                      material: m,
-                      onTap: () => widget.appState.openMaterialDetail(m),
-                    );
-                  },
-                ),
-                ),
+          child: ValueListenableBuilder<String>(
+            valueListenable: _query,
+            builder: (context, query, _) {
+              final results = _computeResults(query);
+              return market.isFirstLoad && market.isLoading
+                  ? const LoadingView()
+                  : market.error != null && market.materials.isEmpty
+                      ? ErrorView(message: market.error!, onRetry: market.load)
+                      : results.isEmpty
+                          ? _EmptySearch()
+                          : RefreshIndicator(
+                              onRefresh: market.load,
+                              child: GridView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.all(14),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 14,
+                                  mainAxisSpacing: 14,
+                                  childAspectRatio: 0.72,
+                                ),
+                                itemCount: results.length,
+                                itemBuilder: (_, i) {
+                                  final m = results[i];
+                                  return _SearchProductCard(
+                                    material: m,
+                                    onTap: () => widget.appState.openMaterialDetail(m),
+                                  );
+                                },
+                              ),
+                            );
+            },
+          ),
         ),
       ],
     );

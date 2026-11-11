@@ -41,6 +41,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   final Set<String> _discarded = {};
 
   List<MaterialEntity> _materials = const [];
+  List<MaterialEntity>? _availableMaterialsCache;
   List<WishlistItemEntity> _wishlist = const [];
   DateTime? _wishlistSavedAt;
   DateTime? _materialsSavedAt;
@@ -55,7 +56,7 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   List<MaterialEntity> get materials => _materials;
   List<MaterialEntity> get availableMaterials =>
-      _materials.where((m) => m.isAvailable).toList(growable: false);
+      _availableMaterialsCache ??= List.unmodifiable(_materials.where((m) => m.isAvailable));
   List<WishlistItemEntity> get wishlist => _wishlist;
 
   /// Set while the favorites shown are the copy saved on the phone (offline): when it was saved.
@@ -124,6 +125,7 @@ class MarketplaceViewModel extends ChangeNotifier {
       final result = await getMaterials.executeCached();
       if (generation != _generation) return;
       _materials = result.items;
+      _availableMaterialsCache = null;
       _materialsSavedAt = result.savedAt;
     } on DataException catch (e) {
       if (generation != _generation) return;
@@ -282,6 +284,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   Future<MaterialEntity> publish(NewListingData data) async {
     final created = await createListing.execute(data);
     _materials = [created, ..._materials];
+    _availableMaterialsCache = null;
     notifyListeners();
     return created;
   }
@@ -293,6 +296,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     final copy = List<MaterialEntity>.of(_materials);
     copy[idx] = updated;
     _materials = copy;
+    _availableMaterialsCache = null;
     notifyListeners();
   }
 
@@ -303,6 +307,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _pendingListings = const [];
     _discarded.clear();
     _materials = const [];
+    _availableMaterialsCache = null;
     _wishlist = const [];
     _wishlistSavedAt = null;
     _materialsSavedAt = null;

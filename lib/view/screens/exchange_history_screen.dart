@@ -241,7 +241,7 @@ class _ExchangeCard extends StatelessWidget {
             child: SizedBox(
               width: 64,
               height: 64,
-              child: CachedPhoto(imageUrl: exchange.material?.primaryImageUrl ?? '', category: exchange.material?.category.name, fit: BoxFit.cover),
+              child: CachedPhoto(imageUrl: exchange.material?.primaryImageUrl ?? '', category: exchange.material?.category.name, width: 64, height: 64, fit: BoxFit.cover),
             ),
           ),
           const SizedBox(width: 12),

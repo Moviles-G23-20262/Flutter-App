@@ -58,24 +58,83 @@ class CachedPhoto extends StatelessWidget {
     );
   }
 
+  static const int _maxDecodeDimension = 2048;
+
+  Widget _wrapClip(Widget child) {
+    final radius = borderRadius;
+    if (radius != null && radius != BorderRadius.zero) {
+      return ClipRRect(borderRadius: radius, child: child);
+    }
+    return child;
+  }
+
+  static (int?, int?) _resolveMemCacheSize({
+    required double? logicalWidth,
+    required double? logicalHeight,
+    required double dpr,
+  }) {
+    final pxW = (logicalWidth != null && logicalWidth.isFinite && logicalWidth > 0)
+        ? (logicalWidth * dpr).round().clamp(1, _maxDecodeDimension)
+        : null;
+    final pxH = (logicalHeight != null && logicalHeight.isFinite && logicalHeight > 0)
+        ? (logicalHeight * dpr).round().clamp(1, _maxDecodeDimension)
+        : null;
+    if (pxW == null && pxH == null) return (null, null);
+    // Pass at most one decode bound so ResizeImage preserves the photo's aspect ratio.
+    if (pxW != null && (pxH == null || pxW >= pxH)) {
+      return (pxW, null);
+    }
+    return (null, pxH);
+  }
+
+  Widget _buildNetworkImage(BuildContext context, int? memCacheWidth, int? memCacheHeight) {
+    return CachedNetworkImage(
+      imageUrl: imageUrl!,
+      width: width,
+      height: height,
+      fit: fit,
+      memCacheWidth: memCacheWidth,
+      memCacheHeight: memCacheHeight,
+      placeholder: (context, url) => _buildPlaceholder(context),
+      errorWidget: (context, url, error) => _buildPlaceholder(context),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return ClipRRect(
-        borderRadius: borderRadius ?? BorderRadius.zero,
-        child: _buildPlaceholder(context),
-      );
+      return _wrapClip(_buildPlaceholder(context));
     }
 
-    return ClipRRect(
-      borderRadius: borderRadius ?? BorderRadius.zero,
-      child: CachedNetworkImage(
-        imageUrl: imageUrl!,
-        width: width,
-        height: height,
-        fit: fit,
-        placeholder: (context, url) => _buildPlaceholder(context),
-        errorWidget: (context, url, error) => _buildPlaceholder(context),
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final hasFiniteW = width != null && width!.isFinite;
+    final hasFiniteH = height != null && height!.isFinite;
+
+    if (hasFiniteW && hasFiniteH) {
+      final (memW, memH) = _resolveMemCacheSize(
+        logicalWidth: width,
+        logicalHeight: height,
+        dpr: dpr,
+      );
+      return _wrapClip(_buildNetworkImage(context, memW, memH));
+    }
+
+    return _wrapClip(
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final resolvedW = hasFiniteW
+              ? width
+              : (constraints.hasBoundedWidth ? constraints.maxWidth : null);
+          final resolvedH = hasFiniteH
+              ? height
+              : (constraints.hasBoundedHeight ? constraints.maxHeight : null);
+          final (memW, memH) = _resolveMemCacheSize(
+            logicalWidth: resolvedW,
+            logicalHeight: resolvedH,
+            dpr: dpr,
+          );
+          return _buildNetworkImage(context, memW, memH);
+        },
       ),
     );
   }
