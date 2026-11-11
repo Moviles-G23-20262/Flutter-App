@@ -7,6 +7,10 @@ import '../../app/theme/app_theme.dart';
 /// Implements EC14: Caches images in memory and local disk (200 files, 30 days).
 /// If an image fails to load while offline or has never been downloaded, it gracefully renders
 /// a category placeholder icon instead of a broken empty box or crash.
+///
+/// A photo is usually shown much smaller than it was uploaded, so [memCacheWidth] and
+/// [maxWidthDiskCache] (both in pixels, both optional) make the image be resized before it is kept
+/// in the memory cache and in the disk cache. Small thumbnails then do not hold full-size bitmaps.
 class CachedPhoto extends StatelessWidget {
   final String? imageUrl;
   final String? category;
@@ -14,6 +18,12 @@ class CachedPhoto extends StatelessWidget {
   final double? height;
   final BoxFit fit;
   final BorderRadius? borderRadius;
+
+  /// Width in pixels the decoded image is limited to in the memory cache; null keeps it as is.
+  final int? memCacheWidth;
+
+  /// Width in pixels the image file is limited to in the disk cache; null keeps it as is.
+  final int? maxWidthDiskCache;
 
   const CachedPhoto({
     super.key,
@@ -23,6 +33,8 @@ class CachedPhoto extends StatelessWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
+    this.memCacheWidth,
+    this.maxWidthDiskCache,
   });
 
   IconData _categoryIcon() {
@@ -74,6 +86,8 @@ class CachedPhoto extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        memCacheWidth: memCacheWidth,
+        maxWidthDiskCache: maxWidthDiskCache,
         placeholder: (context, url) => _buildPlaceholder(context),
         errorWidget: (context, url, error) => _buildPlaceholder(context),
       ),

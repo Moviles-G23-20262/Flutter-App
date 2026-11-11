@@ -8,6 +8,7 @@ import '../model/entities/user_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import 'account_view_model.dart';
 import 'average_ticket_view_model.dart';
+import 'recent_searches_view_model.dart';
 import 'chat_view_model.dart';
 import 'marketplace_view_model.dart';
 import 'meeting_planner_view_model.dart';
@@ -67,6 +68,9 @@ class AppViewModel extends ChangeNotifier {
   /// The average ticket card in the Seller Hub; without it the card is not shown.
   final AverageTicketViewModel? averageTicket;
 
+  /// The recent searches under the search box (kept on the phone); without it none are shown.
+  final RecentSearchesViewModel? recentSearches;
+
   /// Light/dark, including the automatic ambient-light mode.
   final ThemeViewModel theme;
 
@@ -96,6 +100,7 @@ class AppViewModel extends ChangeNotifier {
     required this.schedule,
     required this.meetups,
     this.averageTicket,
+    this.recentSearches,
     required this.theme,
     required this.power,
     required this.connectivity,
@@ -324,6 +329,7 @@ class AppViewModel extends ChangeNotifier {
     account.dispose();
     schedule.dispose();
     averageTicket?.dispose();
+    recentSearches?.dispose();
     theme.removeListener(notifyListeners);
     theme.dispose();
     power.removeListener(_applyPowerSaving);
