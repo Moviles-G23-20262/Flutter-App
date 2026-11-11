@@ -5,6 +5,7 @@ import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
+import '../../view_model/recent_searches_view_model.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/strategies/sort_strategy.dart';
 
@@ -60,6 +61,16 @@ class _SearchScreenState extends State<SearchScreen> {
     _observedAvailable = widget.appState.marketplace.availableMaterials;
     widget.appState.connectivity.addListener(_onConnectivityChanged);
     widget.appState.marketplace.addListener(_onMarketplaceChanged);
+    // The recent searches are on the phone (Hive), so they load without a connection.
+    _recent?.load(widget.appState.currentUser?.id);
+  }
+
+  RecentSearchesViewModel? get _recent => widget.appState.recentSearches;
+
+  /// Puts a recent search back in the box; the results follow it.
+  void _useRecentSearch(String query) {
+    _queryCtrl.value = TextEditingValue(text: query, selection: TextSelection.collapsed(offset: query.length));
+    _query.value = query;
   }
 
   @override
@@ -217,6 +228,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       placeholder: 'Search course materials…',
                       controller: _queryCtrl,
                       onChanged: (v) => _query.value = v,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (v) => _recent?.record(v),
                       prefixIcon: Icon(Icons.search_rounded, color: txMuted, size: 18),
                     ),
                   ),
@@ -242,6 +255,21 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         Divider(color: border, height: 1),
+
+        // ── Recent searches (saved on the phone, so they also show offline) ────────
+        ListenableBuilder(
+          listenable: Listenable.merge([_query, ?_recent]),
+          builder: (context, _) {
+            final recent = _recent;
+            if (recent == null || recent.searches.isEmpty || _query.value.isNotEmpty) return const SizedBox.shrink();
+            return _RecentSearches(
+              searches: recent.searches,
+              onSelected: _useRecentSearch,
+              onRemove: recent.forget,
+              onClear: recent.clearAll,
+            );
+          },
+        ),
 
         // ── Results grid ────────────────────────────────────────────────────
         Expanded(
@@ -271,7 +299,11 @@ class _SearchScreenState extends State<SearchScreen> {
                                   final m = results[i];
                                   return _SearchProductCard(
                                     material: m,
-                                    onTap: () => widget.appState.openMaterialDetail(m),
+                                    onTap: () {
+                                      // Opening a result means the search was useful: remember it.
+                                      _recent?.record(_query.value);
+                                      widget.appState.openMaterialDetail(m);
+                                    },
                                   );
                                 },
                               ),
@@ -325,6 +357,66 @@ class _OfflineBanner extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The user's latest searches as chips: tap one to search it again, the cross forgets it.
+class _RecentSearches extends StatelessWidget {
+  final List<String> searches;
+  final ValueChanged<String> onSelected;
+  final ValueChanged<String> onRemove;
+  final VoidCallback onClear;
+
+  const _RecentSearches({
+    required this.searches,
+    required this.onSelected,
+    required this.onRemove,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final txMuted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+    final txPrimary = dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    return Padding(
+      key: const Key('recent-searches'),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_rounded, color: txMuted, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('Recent searches', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
+              ),
+              TextButton(
+                key: const Key('clear-recent-searches'),
+                onPressed: onClear,
+                style: TextButton.styleFrom(minimumSize: const Size(0, 28), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final query in searches)
+                InputChip(
+                  key: Key('recent-search-$query'),
+                  label: Text(query, style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs)),
+                  onPressed: () => onSelected(query),
+                  onDeleted: () => onRemove(query),
+                  deleteIconColor: txMuted,
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -514,6 +606,10 @@ class _SheetLabel extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SearchProductCard extends StatelessWidget {
+  /// Image cache limits for the grid thumbnails (pixels).
+  static const int _thumbnailMemCacheWidth = 400;
+  static const int _thumbnailDiskCacheWidth = 800;
+
   final MaterialEntity material;
   final VoidCallback onTap;
 
@@ -536,7 +632,16 @@ class _SearchProductCard extends StatelessWidget {
             SizedBox(
               height: 120,
               width: double.infinity,
-              child: CachedPhoto(imageUrl: material.primaryImageUrl, category: material.category.name, fit: BoxFit.cover),
+              // Grid thumbnails (about 120 px tall): resize before caching instead of keeping the
+              // full photo. 400 px in memory is sharp on a phone grid; 800 px on disk leaves room
+              // to open the same photo larger without downloading it again.
+              child: CachedPhoto(
+                imageUrl: material.primaryImageUrl,
+                category: material.category.name,
+                fit: BoxFit.cover,
+                memCacheWidth: _thumbnailMemCacheWidth,
+                maxWidthDiskCache: _thumbnailDiskCacheWidth,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),

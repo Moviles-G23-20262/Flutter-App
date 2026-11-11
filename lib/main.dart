@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'app/app_dependencies.dart';
 import 'view_model/account_view_model.dart';
 import 'view_model/app_view_model.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'view_model/average_ticket_view_model.dart';
+import 'view_model/recent_searches_view_model.dart';
 import 'view_model/login_view_model.dart';
 import 'view_model/register_view_model.dart';
 import 'view_model/chat_view_model.dart';
@@ -31,8 +33,10 @@ import 'view/screens/favorites_screen.dart';
 import 'view/screens/notifications_screen.dart';
 import 'view/widgets/common_widgets.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Key/value database (recent searches); its boxes live in the app's documents folder.
+  await Hive.initFlutter();
   PaintingBinding.instance.imageCache.maximumSize = 100;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
   runApp(const CampusSwapApp());
@@ -94,6 +98,12 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     ),
     meetups: _deps.meetups,
     averageTicket: AverageTicketViewModel(getAverageTicket: _deps.getAverageTicket),
+    recentSearches: RecentSearchesViewModel(
+      getRecent: _deps.getRecentSearches,
+      saveRecent: _deps.saveRecentSearch,
+      removeRecent: _deps.removeRecentSearch,
+      clearRecent: _deps.clearRecentSearches,
+    ),
     theme: ThemeViewModel(
       watchAmbientLight: _deps.watchAmbientLight,
       loadPreference: _deps.loadThemePreference,

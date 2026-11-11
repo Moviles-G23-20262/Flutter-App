@@ -57,6 +57,9 @@ import 'package:flutter_front_end/model/entities/power_status.dart';
 import 'package:flutter_front_end/model/repositories/power_repositories.dart';
 import 'package:flutter_front_end/model/use_cases/power_use_cases.dart';
 import 'package:flutter_front_end/view_model/power_view_model.dart';
+import 'package:flutter_front_end/view_model/recent_searches_view_model.dart';
+import 'package:flutter_front_end/model/repositories/recent_searches_repository.dart';
+import 'package:flutter_front_end/model/use_cases/recent_searches_use_cases.dart';
 import 'package:flutter_front_end/view/widgets/formatters.dart';
 import 'package:flutter_front_end/view/widgets/offline_banner.dart';
 import 'package:flutter_front_end/view/widgets/saved_copy_banner.dart';
@@ -465,12 +468,20 @@ class _World {
     removeBlock: RemoveScheduleBlockUseCase(scheduleRepo),
   );
 
+  final recentSearches = _MemoryRecentSearches();
+
   late final appState = AppViewModel(
     marketplace: marketplaceState,
     chats: chatState,
     account: accountState,
     schedule: scheduleState,
     meetups: meetups,
+    recentSearches: RecentSearchesViewModel(
+      getRecent: GetRecentSearchesUseCase(recentSearches),
+      saveRecent: SaveRecentSearchUseCase(recentSearches),
+      removeRecent: RemoveRecentSearchUseCase(recentSearches),
+      clearRecent: ClearRecentSearchesUseCase(recentSearches),
+    ),
     theme: ThemeViewModel(
       watchAmbientLight: WatchAmbientLightUseCase(_NoLightSensor()),
       loadPreference: LoadThemePreferenceUseCase(_NoSavedTheme()),
@@ -483,6 +494,24 @@ class _World {
       watchConnectivity: WatchConnectivityUseCase(network),
     ),
   );
+}
+
+class _MemoryRecentSearches implements RecentSearchesRepository {
+  final saved = <String, List<String>>{};
+
+  @override
+  Future<List<String>> getAll(String ownerId) async => [...?saved[ownerId]];
+
+  @override
+  Future<List<String>> add(String ownerId, String query) async =>
+      saved[ownerId] = [query.trim(), ...?saved[ownerId]?.where((q) => q != query.trim())];
+
+  @override
+  Future<List<String>> remove(String ownerId, String query) async =>
+      saved[ownerId] = [...?saved[ownerId]?.where((q) => q != query)];
+
+  @override
+  Future<void> clear(String ownerId) async => saved[ownerId] = [];
 }
 
 class _FakeTracker implements AnalyticsEventRepository {
@@ -1353,6 +1382,109 @@ void main() {
 
       expect(find.byType(OfflineBanner), findsNothing);
       expect(find.byType(SavedCopyBanner), findsNothing);
+      world.chatState.clear();
+    });
+  });
+
+  group('Search screen recent searches', () {
+    final me = UserEntity(
+      id: _me,
+      email: 'me@uniandes.edu.co',
+      fullName: 'Maria Santos',
+      major: 'CS',
+      rating: 4.8,
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+    Future<_World> pumpSearch(WidgetTester tester, {List<String> saved = const [], bool online = true}) async {
+      final world = _World();
+      world.network.online = online;
+      world.recentSearches.saved[_me] = [...saved];
+      await tester.binding.setSurfaceSize(const Size(420, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      world.appState.login(me);
+      world.appState.connectivity.start();
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SearchScreen(appState: world.appState))));
+      await tester.pumpAndSettle();
+      return world;
+    }
+
+    testWidgets('offline, the saved searches are shown and tapping one fills the search box', (tester) async {
+      final world = await pumpSearch(tester, saved: ['calculus', 'chemistry book'], online: false);
+
+      expect(find.byKey(const Key('offline-banner-text')), findsOneWidget);
+      expect(find.byKey(const Key('recent-search-calculus')), findsOneWidget);
+      expect(find.byKey(const Key('recent-search-chemistry book')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('recent-search-calculus')));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextField, 'calculus'), findsOneWidget);
+      expect(find.byKey(const Key('recent-searches')), findsNothing, reason: 'hidden while a query is typed');
+      world.chatState.clear();
+    });
+
+    testWidgets('signing out empties the list and another account only sees its own searches', (tester) async {
+      final world = await pumpSearch(tester, saved: ['calculus']);
+      world.recentSearches.saved['other-user'] = ['chemistry'];
+      final recent = world.appState.recentSearches!;
+      expect(recent.searches, ['calculus']);
+
+      world.appState.logout();
+      await tester.pumpAndSettle();
+      expect(recent.searches, isEmpty);
+      await recent.record('leaked?'); // nobody is signed in: must not be saved anywhere
+      expect(world.recentSearches.saved[_me], ['calculus']);
+      expect(world.recentSearches.saved.keys.toSet(), {_me, 'other-user'}, reason: 'no list was created for nobody');
+
+      world.appState.login(UserEntity(
+        id: 'other-user',
+        email: 'other@uniandes.edu.co',
+        fullName: 'Other User',
+        major: 'CS',
+        rating: 4.0,
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(recent.searches, ['chemistry']);
+      expect(world.recentSearches.saved[_me], ['calculus']);
+      world.chatState.clear();
+    });
+
+    testWidgets('nothing saved: no recent searches block', (tester) async {
+      final world = await pumpSearch(tester);
+
+      expect(find.byKey(const Key('recent-searches')), findsNothing);
+      world.chatState.clear();
+    });
+
+    testWidgets('submitting a search saves it, and it is offered again once the box is empty', (tester) async {
+      final world = await pumpSearch(tester);
+
+      await tester.enterText(find.byType(TextField).first, 'physics');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(world.recentSearches.saved[_me], ['physics']);
+
+      await tester.enterText(find.byType(TextField).first, '');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('recent-search-physics')), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('the cross forgets one search and Clear forgets them all', (tester) async {
+      final world = await pumpSearch(tester, saved: ['calculus', 'physics']);
+
+      await tester.tap(find.descendant(of: find.byKey(const Key('recent-search-calculus')), matching: find.byTooltip('Delete')));
+      await tester.pumpAndSettle();
+      expect(world.recentSearches.saved[_me], ['physics']);
+      expect(find.byKey(const Key('recent-search-calculus')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('clear-recent-searches')));
+      await tester.pumpAndSettle();
+      expect(world.recentSearches.saved[_me], isEmpty);
+      expect(find.byKey(const Key('recent-searches')), findsNothing);
       world.chatState.clear();
     });
   });

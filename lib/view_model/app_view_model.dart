@@ -8,6 +8,7 @@ import '../model/entities/user_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import 'account_view_model.dart';
 import 'average_ticket_view_model.dart';
+import 'recent_searches_view_model.dart';
 import 'chat_view_model.dart';
 import 'marketplace_view_model.dart';
 import 'meeting_planner_view_model.dart';
@@ -67,6 +68,9 @@ class AppViewModel extends ChangeNotifier {
   /// The average ticket card in the Seller Hub; without it the card is not shown.
   final AverageTicketViewModel? averageTicket;
 
+  /// The recent searches under the search box (kept on the phone); without it none are shown.
+  final RecentSearchesViewModel? recentSearches;
+
   /// Light/dark, including the automatic ambient-light mode.
   final ThemeViewModel theme;
 
@@ -96,6 +100,7 @@ class AppViewModel extends ChangeNotifier {
     required this.schedule,
     required this.meetups,
     this.averageTicket,
+    this.recentSearches,
     required this.theme,
     required this.power,
     required this.connectivity,
@@ -111,8 +116,14 @@ class AppViewModel extends ChangeNotifier {
     connectivity.addListener(_onConnectivityChanged);
   }
 
+  bool _wasOnline = true;
+
   void _onConnectivityChanged() {
     marketplace.load();
+    final reconnected = connectivity.isOnline && !_wasOnline;
+    _wasOnline = connectivity.isOnline;
+    // BQ15 refreshes by itself when the network comes back (it may be showing a saved copy or an error).
+    if (reconnected) averageTicket?.load(force: true);
     if (connectivity.isOnline) {
       _verifyOfflineSession();
       chats.setOffline(false);
@@ -260,6 +271,9 @@ class AppViewModel extends ChangeNotifier {
     marketplace.watchPending(user.id);
     schedule.load();
     startOutboxSync?.execute(user.id);
+    // Recent searches belong to the account: show this user's (a switch of account, by password
+    // or Quick Unlock, never shows the previous user's).
+    recentSearches?.load(user.id);
   }
 
   /// Sends waiting outbox items immediately over mobile data for a single sync (EC13).
@@ -311,6 +325,7 @@ class AppViewModel extends ChangeNotifier {
     _selectedExchange = null;
     _plannerRoom = null;
     _currentUser = null;
+    recentSearches?.load(null); // nobody signed in: nothing shown, nothing saved
     _isLoggedIn = false;
     _currentScreen = AppScreen.login;
     notifyListeners();
@@ -324,6 +339,7 @@ class AppViewModel extends ChangeNotifier {
     account.dispose();
     schedule.dispose();
     averageTicket?.dispose();
+    recentSearches?.dispose();
     theme.removeListener(notifyListeners);
     theme.dispose();
     power.removeListener(_applyPowerSaving);

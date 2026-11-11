@@ -7,6 +7,9 @@ import '../model/use_cases/connectivity_use_cases.dart';
 import '../model/data_sources/analytics_remote_data_source.dart';
 import '../model/repositories/impl/meeting_density_repository_impl.dart';
 import '../model/repositories/impl/price_stats_repository_impl.dart';
+import '../model/data_sources/local/recent_searches_store.dart';
+import '../model/repositories/impl/recent_searches_repository_impl.dart';
+import '../model/use_cases/recent_searches_use_cases.dart';
 import '../model/repositories/impl/time_to_sell_repository_impl.dart';
 import '../model/entities/material_entity.dart';
 import '../model/repositories/impl/listing_health_preferences_repository_impl.dart';
@@ -186,6 +189,10 @@ class AppDependencies {
 
   /// Average ticket of completed sales, for the Seller Hub.
   final GetAverageTicketUseCase getAverageTicket;
+  final GetRecentSearchesUseCase getRecentSearches;
+  final SaveRecentSearchUseCase saveRecentSearch;
+  final RemoveRecentSearchUseCase removeRecentSearch;
+  final ClearRecentSearchesUseCase clearRecentSearches;
   final GetScheduleUseCase getSchedule;
   final AddScheduleBlockUseCase addScheduleBlock;
   final RemoveScheduleBlockUseCase removeScheduleBlock;
@@ -228,6 +235,10 @@ class AppDependencies {
     required this.getChatAgreement,
     required this.getTimeToSell,
     required this.getAverageTicket,
+    required this.getRecentSearches,
+    required this.saveRecentSearch,
+    required this.removeRecentSearch,
+    required this.clearRecentSearches,
     required this.getSchedule,
     required this.addScheduleBlock,
     required this.removeScheduleBlock,
@@ -330,6 +341,12 @@ class AppDependencies {
     final apiClient = ApiClient(baseUrl: baseUrl, client: http.Client());
 
     const analyticsBaseUrl = String.fromEnvironment('ANALYTICS_BASE_URL');
+    if (analyticsBaseUrl.isEmpty) {
+      throw StateError(
+        'ANALYTICS_BASE_URL is not defined. Run the app with '
+        '--dart-define-from-file=config/development.json',
+      );
+    }
     final analyticsClient = ApiClient(baseUrl: analyticsBaseUrl, client: http.Client());
     final analyticsRemote = AnalyticsRemoteDataSource(apiClient: analyticsClient);
     final database = AppDatabase();
@@ -341,6 +358,7 @@ class AppDependencies {
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final timeToSellRepository = TimeToSellRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final averageTicketRepository = AverageTicketRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final recentSearchesRepository = RecentSearchesRepositoryImpl(RecentSearchesStore());
     final listingHealthRepository = ListingHealthRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final listingHealthPrefsRepository = ListingHealthPreferencesRepositoryImpl();
     final sessionOwner = SessionOwner();
@@ -446,6 +464,10 @@ class AppDependencies {
       getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
       getAverageTicket: GetAverageTicketUseCase(averageTicketRepository),
+      getRecentSearches: GetRecentSearchesUseCase(recentSearchesRepository),
+      saveRecentSearch: SaveRecentSearchUseCase(recentSearchesRepository),
+      removeRecentSearch: RemoveRecentSearchUseCase(recentSearchesRepository),
+      clearRecentSearches: ClearRecentSearchesUseCase(recentSearchesRepository),
       getSchedule: GetScheduleUseCase(scheduleRepository),
       addScheduleBlock: AddScheduleBlockUseCase(scheduleRepository),
       removeScheduleBlock: RemoveScheduleBlockUseCase(scheduleRepository),

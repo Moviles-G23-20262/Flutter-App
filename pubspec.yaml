@@ -28,6 +28,8 @@ dependencies:
   path_provider: ^2.1.6
   cached_network_image: ^3.4.1
   image: ^4.12.0
+  hive_ce: ^2.23.3
+  hive_ce_flutter: ^2.5.0
 
 dev_dependencies:
   flutter_test:

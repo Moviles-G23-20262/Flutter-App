@@ -7,6 +7,11 @@ import '../../app/theme/app_theme.dart';
 /// Implements EC14: Caches images in memory and local disk (200 files, 30 days).
 /// If an image fails to load while offline or has never been downloaded, it gracefully renders
 /// a category placeholder icon instead of a broken empty box or crash.
+///
+/// A photo is usually shown much smaller than it was uploaded. By default the decode size follows
+/// the widget's size and the device pixel ratio. [memCacheWidth] and [maxWidthDiskCache] (both in
+/// pixels, both optional) set the limits explicitly: the image is resized before it is kept in the
+/// memory cache and in the disk cache, so thumbnails do not hold full-size bitmaps.
 class CachedPhoto extends StatelessWidget {
   final String? imageUrl;
   final String? category;
@@ -14,6 +19,12 @@ class CachedPhoto extends StatelessWidget {
   final double? height;
   final BoxFit fit;
   final BorderRadius? borderRadius;
+
+  /// Width in pixels the decoded image is limited to in the memory cache; null keeps it as is.
+  final int? memCacheWidth;
+
+  /// Width in pixels the image file is limited to in the disk cache; null keeps it as is.
+  final int? maxWidthDiskCache;
 
   const CachedPhoto({
     super.key,
@@ -23,6 +34,8 @@ class CachedPhoto extends StatelessWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
+    this.memCacheWidth,
+    this.maxWidthDiskCache,
   });
 
   IconData _categoryIcon() {
@@ -87,14 +100,18 @@ class CachedPhoto extends StatelessWidget {
     return (null, pxH);
   }
 
-  Widget _buildNetworkImage(BuildContext context, int? memCacheWidth, int? memCacheHeight) {
+  /// [autoWidth] / [autoHeight] are the decode size worked out from the layout. An explicit
+  /// [memCacheWidth] wins over them (and then no height bound is set, so the aspect ratio holds).
+  Widget _buildNetworkImage(BuildContext context, int? autoWidth, int? autoHeight) {
+    final explicitWidth = memCacheWidth;
     return CachedNetworkImage(
       imageUrl: imageUrl!,
       width: width,
       height: height,
       fit: fit,
-      memCacheWidth: memCacheWidth,
-      memCacheHeight: memCacheHeight,
+      memCacheWidth: explicitWidth ?? autoWidth,
+      memCacheHeight: explicitWidth != null ? null : autoHeight,
+      maxWidthDiskCache: maxWidthDiskCache,
       placeholder: (context, url) => _buildPlaceholder(context),
       errorWidget: (context, url, error) => _buildPlaceholder(context),
     );

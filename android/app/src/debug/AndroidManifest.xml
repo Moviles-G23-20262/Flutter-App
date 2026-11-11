@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug only: lets the app reach http://localhost:8000 (analytics) through `adb reverse`. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
