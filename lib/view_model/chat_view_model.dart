@@ -230,6 +230,8 @@ class ChatViewModel extends ChangeNotifier {
     if (trimmed.length > 2000) {
       return 'Messages can have at most 2000 characters.';
     }
+    // What is shown, queued and sent has no spaces around it, like what the server stores.
+    text = trimmed;
 
     final senderId = _userId ?? '';
     final queue = queueMessage;

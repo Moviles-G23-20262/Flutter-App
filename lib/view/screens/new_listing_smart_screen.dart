@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../app/theme/app_theme.dart';
+import '../../model/rules/listing_rules.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
@@ -32,6 +34,18 @@ class NewListingSmartScreen extends StatefulWidget {
 }
 
 class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
+  // The lengths are the server's. The price is typed in whole pesos, with "." or "," between thousands.
+  static final _titleFormatters = <TextInputFormatter>[
+    LengthLimitingTextInputFormatter(ListingRules.maxTitleLength),
+  ];
+  static final _descriptionFormatters = <TextInputFormatter>[
+    LengthLimitingTextInputFormatter(ListingRules.maxDescriptionLength),
+  ];
+  static final _priceFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+    LengthLimitingTextInputFormatter(ListingRules.maxPriceInput),
+  ];
+
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _courseCtrl = TextEditingController();
@@ -388,6 +402,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                           key: const Key('listing-title'),
                           placeholder: 'e.g. Organic Chemistry Textbook',
                           controller: _titleCtrl,
+                          inputFormatters: _titleFormatters,
                         ),
                         const SizedBox(height: 12),
                         _FieldLabel('Description', color: txMuted),
@@ -396,6 +411,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                           placeholder: 'Condition notes, what is included, meetup details…',
                           controller: _descCtrl,
                           maxLines: 4,
+                          inputFormatters: _descriptionFormatters,
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -424,7 +440,9 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                                     key: const Key('smart-price-field'),
                                     placeholder: 'e.g. 35000',
                                     controller: _priceCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    // Whole pesos: digits, with "." or "," only to separate thousands.
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: _priceFormatters,
                                   ),
                                 ],
                               ),

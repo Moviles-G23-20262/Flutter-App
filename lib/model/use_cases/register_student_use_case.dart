@@ -19,7 +19,7 @@ class RegisterStudentUseCase {
     final error = RegistrationRules.validateFullName(fullName) ??
         RegistrationRules.validateEmail(email) ??
         RegistrationRules.validateMajor(major) ??
-        RegistrationRules.validatePassword(password);
+        RegistrationRules.validatePassword(password, email: email, fullName: fullName);
     if (error != null) throw InvalidRegistrationException(error);
 
     final cleanFaculty = faculty?.trim();
@@ -28,8 +28,8 @@ class RegisterStudentUseCase {
       RegistrationData(
         email: RegistrationRules.normalizeEmail(email),
         password: password,
-        fullName: fullName.trim(),
-        major: major.trim(),
+        fullName: RegistrationRules.normalizeName(fullName),
+        major: RegistrationRules.normalizeText(major),
         faculty: (cleanFaculty == null || cleanFaculty.isEmpty) ? null : cleanFaculty,
       ),
     );

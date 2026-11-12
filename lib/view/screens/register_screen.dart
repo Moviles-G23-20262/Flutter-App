@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../model/rules/input_rules.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/register_view_model.dart';
 import '../widgets/common_widgets.dart';
@@ -35,6 +37,16 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  // Same pattern as the login form: emojis never get into a field, and email and password have
+  // no whitespace at all, so a pasted " ana@uniandes.edu.co " is cleaned up while it is typed.
+  static final _textFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.deny(InputRules.emoji),
+  ];
+  static final _noSpaceFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.deny(InputRules.emoji),
+    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+  ];
+
   late final RegisterViewModel _vm = widget.createViewModel();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -205,6 +217,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _nameCtrl,
             enabled: !_vm.isLoading,
             textCapitalization: TextCapitalization.words,
+            inputFormatters: _textFormatters,
             errorText: _vm.errorFor(RegisterField.name),
             onChanged: (v) => _vm.update(RegisterField.name, v),
           ),
@@ -216,6 +229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _emailCtrl,
             enabled: !_vm.isLoading,
             keyboardType: TextInputType.emailAddress,
+            inputFormatters: _noSpaceFormatters,
             errorText: _vm.errorFor(RegisterField.email),
             onChanged: (v) => _vm.update(RegisterField.email, v),
           ),
@@ -238,6 +252,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _majorCtrl,
             enabled: !_vm.isLoading,
             textCapitalization: TextCapitalization.words,
+            inputFormatters: _textFormatters,
             errorText: _vm.errorFor(RegisterField.major),
             onChanged: (v) => _vm.update(RegisterField.major, v),
           ),
@@ -250,6 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: _passwordCtrl,
             enabled: !_vm.isLoading,
             obscureText: _vm.obscurePassword,
+            inputFormatters: _noSpaceFormatters,
             errorText: _vm.errorFor(RegisterField.password),
             onChanged: (v) => _vm.update(RegisterField.password, v),
             suffixIcon: IconButton(
@@ -270,6 +286,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             enabled: !_vm.isLoading,
             obscureText: _vm.obscurePassword,
             textInputAction: TextInputAction.done,
+            inputFormatters: _noSpaceFormatters,
             errorText: _vm.errorFor(RegisterField.confirm),
             onChanged: (v) => _vm.update(RegisterField.confirm, v),
           ),
@@ -339,13 +356,25 @@ class _PasswordHint extends StatelessWidget {
         ? (dark ? AppColors.darkSuccess : AppColors.lightSuccess)
         : (dark ? AppColors.darkTextMuted : AppColors.lightTextMuted);
 
-    return Row(
+    final muted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(ok ? Icons.check_circle_rounded : Icons.circle_outlined, size: 14, color: color),
-        const SizedBox(width: 6),
+        Row(
+          children: [
+            Icon(ok ? Icons.check_circle_rounded : Icons.circle_outlined, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              'At least ${RegisterViewModel.minPasswordLength} characters',
+              style: AppTextStyles.body(color, fontSize: AppTextStyles.sizeXs),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
         Text(
-          'At least ${RegisterViewModel.minPasswordLength} characters',
-          style: AppTextStyles.body(color, fontSize: AppTextStyles.sizeXs),
+          'With an uppercase letter, a lowercase letter, a number and a symbol. No spaces.',
+          style: AppTextStyles.body(muted, fontSize: AppTextStyles.sizeXs),
         ),
       ],
     );

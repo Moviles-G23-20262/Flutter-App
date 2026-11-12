@@ -876,6 +876,17 @@ void main() {
       expect(world.chatState.messagesOf('r1'), hasLength(1));
       world.chatState.clear();
     });
+
+    test('a message is shown and sent without the spaces around it', () async {
+      final world = _World();
+      world.chats.rooms = [room()];
+      world.chatState.start(_me);
+
+      expect(await world.chatState.send('r1', '   Is it still available?  \n'), isNull);
+
+      expect(world.chatState.messagesOf('r1').single.content, 'Is it still available?');
+      world.chatState.clear();
+    });
   });
 
   group('AccountViewModel', () {
@@ -1517,6 +1528,19 @@ void main() {
 
       expect(find.byIcon(Icons.photo_camera_outlined), findsNothing);
       expect(find.byIcon(Icons.filter_alt_rounded), findsOneWidget);
+      world.chatState.clear();
+    });
+
+    testWidgets('a search of only spaces shows everything, like an empty one', (tester) async {
+      final world = await pumpSearch(tester);
+      world.materials.materials = [_material(id: 'a').copyWith(title: 'Calculus')];
+      await world.appState.marketplace.load();
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, '   ');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Calculus'), findsOneWidget, reason: 'a title without a space still shows');
       world.chatState.clear();
     });
 

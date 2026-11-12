@@ -9,6 +9,7 @@ import '../model/entities/listing_draft.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
 import '../model/exceptions/data_exceptions.dart';
+import '../model/rules/listing_rules.dart';
 import '../model/use_cases/classify_item_photo_use_case.dart';
 import '../model/use_cases/connectivity_use_cases.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
@@ -364,22 +365,17 @@ class SmartListingViewModel extends ChangeNotifier {
     if (_isPublishing || _published) return false;
     onFormChanged(title: title, description: description, courseCode: courseCode, price: price);
 
-    final amount = double.tryParse(price.trim().replaceAll(',', '.'));
+    final amount = ListingRules.parsePrice(price);
     final problem = _selectedCategory == null
         ? 'Choose a category.'
         : _selectedCondition == null
             ? 'Choose a condition.'
             : _photos.isEmpty
                 ? 'Please add at least one photo of the item'
-                : title.trim().isEmpty
-                ? 'Add a title.'
-                : description.trim().isEmpty
-                    ? 'Add a description.'
-                    : (amount == null || amount <= 0)
-                        ? 'Enter a valid price.'
-                        : publisher == null
-                            ? 'Publishing is not available right now.'
-                            : null;
+                : ListingRules.validateTitle(title) ??
+                    ListingRules.validateDescription(description) ??
+                    ListingRules.validatePrice(price) ??
+                    (publisher == null ? 'Publishing is not available right now.' : null);
     if (problem != null) {
       _publishError = problem;
       notifyListeners();
@@ -404,10 +400,10 @@ class SmartListingViewModel extends ChangeNotifier {
         images = [for (final photo in compressed) PendingImage(bytes: photo.bytes, filename: p.basename(photo.path))];
       }
       final data = NewListingData(
-        title: title,
-        description: description,
+        title: ListingRules.normalizeTitle(title),
+        description: ListingRules.normalizeDescription(description),
         courseCode: courseCode,
-        price: amount!,
+        price: amount!.toDouble(),
         condition: MaterialConditionEnum.values.byName(_selectedCondition!),
         category: MaterialCategoryEnum.values.byName(_selectedCategory!),
         images: images,
