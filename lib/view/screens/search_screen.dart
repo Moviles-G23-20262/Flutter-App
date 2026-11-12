@@ -128,6 +128,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<MaterialEntity> _computeResults(String query) {
+    // Only spaces is no search: everything is shown, instead of the items with a space in their title.
+    query = query.trim();
     final available = widget.appState.marketplace.availableMaterials;
     final sortId = _filters.sort.id;
     if (identical(available, _cachedSource) &&
@@ -261,7 +263,7 @@ class _SearchScreenState extends State<SearchScreen> {
           listenable: Listenable.merge([_query, ?_recent]),
           builder: (context, _) {
             final recent = _recent;
-            if (recent == null || recent.searches.isEmpty || _query.value.isNotEmpty) return const SizedBox.shrink();
+            if (recent == null || recent.searches.isEmpty || _query.value.trim().isNotEmpty) return const SizedBox.shrink();
             return _RecentSearches(
               searches: recent.searches,
               onSelected: _useRecentSearch,

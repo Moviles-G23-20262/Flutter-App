@@ -12,4 +12,12 @@ abstract final class InputRules {
   );
 
   static bool containsEmoji(String text) => emoji.hasMatch(text);
+
+  /// Control characters (line breaks and tabs included) and the invisible ones: zero-width space,
+  /// bidirectional marks, word joiner and byte-order mark. A zero-width joiner is not here: emoji
+  /// sequences use it, and [emoji] already covers it.
+  static final RegExp controlOrInvisible = RegExp(
+    r'[\u{0000}-\u{001F}\u{007F}-\u{009F}\u{200B}-\u{200C}\u{200E}-\u{200F}\u{2028}-\u{202E}\u{2060}-\u{2064}\u{FEFF}]',
+    unicode: true,
+  );
 }

@@ -27,12 +27,8 @@ abstract final class RegistrationRules {
   static final RegExp _whitespace = RegExp(r'\s');
   static final RegExp _manySpaces = RegExp(r'\s+');
 
-  /// Control characters and invisible ones (zero-width, bidi marks). Plain whitespace is
-  /// collapsed before this is checked.
-  static final RegExp _invisible = RegExp(
-    r'[\u{0000}-\u{001F}\u{007F}-\u{009F}\u{200B}-\u{200F}\u{2028}-\u{202E}\u{2060}-\u{2064}\u{FEFF}]',
-    unicode: true,
-  );
+  /// Control and invisible characters. Plain whitespace is collapsed before this is checked.
+  static final RegExp _invisible = InputRules.controlOrInvisible;
 
   static final RegExp _letter = RegExp(r'\p{L}', unicode: true);
 

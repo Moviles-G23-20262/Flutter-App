@@ -146,7 +146,7 @@ void main() {
       expect(vm.suggestedPrice, 30000);
 
       await vm.addPhoto(ImageSource.camera);
-      expect(await vm.publish(title: 'x', description: 'y', price: '48000'), isTrue);
+      expect(await vm.publish(title: 'Calculus', description: 'Barely used', price: '48000'), isTrue);
 
       expect(backend.published.single.price, 48000);
     });
@@ -194,13 +194,14 @@ void main() {
 
   group('publish', () {
     test('sends the trimmed-in data of the form', () async {
-      expect(await publishValid(price: '35.500,5'.replaceAll('.', '')), isTrue);
+      expect(await publishValid(price: '35.500'), isTrue);
 
       final data = backend.published.single;
+      expect(data.title, 'Calculus');
       expect(data.category, MaterialCategoryEnum.BOOKS);
       expect(data.condition, MaterialConditionEnum.GOOD);
       expect(data.courseCode, 'MATE 1203');
-      expect(data.price, 35500.5);
+      expect(data.price, 35500, reason: '"35.500" is thirty-five thousand five hundred pesos, not 35.5');
       expect(vm.published, isTrue);
       expect(vm.publishError, isNull);
       expect(vm.isPublishing, isFalse);
@@ -219,14 +220,20 @@ void main() {
       expect(vm.publishError, 'Please add at least one photo of the item');
 
       await vm.addPhoto(ImageSource.camera);
-      await vm.publish(title: ' ', description: 'y', price: '10');
+      await vm.publish(title: ' ', description: 'Barely used', price: '35000');
       expect(vm.publishError, 'Add a title.');
-      await vm.publish(title: 'x', description: '', price: '10');
+      await vm.publish(title: 'ab', description: 'Barely used', price: '35000');
+      expect(vm.publishError, 'The title needs 3 to 100 characters.');
+      await vm.publish(title: 'Calculus', description: '', price: '35000');
       expect(vm.publishError, 'Add a description.');
-      await vm.publish(title: 'x', description: 'y', price: 'abc');
-      expect(vm.publishError, 'Enter a valid price.');
-      await vm.publish(title: 'x', description: 'y', price: '0');
-      expect(vm.publishError, 'Enter a valid price.');
+      await vm.publish(title: 'Calculus', description: 'Works', price: '35000');
+      expect(vm.publishError, 'The description needs 10 to 1000 characters.');
+      await vm.publish(title: 'Calculus', description: 'Barely used', price: '');
+      expect(vm.publishError, 'Enter a price.');
+      await vm.publish(title: 'Calculus', description: 'Barely used', price: 'abc');
+      expect(vm.publishError, 'Enter the price in whole pesos, like 45000 or 45.000.');
+      await vm.publish(title: 'Calculus', description: 'Barely used', price: '0');
+      expect(vm.publishError, 'The price must be between \$1.000 and \$50.000.000 COP.');
 
       expect(backend.published, isEmpty);
     });
@@ -241,7 +248,19 @@ void main() {
       expect(vm.isPublishing, isFalse);
 
       backend.error = null;
-      expect(await vm.publish(title: 'a', description: 'b', price: '1000'), isTrue);
+      expect(await vm.publish(title: 'Calculus', description: 'Barely used', price: '1000'), isTrue);
+    });
+
+    test('prices outside 1.000 to 50.000.000 COP, or not in whole pesos, are never sent', () async {
+      for (final price in ['10', '999', '45.5', '35500,5', '50.000.001', '99999999999999999999999', '45..000', '4.5000']) {
+        expect(await publishValid(price: price), isFalse, reason: price);
+      }
+      expect(backend.published, isEmpty);
+    });
+
+    test('a price typed with dots or commas between thousands is the same price', () async {
+      expect(await publishValid(price: '45.000'), isTrue);
+      expect(backend.published.single.price, 45000);
     });
 
     test('an unexpected failure never throws', () async {
@@ -275,7 +294,7 @@ void main() {
       addTearDown(bare.dispose);
       await bare.addPhoto(ImageSource.camera);
 
-      expect(await bare.publish(title: 'x', description: 'y', price: '10'), isFalse);
+      expect(await bare.publish(title: 'Calculus', description: 'Barely used', price: '35000'), isFalse);
       expect(bare.publishError, contains('not available'));
     });
   });
