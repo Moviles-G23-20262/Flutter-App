@@ -1,5 +1,6 @@
 import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
+import '../widgets/formatters.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/wishlist_item_entity.dart';
 import '../../view_model/app_view_model.dart';
@@ -108,7 +109,7 @@ class FavoritesScreen extends StatelessWidget {
                                                     style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs),
                                                   ),
                                                   const SizedBox(height: 4),
-                                                  Text('\$${material.price.toStringAsFixed(2)}',
+                                                  Text(copPrice(material.price),
                                                       style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                                                 ],
                                               ),

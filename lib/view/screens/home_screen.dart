@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/formatters.dart';
 import '../../app/theme/app_theme.dart';
 import '../widgets/async_views.dart';
 import '../widgets/cached_photo.dart';
@@ -576,7 +577,7 @@ class _ProductCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   AppBadge(material.conditionDisplayName),
                   const SizedBox(height: 6),
-                  Text('\$${material.price.toStringAsFixed(2)}',
+                  Text(copPrice(material.price),
                       style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                 ],
               ),
@@ -647,7 +648,7 @@ class _RecommendedRow extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('\$${material.price.toStringAsFixed(2)}',
+                      child: Text(copPrice(material.price),
                           style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                     ),
                     GestureDetector(

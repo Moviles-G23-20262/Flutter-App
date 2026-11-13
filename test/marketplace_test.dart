@@ -41,6 +41,7 @@ import 'package:flutter_front_end/model/use_cases/rank_meeting_points_use_case.d
 import 'package:flutter_front_end/model/repositories/connectivity_repository.dart';
 import 'package:flutter_front_end/model/use_cases/connectivity_use_cases.dart';
 import 'package:flutter_front_end/view/screens/home_screen.dart';
+import 'package:flutter_front_end/view/screens/material_detail_screen.dart';
 import 'package:flutter_front_end/view/screens/search_screen.dart';
 import 'package:flutter_front_end/view_model/connectivity_view_model.dart';
 import 'package:flutter_front_end/view_model/account_view_model.dart';
@@ -60,6 +61,7 @@ import 'package:flutter_front_end/view_model/power_view_model.dart';
 import 'package:flutter_front_end/view_model/recent_searches_view_model.dart';
 import 'package:flutter_front_end/model/repositories/recent_searches_repository.dart';
 import 'package:flutter_front_end/model/use_cases/recent_searches_use_cases.dart';
+import 'package:flutter_front_end/view/widgets/common_widgets.dart' show AppCard;
 import 'package:flutter_front_end/view/widgets/formatters.dart';
 import 'package:flutter_front_end/view/widgets/offline_banner.dart';
 import 'package:flutter_front_end/view/widgets/saved_copy_banner.dart';
@@ -1386,6 +1388,22 @@ void main() {
       return world;
     }
 
+    testWidgets('prices show as pesos, like \$110.000 COP, in Current Offers and in Recommended', (tester) async {
+      final world = await pumpHome(tester, [
+        for (var i = 0; i < 7; i++)
+          _material(id: '00000000-0000-4000-8000-00000000010$i', price: 110000).copyWith(title: 'Textbook $i'),
+      ]);
+
+      expect(find.text('\$110.000 COP'), findsWidgets);
+      expect(find.textContaining('110000'), findsNothing, reason: 'no raw number');
+      expect(find.textContaining(RegExp(r'\.\d{2}(?!\d)')), findsNothing, reason: 'no cents');
+
+      // The Recommended rows are the ones after the first four offers.
+      final recommended = find.ancestor(of: find.text('Textbook 4'), matching: find.byType(AppCard));
+      expect(find.descendant(of: recommended, matching: find.text('\$110.000 COP')), findsOneWidget);
+      world.chatState.clear();
+    });
+
     testWidgets('shows what the server returned, not canned listings', (tester) async {
       final world = await pumpHome(tester, [
         _material(id: 'a').copyWith(title: 'Server Textbook'),
@@ -1737,6 +1755,18 @@ void main() {
       world.chatState.clear();
     });
 
+    testWidgets('a listing and a waiting one show their price as pesos too', (tester) async {
+      final world = await pumpHub(tester, materials: [_material(id: _m1, sellerId: _me, price: 110000)]);
+
+      world.pendingListings.emit([pending('a')]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('\$110.000 COP'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'\.\d{2}(?!\d)')), findsNothing);
+      expect(find.textContaining('110000'), findsNothing);
+      world.chatState.clear();
+    });
+
     testWidgets('they come before the published listings', (tester) async {
       final world = await pumpHub(tester, materials: [_material(id: 'live', sellerId: _me)]);
 
@@ -1761,6 +1791,63 @@ void main() {
 
       expect(find.text('Waiting to publish'), findsNothing);
       expect(find.text('Casio fx-991EX'), findsOneWidget);
+      world.chatState.clear();
+    });
+  });
+  group('Detail screen: "Buy this item?" dialog', () {
+    Future<_World> pumpDetail(WidgetTester tester) async {
+      final original = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('overflowed')) return;
+        original?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = original);
+
+      final world = _World();
+      world.appState.login(UserEntity(
+        id: _me,
+        email: 'me@uniandes.edu.co',
+        fullName: 'Maria Santos',
+        major: 'CS',
+        rating: 4.8,
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      await tester.binding.setSurfaceSize(const Size(420, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(
+        home: MaterialDetailScreen(
+          appState: world.appState,
+          material: _material(id: _m1, sellerId: _other, price: 110000),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      return world;
+    }
+
+    testWidgets('the note above the buttons stays small (13)', (tester) async {
+      final world = await pumpDetail(tester);
+
+      final note = tester.widget<Text>(find.byKey(const Key('buy-notice')));
+      expect(note.style?.fontSize, 13);
+      expect(find.text('\$110.000 COP'), findsWidgets);
+      world.chatState.clear();
+    });
+
+    testWidgets('the dialog has a 20 bold title and a 16 message with 1.4 line height', (tester) async {
+      final world = await pumpDetail(tester);
+
+      await tester.tap(find.text('Buy this item'));
+      await tester.pumpAndSettle();
+
+      final title = tester.widget<Text>(find.byKey(const Key('buy-dialog-title')));
+      expect(title.data, 'Buy this item?');
+      expect(title.style?.fontSize, 20);
+      expect(title.style?.fontWeight, FontWeight.w700);
+
+      final message = tester.widget<Text>(find.byKey(const Key('buy-dialog-message')));
+      expect(message.data, startsWith('Casio fx-991EX for \$110.000 COP.'));
+      expect(message.style?.fontSize, 16);
+      expect(message.style?.height, 1.4);
       world.chatState.clear();
     });
   });
