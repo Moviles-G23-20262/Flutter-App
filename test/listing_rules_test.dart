@@ -46,15 +46,30 @@ void main() {
       expect(ListingRules.normalizeTitle('  Organic    Chemistry \t Book '), 'Organic Chemistry Book');
     });
 
-    test('needs 3 to 100 characters, none of them a control character', () {
+    test('needs 3 to 60 characters, none of them a control character', () {
+      expect(ListingRules.maxTitleLength, 60);
       expect(ListingRules.validateTitle('Cal'), isNull);
-      expect(ListingRules.validateTitle('a' * 100), isNull);
+      expect(ListingRules.validateTitle('a' * 60), isNull);
       expect(ListingRules.validateTitle('   '), 'Add a title.');
-      expect(ListingRules.validateTitle('ab'), 'The title needs 3 to 100 characters.');
-      expect(ListingRules.validateTitle('   a   '), 'The title needs 3 to 100 characters.');
-      expect(ListingRules.validateTitle('a' * 101), 'The title needs 3 to 100 characters.');
+      expect(ListingRules.validateTitle('ab'), 'The title needs 3 to 60 characters.');
+      expect(ListingRules.validateTitle('   a   '), 'The title needs 3 to 60 characters.');
+      expect(ListingRules.validateTitle('a' * 61), 'The title needs 3 to 60 characters.');
       expect(ListingRules.validateTitle('Arduino\x00UNO'), 'The title has characters that are not allowed.');
       expect(ListingRules.validateTitle('Arduino\u{200B}UNO'), 'The title has characters that are not allowed.');
+    });
+  });
+
+  group('ListingRules title emojis', () {
+    test('are refused with a clear message', () {
+      for (final title in ['Arduino UNO 🔧', '📚 Calculus', 'Libro ❤️', 'Mesa 🇨🇴', 'Silla 👍🏽']) {
+        expect(ListingRules.validateTitle(title), "The title can't contain emojis.", reason: title);
+      }
+    });
+
+    test('accents, digits and normal symbols are fine', () {
+      for (final title in ['Cálculo Diferencial 2ª ed.', 'Silla #3 (casi nueva) - \$20.000', 'Física I & II']) {
+        expect(ListingRules.validateTitle(title), isNull, reason: title);
+      }
     });
   });
 
@@ -63,14 +78,15 @@ void main() {
       expect(ListingRules.normalizeDescription('  Barely used.\nWith cable.  '), 'Barely used.\nWith cable.');
     });
 
-    test('needs 10 to 1000 characters, none of them a control character', () {
+    test('needs 10 to 330 characters, none of them a control character', () {
+      expect(ListingRules.maxDescriptionLength, 330);
       expect(ListingRules.validateDescription('Barely used'), isNull);
       expect(ListingRules.validateDescription('Line one\nline two'), isNull);
-      expect(ListingRules.validateDescription('a' * 1000), isNull);
+      expect(ListingRules.validateDescription('a' * 330), isNull);
       expect(ListingRules.validateDescription('   '), 'Add a description.');
-      expect(ListingRules.validateDescription('Works'), 'The description needs 10 to 1000 characters.');
-      expect(ListingRules.validateDescription('          x '), 'The description needs 10 to 1000 characters.');
-      expect(ListingRules.validateDescription('a' * 1001), 'The description needs 10 to 1000 characters.');
+      expect(ListingRules.validateDescription('Works'), 'The description needs 10 to 330 characters.');
+      expect(ListingRules.validateDescription('          x '), 'The description needs 10 to 330 characters.');
+      expect(ListingRules.validateDescription('a' * 331), 'The description needs 10 to 330 characters.');
       expect(ListingRules.validateDescription('Barely used\x07 with cable'), 'The description has characters that are not allowed.');
     });
   });

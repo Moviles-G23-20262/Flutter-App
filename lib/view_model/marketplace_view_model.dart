@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/new_listing_data.dart';
 import '../model/entities/pending_items.dart';
+import '../model/rules/client_id.dart';
 import '../model/entities/wishlist_item_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
@@ -165,22 +166,42 @@ class MarketplaceViewModel extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Shown instead of calling the server for a listing it does not know yet.
+  static const String syncingMessage = itemSyncingMessage;
+
+  /// A listing the user made offline is still waiting on the phone: the server has no such
+  /// listing yet, so favoriting, chatting or buying it would fail.
+  bool isSyncing(String materialId) => _pendingListings.any((l) => l.id == materialId);
+
+  /// `null` when [materialId] is a listing id the server knows and can be sent; otherwise the
+  /// message to show instead of making a call that would end in a 400 ("uuid is expected") or a
+  /// 404. Covers an empty or non-UUID id and a listing still waiting in the offline queue.
+  String? serverIdProblem(String materialId) =>
+      isUuid(materialId) && !isSyncing(materialId) ? null : syncingMessage;
+
+  /// Id prefix of the placeholder shown while a favorite is being saved. It is not an id the
+  /// server knows: sending it in `DELETE /wishlist-items/:id` is refused ("uuid is expected").
+  static const String _placeholderPrefix = 'temp-';
+
+  static bool _isPlaceholder(WishlistItemEntity item) => item.id.startsWith(_placeholderPrefix);
+
   /// Heart tapped. Updates instantly and rolls back if the server refuses.
   /// Offline the server cannot confirm it, so it is rolled back and the user is told why.
   /// Returns an error message to show, or `null` on success.
   Future<String?> toggleFavorite(String materialId) async {
+    final notReady = serverIdProblem(materialId);
+    if (notReady != null) return notReady;
     if (!_togglingFavorites.add(materialId)) return null;
     final generation = _generation;
-    final before = _wishlist;
-    final was = isFavorite(materialId);
+    final existing = _wishlist.where((w) => w.materialId == materialId).firstOrNull;
 
     // Optimistic: toggle right away.
-    if (was) {
+    if (existing != null) {
       _wishlist = _wishlist.where((w) => w.materialId != materialId).toList(growable: false);
     } else {
       _wishlist = [
         WishlistItemEntity(
-          id: 'temp-$materialId',
+          id: '$_placeholderPrefix$materialId',
           userId: '',
           materialId: materialId,
           createdAt: DateTime.now(),
@@ -191,9 +212,10 @@ class MarketplaceViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (was) {
-        final existing = before.firstWhere((w) => w.materialId == materialId);
-        await removeFromWishlist.execute(existing.id);
+      if (existing != null) {
+        // A placeholder was never saved on the server (its save failed or was dropped), so there
+        // is nothing to delete there; asking would be a 400 for an id that is not a UUID.
+        if (!_isPlaceholder(existing)) await removeFromWishlist.execute(existing.id);
       } else {
         final created = await addToWishlist.execute(materialId);
         if (generation == _generation) {
@@ -204,7 +226,11 @@ class MarketplaceViewModel extends ChangeNotifier {
       return null;
     } on DataException catch (e) {
       if (generation == _generation) {
-        _wishlist = before;
+        // Undo only this heart. Restoring a snapshot taken before the tap would also undo a
+        // favorite saved meanwhile, and bring its placeholder back.
+        _wishlist = existing != null
+            ? [existing, ..._wishlist.where((w) => w.materialId != materialId)]
+            : _wishlist.where((w) => w.materialId != materialId).toList(growable: false);
         notifyListeners();
       }
       return e.message;

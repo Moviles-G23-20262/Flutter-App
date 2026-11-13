@@ -20,4 +20,21 @@ abstract final class InputRules {
     r'[\u{0000}-\u{001F}\u{007F}-\u{009F}\u{200B}-\u{200C}\u{200E}-\u{200F}\u{2028}-\u{202E}\u{2060}-\u{2064}\u{FEFF}]',
     unicode: true,
   );
+
+  // ── Character counters ─────────────────────────────────────────────────────
+
+  /// A counter turns amber from this share of the limit, before the field is full.
+  static const double counterWarningRatio = 0.85;
+
+  /// How full a text field is: [CounterLevel.normal] up to 85 % of [max], [CounterLevel.warning]
+  /// from there, [CounterLevel.full] at [max].
+  static CounterLevel counterLevel(int length, int max) {
+    if (max <= 0) return CounterLevel.normal;
+    if (length >= max) return CounterLevel.full;
+    if (length >= max * counterWarningRatio) return CounterLevel.warning;
+    return CounterLevel.normal;
+  }
 }
+
+/// How close a text is to its limit; see [InputRules.counterLevel].
+enum CounterLevel { normal, warning, full }

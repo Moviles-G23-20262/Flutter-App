@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../widgets/appearance_card.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
+import '../../model/entities/exchange_entity.dart';
 import '../../view_model/app_view_model.dart';
 
 // ─── Profile Screen ───────────────────────────────────────────────────────────
@@ -32,7 +33,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildBody(BuildContext context) {
     final user       = widget.appState.currentUser;
     final account    = widget.appState.account;
-    final purchases  = user == null ? const [] : account.purchasesOf(user.id);
+    final List<ExchangeEntity> purchases =
+        user == null ? const <ExchangeEntity>[] : account.purchasesOf(user.id);
     final brightness = Theme.of(context).brightness;
     final surface    = brightness == Brightness.dark ? AppColors.darkSurface    : AppColors.lightSurface;
     final border     = brightness == Brightness.dark ? AppColors.darkBorder     : AppColors.lightBorder;

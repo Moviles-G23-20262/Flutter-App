@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/chat_room_entity.dart';
 import '../../model/entities/exchange_entity.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/meetup_entities.dart';
 import '../../view_model/app_view_model.dart';
+import '../../view_model/chat_view_model.dart';
 import '../widgets/async_views.dart';
 import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
@@ -388,6 +390,20 @@ class _ChatViewState extends State<ChatView> {
         ),
 
         // ── Input bar ──
+        // The counter only appears from 80 % of the limit, so a normal message shows none.
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _msgCtrl,
+          builder: (context, value, _) {
+            if (value.text.length < ChatViewModel.maxMessageLength * 0.8) return const SizedBox.shrink();
+            return Container(
+              key: const Key('message-counter'),
+              color: elevated,
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.fromLTRB(14, 6, 20, 0),
+              child: CounterLabel(length: value.text.characters.length, max: ChatViewModel.maxMessageLength),
+            );
+          },
+        ),
         Container(
           color: elevated,
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
@@ -399,7 +415,7 @@ class _ChatViewState extends State<ChatView> {
                   builder: (context, sending, _) => TextField(
                     controller: _msgCtrl,
                     enabled: !sending,
-                    maxLength: 2000,
+                    inputFormatters: [LengthLimitingTextInputFormatter(ChatViewModel.maxMessageLength)],
                     minLines: 1,
                     maxLines: 4,
                     textInputAction: TextInputAction.send,
@@ -407,7 +423,6 @@ class _ChatViewState extends State<ChatView> {
                     style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
                     decoration: InputDecoration(
                       hintText: 'Message $otherFirst…',
-                      counterText: '',
                       hintStyle: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
                       filled: true,
                       fillColor: surface,

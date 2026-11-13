@@ -374,6 +374,7 @@ class SmartListingViewModel extends ChangeNotifier {
                 ? 'Please add at least one photo of the item'
                 : ListingRules.validateTitle(title) ??
                     ListingRules.validateDescription(description) ??
+                    ListingRules.validateCourseCode(courseCode) ??
                     ListingRules.validatePrice(price) ??
                     (publisher == null ? 'Publishing is not available right now.' : null);
     if (problem != null) {

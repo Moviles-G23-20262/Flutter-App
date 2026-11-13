@@ -100,11 +100,12 @@ void main() {
         expect(RegistrationRules.validateFullName('Ana\u{200B}Gomez'), isNotNull);
       });
 
-      test('needs 2 real letters and at most 80 characters', () {
+      test('needs 2 real letters and at most 50 characters', () {
         expect(RegistrationRules.validateFullName('A'), isNotNull);
         expect(RegistrationRules.validateFullName('A.'), isNotNull);
-        expect(RegistrationRules.validateFullName('a' * 80), isNull);
-        expect(RegistrationRules.validateFullName('a' * 81), isNotNull);
+        expect(RegistrationRules.maxNameLength, 50);
+        expect(RegistrationRules.validateFullName('a' * 50), isNull);
+        expect(RegistrationRules.validateFullName('a' * 51), 'Your name is too long (at most 50 characters).');
       });
     });
 

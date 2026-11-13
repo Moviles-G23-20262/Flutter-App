@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show TextInputFormatter;
+import 'package:flutter/services.dart' show FilteringTextInputFormatter, TextEditingValue, TextInputFormatter;
+import '../../model/rules/input_rules.dart';
 import '../../app/theme/app_theme.dart';
 
 // ─── Reusable Widgets ─────────────────────────────────────────────────────────
@@ -279,6 +280,10 @@ class AppTextField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onSubmitted;
 
+  /// Space between the text and the border. More at the bottom leaves room for something drawn
+  /// over the field, like a character counter.
+  final EdgeInsetsGeometry contentPadding;
+
   const AppTextField({
     super.key,
     required this.placeholder,
@@ -297,6 +302,7 @@ class AppTextField extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
     this.inputFormatters,
     this.onSubmitted,
+    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
   });
 
   @override
@@ -330,7 +336,7 @@ class AppTextField extends StatelessWidget {
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         errorText: errorText,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: contentPadding,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: border),
@@ -479,3 +485,192 @@ class CampusSwapLogo extends StatelessWidget {
   }
 }
 
+
+/// "12/50", drawn grey, amber from 85 % of the limit and red once it is full, so the user is
+/// warned before trying to send. Hidden below [showFrom] (a share of [max], e.g. 0.8) when the
+/// counter should only appear near the limit.
+class CounterLabel extends StatelessWidget {
+  final int length;
+  final int max;
+  final double showFrom;
+
+  const CounterLabel({super.key, required this.length, required this.max, this.showFrom = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    if (length < max * showFrom) return const SizedBox.shrink();
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final color = switch (InputRules.counterLevel(length, max)) {
+      CounterLevel.normal => dark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+      CounterLevel.warning => dark ? AppColors.darkWarning : AppColors.lightWarning,
+      CounterLevel.full => dark ? AppColors.darkError : AppColors.lightError,
+    };
+    return Text(
+      '$length/$max',
+      semanticsLabel: '$length of $max characters',
+      style: AppTextStyles.mono(
+        color,
+        fontSize: AppTextStyles.sizeXs,
+        fontWeight: length >= max * InputRules.counterWarningRatio ? FontWeight.w700 : FontWeight.w400,
+      ),
+    );
+  }
+}
+
+/// A [CounterLabel] that follows [controller] by itself.
+class CharacterCounter extends StatelessWidget {
+  final TextEditingController controller;
+  final int max;
+  final double showFrom;
+
+  const CharacterCounter({super.key, required this.controller, required this.max, this.showFrom = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) =>
+          CounterLabel(length: value.text.characters.length, max: max, showFrom: showFrom),
+    );
+  }
+}
+
+/// Removes emojis (typed or pasted) from a field and remembers whether the last edit had any,
+/// so [FieldFeedback] can say why they vanished. A plain edit clears the notice.
+class EmojiBlocker extends TextInputFormatter {
+  final ValueNotifier<bool> found = ValueNotifier<bool>(false);
+
+  static final _deny = FilteringTextInputFormatter.deny(InputRules.emoji);
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final hasEmoji = InputRules.containsEmoji(newValue.text);
+    found.value = hasEmoji;
+    return hasEmoji ? _deny.formatEditUpdate(oldValue, newValue) : newValue;
+  }
+
+  void dispose() => found.dispose();
+}
+
+/// What sits under a text field while it is being typed in: the warning for an emoji that was
+/// removed, a live hint ([validate] says what is wrong with the text so far, shown once the
+/// field has been edited) and the `n/max` counter. Nothing waits for the Send button.
+class FieldFeedback extends StatefulWidget {
+  final TextEditingController controller;
+
+  /// The limit of the field, or null for no counter.
+  final int? max;
+
+  /// A counter that only shows from this share of [max] (0.8 = 80 %).
+  final double counterShowFrom;
+
+  /// The problem with the text, or null when it is fine. Not asked while the field is untouched.
+  final String? Function(String text)? validate;
+
+  final EmojiBlocker? emojiBlocker;
+  final String emojiMessage;
+
+  /// Hide the hint, e.g. because the field already shows an error of its own.
+  final bool suppressHint;
+
+  final Key? hintKey;
+  final Key? emojiNoticeKey;
+  final Key? counterKey;
+
+  const FieldFeedback({
+    super.key,
+    required this.controller,
+    this.max,
+    this.counterShowFrom = 0,
+    this.validate,
+    this.emojiBlocker,
+    this.emojiMessage = "Emojis aren't allowed here, so we removed them.",
+    this.suppressHint = false,
+    this.hintKey,
+    this.emojiNoticeKey,
+    this.counterKey,
+  });
+
+  @override
+  State<FieldFeedback> createState() => _FieldFeedbackState();
+}
+
+class _FieldFeedbackState extends State<FieldFeedback> {
+  bool _touched = false;
+  late String _lastText = widget.controller.text;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onText);
+  }
+
+  @override
+  void didUpdateWidget(FieldFeedback old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_onText);
+      widget.controller.addListener(_onText);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onText);
+    super.dispose();
+  }
+
+  void _onText() {
+    // Focusing or moving the cursor also notifies; only a change in the text counts as typing.
+    final text = widget.controller.text;
+    if (text != _lastText) {
+      _lastText = text;
+      _touched = true;
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final warning = dark ? AppColors.darkWarning : AppColors.lightWarning;
+    final error = dark ? AppColors.darkError : AppColors.lightError;
+    final hint = (_touched && !widget.suppressHint) ? widget.validate?.call(widget.controller.text) : null;
+    final blocker = widget.emojiBlocker;
+
+    final messages = <Widget>[
+      if (blocker != null)
+        ValueListenableBuilder<bool>(
+          valueListenable: blocker.found,
+          builder: (context, found, _) => found
+              ? Text(widget.emojiMessage,
+                  key: widget.emojiNoticeKey,
+                  style: AppTextStyles.body(error, fontSize: AppTextStyles.sizeXs))
+              : const SizedBox.shrink(),
+        ),
+      if (hint != null)
+        Text(hint, key: widget.hintKey, style: AppTextStyles.body(warning, fontSize: AppTextStyles.sizeXs)),
+    ];
+    final max = widget.max;
+    if (messages.isEmpty && max == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: messages)),
+          if (max != null) ...[
+            const SizedBox(width: 8),
+            CharacterCounter(
+              key: widget.counterKey,
+              controller: widget.controller,
+              max: max,
+              showFrom: widget.counterShowFrom,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

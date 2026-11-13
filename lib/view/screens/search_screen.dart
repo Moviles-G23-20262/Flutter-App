@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
 import '../../app/theme/app_theme.dart';
 import '../widgets/async_views.dart';
 import '../widgets/cached_photo.dart';
@@ -229,6 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     child: AppTextField(
                       placeholder: 'Search course materials…',
                       controller: _queryCtrl,
+                      inputFormatters: [LengthLimitingTextInputFormatter(100)],
                       onChanged: (v) => _query.value = v,
                       textInputAction: TextInputAction.search,
                       onSubmitted: (v) => _recent?.record(v),

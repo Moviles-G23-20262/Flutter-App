@@ -5,6 +5,7 @@ import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
+import '../../model/rules/client_id.dart';
 
 // ─── Material Detail Screen ───────────────────────────────────────────────────
 
@@ -22,20 +23,55 @@ class MaterialDetailScreen extends StatefulWidget {
   State<MaterialDetailScreen> createState() => _MaterialDetailScreenState();
 }
 
+/// The text of the "Buy this item?" confirmation: it is read before reserving, so it is big.
+const double kBuyDialogTitleSize = 20;
+const double kBuyDialogMessageSize = 16;
+const double kBuyDialogMessageHeight = 1.4;
+
+/// The discreet note above the buttons.
+const double _buyNoticeFontSize = 13;
+
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
-  final int  _imageIndex = 0;
+  final int _imageIndex = 0;
   bool _openingChat = false;
   bool _buying = false;
 
   bool get _isFav => widget.appState.marketplace.isFavorite(widget.material.id);
-  bool get _isMine => widget.material.sellerId == widget.appState.currentUser?.id;
+  bool get _isMine =>
+      widget.material.sellerId == widget.appState.currentUser?.id;
+
+  /// What the listing's status means for the student and what they can still do.
+  static String statusNotice(MaterialEntity m) {
+    switch (m.status) {
+      case MaterialStatusEnum.RESERVED:
+        return 'This item is reserved: another student already placed an order and is arranging '
+            "the meetup with the seller, so it can't be bought right now. You can still message "
+            'the seller, and if the order falls through it will become available again.';
+      case MaterialStatusEnum.SOLD:
+        return "This item has already been sold, so it can't be bought anymore. You can still "
+            'message the seller to ask whether they have a similar item.';
+      case MaterialStatusEnum.AVAILABLE:
+        return 'This item is available.';
+    }
+  }
+
+  /// Explains what "Buy this item" does before the student taps it.
+  static String buyNotice(MaterialEntity m) {
+    final seller = m.seller?.fullName.split(' ').first ?? 'the seller';
+    return 'Buy this item to reserve it for you. Nothing is charged in the app: you agree on a '
+        'campus meetup with $seller and pay in person, once you have checked the item.';
+  }
 
   void _showMessage(String message) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   Future<void> _toggleFav() async {
-    final error = await widget.appState.marketplace.toggleFavorite(widget.material.id);
+    final error = await widget.appState.marketplace.toggleFavorite(
+      widget.material.id,
+    );
     if (error != null) _showMessage(error);
   }
 
@@ -53,18 +89,45 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     final m = widget.material;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Buy this item?'),
-        content: Text(
-          '${m.title} for ${copPrice(m.price)}.\n\n'
-          'It will be reserved for you. You pay in person when you meet '
-          '${m.seller?.fullName.split(' ').first ?? 'the seller'} on campus.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Place order')),
-        ],
-      ),
+      builder: (context) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final txPrimary = dark
+            ? AppColors.darkTextPrimary
+            : AppColors.lightTextPrimary;
+        final txSecondary = dark
+            ? AppColors.darkTextSecondary
+            : AppColors.lightTextSecondary;
+        return AlertDialog(
+          title: Text(
+            'Buy this item?',
+            key: const Key('buy-dialog-title'),
+            style: AppTextStyles.heading(
+              txPrimary,
+              fontSize: kBuyDialogTitleSize,
+            ).copyWith(fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            '${m.title} for ${copPrice(m.price)}.\n\n'
+            'It will be reserved for you. You pay in person when you meet '
+            '${m.seller?.fullName.split(' ').first ?? 'the seller'} on campus.',
+            key: const Key('buy-dialog-message'),
+            style: AppTextStyles.body(
+              txSecondary,
+              fontSize: kBuyDialogMessageSize,
+            ).copyWith(height: kBuyDialogMessageHeight),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Not now'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Place order'),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
     setState(() => _buying = true);
@@ -83,18 +146,36 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   }
 
   Widget _buildBody(BuildContext context) {
-    final m          = widget.material;
-    final seller     = m.seller;
+    final m = widget.material;
+    final seller = m.seller;
     final brightness = Theme.of(context).brightness;
-    final surface    = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
-    final bg         = brightness == Brightness.dark ? AppColors.darkBg          : AppColors.lightBg;
-    final txPrimary  = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
-    final txSecondary= brightness == Brightness.dark ? AppColors.darkTextSecondary: AppColors.lightTextSecondary;
-    final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
-    final accentHi   = brightness == Brightness.dark ? AppColors.darkAccentHi   : AppColors.lightAccentHi;
-    final elevated   = brightness == Brightness.dark ? AppColors.darkElevated    : AppColors.lightElevated;
-    final border     = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
-    final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
+    final surface = brightness == Brightness.dark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+    final bg = brightness == Brightness.dark
+        ? AppColors.darkBg
+        : AppColors.lightBg;
+    final txPrimary = brightness == Brightness.dark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
+    final txSecondary = brightness == Brightness.dark
+        ? AppColors.darkTextSecondary
+        : AppColors.lightTextSecondary;
+    final txMuted = brightness == Brightness.dark
+        ? AppColors.darkTextMuted
+        : AppColors.lightTextMuted;
+    final accentHi = brightness == Brightness.dark
+        ? AppColors.darkAccentHi
+        : AppColors.lightAccentHi;
+    final elevated = brightness == Brightness.dark
+        ? AppColors.darkElevated
+        : AppColors.lightElevated;
+    final border = brightness == Brightness.dark
+        ? AppColors.darkBorder
+        : AppColors.lightBorder;
+    final borderSubtle = brightness == Brightness.dark
+        ? AppColors.darkBorderSubtle
+        : AppColors.lightBorderSubtle;
 
     return Scaffold(
       backgroundColor: bg,
@@ -110,18 +191,27 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                       SizedBox(
                         height: 260,
                         width: double.infinity,
-                        child: CachedPhoto(imageUrl: m.primaryImageUrl, category: m.category.name, fit: BoxFit.cover),
+                        child: CachedPhoto(
+                          imageUrl: m.primaryImageUrl,
+                          category: m.category.name,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                       // Gradient overlay
                       Positioned(
-                        top: 0, left: 0, right: 0,
+                        top: 0,
+                        left: 0,
+                        right: 0,
                         child: Container(
                           height: 100,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Colors.black.withValues(alpha: 0.45), Colors.transparent],
+                              colors: [
+                                Colors.black.withValues(alpha: 0.45),
+                                Colors.transparent,
+                              ],
                             ),
                           ),
                         ),
@@ -129,17 +219,27 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                       // Back + fav buttons
                       SafeArea(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               AppIconButton(
-                                icon: Icon(Icons.arrow_back_rounded, color: txSecondary, size: 18),
-                                onTap: () => widget.appState.navigateTo(AppScreen.home),
+                                icon: Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: txSecondary,
+                                  size: 18,
+                                ),
+                                onTap: () =>
+                                    widget.appState.navigateTo(AppScreen.home),
                               ),
                               AppIconButton(
                                 icon: Icon(
-                                  _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                  _isFav
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
                                   color: accentHi,
                                   size: 18,
                                 ),
@@ -152,18 +252,27 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                       // Image dots
                       if (m.imageUrls.length > 1)
                         Positioned(
-                          bottom: 12, left: 0, right: 0,
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(m.imageUrls.length, (i) => Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: i == _imageIndex ? 18 : 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(3),
-                                color: i == _imageIndex ? accentHi : Colors.white.withValues(alpha: 0.4),
+                            children: List.generate(
+                              m.imageUrls.length,
+                              (i) => Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                width: i == _imageIndex ? 18 : 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(3),
+                                  color: i == _imageIndex
+                                      ? accentHi
+                                      : Colors.white.withValues(alpha: 0.4),
+                                ),
                               ),
-                            )),
+                            ),
                           ),
                         ),
                     ],
@@ -175,160 +284,310 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                   child: Transform.translate(
                     offset: const Offset(0, -16),
                     child: Container(
-                    decoration: BoxDecoration(
-                      color: surface,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Badges
-                          Wrap(
-                            spacing: 6, runSpacing: 6,
-                            children: [
-                              AppBadge(m.category.displayName, highlighted: true),
-                              if (m.courseCode != null) AppBadge(m.courseCode!),
-                              AppBadge(m.conditionDisplayName),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Title
-                          Text(m.title, style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
-                          const SizedBox(height: 8),
-
-                          // Price + rating
-                          Row(
-                            children: [
-                              Text(copPrice(m.price),
-                                  style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeLg)),
-                              const SizedBox(width: 14),
-                              if (seller != null) StarRating(rating: seller.rating),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-
-                          // Seller row
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: elevated,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: border),
-                            ),
-                            child: Row(
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Badges
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
                               children: [
-                                UserAvatar(initials: seller?.initials ?? '?', size: 42, outlined: true),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(seller?.fullName ?? 'Campus seller',
-                                          style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.star_rounded, color: accentHi, size: 12),
-                                          const SizedBox(width: 3),
-                                          Flexible(
-                                            child: Text(
-                                              seller == null
-                                                  ? 'Seller'
-                                                  : '${seller.rating.toStringAsFixed(1)} · ${seller.major}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                AppBadge(
+                                  m.category.displayName,
+                                  highlighted: true,
+                                ),
+                                if (m.courseCode != null)
+                                  AppBadge(m.courseCode!),
+                                AppBadge(m.conditionDisplayName),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Title
+                            Text(
+                              m.title,
+                              style: AppTextStyles.heading(
+                                txPrimary,
+                                fontSize: AppTextStyles.sizeMd,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Price + rating
+                            Row(
+                              children: [
+                                Text(
+                                  copPrice(m.price),
+                                  style: AppTextStyles.price(
+                                    accentHi,
+                                    fontSize: AppTextStyles.sizeLg,
                                   ),
                                 ),
-                                if (!_isMine)
-                                GestureDetector(
-                                  onTap: _messageSeller,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: brightness == Brightness.dark ? AppColors.darkElevated : AppColors.lightElevated,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: borderSubtle),
-                                    ),
-                                    child: Row(
+                                const SizedBox(width: 14),
+                                if (seller != null)
+                                  StarRating(rating: seller.rating),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+
+                            // Seller row
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: elevated,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: border),
+                              ),
+                              child: Row(
+                                children: [
+                                  UserAvatar(
+                                    initials: seller?.initials ?? '?',
+                                    size: 42,
+                                    outlined: true,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.chat_bubble_outline_rounded, size: 14, color: txSecondary),
-                                        const SizedBox(width: 5),
-                                        Text('Chat', style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
+                                        Text(
+                                          seller?.fullName ?? 'Campus seller',
+                                          style: AppTextStyles.body(
+                                            txPrimary,
+                                            fontSize: AppTextStyles.sizeXs,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.star_rounded,
+                                              color: accentHi,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Flexible(
+                                              child: Text(
+                                                seller == null
+                                                    ? 'Seller'
+                                                    : '${seller.rating.toStringAsFixed(1)} · ${seller.major}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: AppTextStyles.mono(
+                                                  txMuted,
+                                                  fontSize:
+                                                      AppTextStyles.size2xs,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                   ),
-                                ),
-                              ],
+                                  if (!_isMine)
+                                    GestureDetector(
+                                      onTap: _messageSeller,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: brightness == Brightness.dark
+                                              ? AppColors.darkElevated
+                                              : AppColors.lightElevated,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: borderSubtle,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.chat_bubble_outline_rounded,
+                                              size: 14,
+                                              color: txSecondary,
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              'Chat',
+                                              style: AppTextStyles.body(
+                                                txSecondary,
+                                                fontSize: AppTextStyles.sizeXs,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 20),
+                            const SizedBox(height: 20),
 
-                          // Description
-                          Text('About this item',
-                              style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeSm)),
-                          const SizedBox(height: 8),
-                          Text(m.description,
-                              style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
-                          const SizedBox(height: 24),
+                            // Description
+                            Text(
+                              'About this item',
+                              style: AppTextStyles.heading(
+                                txPrimary,
+                                fontSize: AppTextStyles.sizeSm,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              m.description,
+                              style: AppTextStyles.body(
+                                txSecondary,
+                                fontSize: AppTextStyles.sizeXs,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
 
-                          // Action buttons
-                          if (_isMine)
-                            Text('This is your listing. Manage it from your Seller Hub.',
-                                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs))
-                          else ...[
-                            if (!m.isAvailable)
+                            // Still waiting to be published: the server cannot take actions on it yet.
+                            if (widget.appState.marketplace.serverIdProblem(
+                                  m.id,
+                                ) !=
+                                null)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(Icons.lock_clock_outlined, size: 15, color: txMuted),
-                                    const SizedBox(width: 6),
+                                    Icon(
+                                      Icons.sync_rounded,
+                                      size: 18,
+                                      color: accentHi,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'This item is ${m.status.displayName.toLowerCase()}. You can still message the seller.',
-                                        style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                                        itemSyncingMessage,
+                                        key: const Key('syncing-notice'),
+                                        style: AppTextStyles.body(
+                                          txSecondary,
+                                          fontSize: 14,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: SecondaryButton(
-                                    label: _openingChat ? 'Opening…' : 'Message',
-                                    leadingIcon: Icon(Icons.chat_bubble_outline_rounded, color: accentHi, size: 16),
-                                    onPressed: _openingChat ? null : _messageSeller,
-                                    fullWidth: true,
+
+                            // Action buttons
+                            if (_isMine)
+                              Text(
+                                "This is your listing, so you can't buy it or message yourself. "
+                                'See its views, edit it or mark it as sold from your Seller Hub.',
+                                key: const Key('own-listing-notice'),
+                                style: AppTextStyles.body(
+                                  txSecondary,
+                                  fontSize: 14,
+                                ),
+                              )
+                            else ...[
+                              if (!m.isAvailable)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lock_clock_outlined,
+                                        size: 18,
+                                        color: txMuted,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          statusNotice(m),
+                                          key: const Key('status-notice'),
+                                          style: AppTextStyles.body(
+                                            txSecondary,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.info_outline_rounded,
+                                        size: 16,
+                                        color: accentHi,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          buyNotice(m),
+                                          key: const Key('buy-notice'),
+                                          style: AppTextStyles.body(
+                                            txMuted,
+                                            fontSize: _buyNoticeFontSize,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                if (m.isAvailable) ...[
-                                  const SizedBox(width: 12),
+                              Row(
+                                children: [
                                   Expanded(
-                                    child: PrimaryButton(
-                                      label: 'Buy now',
-                                      leadingIcon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
-                                      onPressed: _buying ? null : _buy,
-                                      isLoading: _buying,
+                                    child: SecondaryButton(
+                                      label: _openingChat
+                                          ? 'Opening…'
+                                          : 'Message',
+                                      leadingIcon: Icon(
+                                        Icons.chat_bubble_outline_rounded,
+                                        color: accentHi,
+                                        size: 16,
+                                      ),
+                                      onPressed: _openingChat
+                                          ? null
+                                          : _messageSeller,
                                       fullWidth: true,
                                     ),
                                   ),
+                                  if (m.isAvailable) ...[
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: PrimaryButton(
+                                        label: 'Buy this item',
+                                        leadingIcon: const Icon(
+                                          Icons.shopping_bag_outlined,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                        onPressed: _buying ? null : _buy,
+                                        isLoading: _buying,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
-                            ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
                     ),
                   ),
                 ),
@@ -340,4 +599,3 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     );
   }
 }
-

@@ -105,7 +105,7 @@ class SellerHubScreen extends StatelessWidget {
                   children: [
                     _StatCard(icon: Icons.inventory_2_outlined, value: '$activeCount', label: 'Active Listings', brightness: brightness),
                     const SizedBox(width: 10),
-                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: '\$${appState.account.earnedThisMonth(myId).toStringAsFixed(0)}', label: 'Earned This Month', brightness: brightness),
+                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: copPrice(appState.account.earnedThisMonth(myId)), label: 'Earned This Month', brightness: brightness),
                     const SizedBox(width: 10),
                     _StatCard(icon: Icons.trending_up_rounded, value: (me?.rating ?? 0).toStringAsFixed(1), label: 'Your Rating', brightness: brightness),
                   ],
@@ -218,7 +218,7 @@ class SellerHubScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Text('\$${s.price.toStringAsFixed(2)}',
+                        Text(copPrice(s.price),
                             style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
                       ],
                     ),
@@ -486,7 +486,7 @@ class _ListingRow extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('\$${material.price.toStringAsFixed(2)}',
+                      child: Text(copPrice(material.price),
                           style: AppTextStyles.price(accentHi, fontSize: AppTextStyles.sizeSm)),
                     ),
                     Container(
@@ -557,7 +557,7 @@ class _PendingListingRow extends StatelessWidget {
                     style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 8),
-              Text('\$${listing.price}',
+              Text(copPrice(double.tryParse(listing.price) ?? 0),
                   style: AppTextStyles.mono(accentHi, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w500)),
             ],
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../model/rules/input_rules.dart';
+import '../../model/rules/registration_rules.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/register_view_model.dart';
 import '../widgets/common_widgets.dart';
@@ -37,11 +38,20 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Same pattern as the login form: emojis never get into a field, and email and password have
-  // no whitespace at all, so a pasted " ana@uniandes.edu.co " is cleaned up while it is typed.
-  static final _textFormatters = <TextInputFormatter>[
-    FilteringTextInputFormatter.deny(InputRules.emoji),
+  // Name and major stop accepting characters at their limit, so nobody finds out only on
+  // submitting, and drop emojis (the blockers say why).
+  final _nameEmoji = EmojiBlocker();
+  final _majorEmoji = EmojiBlocker();
+  late final _nameFormatters = <TextInputFormatter>[
+    _nameEmoji,
+    LengthLimitingTextInputFormatter(RegistrationRules.maxNameLength),
   ];
+  late final _majorFormatters = <TextInputFormatter>[
+    _majorEmoji,
+    LengthLimitingTextInputFormatter(RegistrationRules.maxMajorLength),
+  ];
+  // Same pattern as the login form: emojis never get into the email or password, which have no
+  // whitespace at all, so a pasted " ana@uniandes.edu.co " is cleaned up while it is typed.
   static final _noSpaceFormatters = <TextInputFormatter>[
     FilteringTextInputFormatter.deny(InputRules.emoji),
     FilteringTextInputFormatter.deny(RegExp(r'\s')),
@@ -71,6 +81,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _vm.dispose();
+    _nameEmoji.dispose();
+    _majorEmoji.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _facultyCtrl.dispose();
@@ -212,12 +224,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         _LabeledField(
           label: 'Full name',
+          footer: FieldFeedback(
+            controller: _nameCtrl,
+            max: RegistrationRules.maxNameLength,
+            validate: RegistrationRules.validateFullName,
+            emojiBlocker: _nameEmoji,
+            emojiMessage: "Your name can't contain emojis, so we removed them.",
+            suppressHint: _vm.errorFor(RegisterField.name) != null,
+            hintKey: const Key('name-hint'),
+            emojiNoticeKey: const Key('name-emoji-notice'),
+            counterKey: const Key('name-counter'),
+          ),
           child: AppTextField(
             placeholder: 'Ana Gomez',
             controller: _nameCtrl,
             enabled: !_vm.isLoading,
             textCapitalization: TextCapitalization.words,
-            inputFormatters: _textFormatters,
+            inputFormatters: _nameFormatters,
             errorText: _vm.errorFor(RegisterField.name),
             onChanged: (v) => _vm.update(RegisterField.name, v),
           ),
@@ -247,12 +270,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         _LabeledField(
           label: 'Major',
+          footer: FieldFeedback(
+            controller: _majorCtrl,
+            max: RegistrationRules.maxMajorLength,
+            validate: RegistrationRules.validateMajor,
+            emojiBlocker: _majorEmoji,
+            emojiMessage: "Your major can't contain emojis, so we removed them.",
+            suppressHint: _vm.errorFor(RegisterField.major) != null,
+            hintKey: const Key('major-hint'),
+            emojiNoticeKey: const Key('major-emoji-notice'),
+            counterKey: const Key('major-counter'),
+          ),
           child: AppTextField(
             placeholder: 'Computer Science',
             controller: _majorCtrl,
             enabled: !_vm.isLoading,
             textCapitalization: TextCapitalization.words,
-            inputFormatters: _textFormatters,
+            inputFormatters: _majorFormatters,
             errorText: _vm.errorFor(RegisterField.major),
             onChanged: (v) => _vm.update(RegisterField.major, v),
           ),
