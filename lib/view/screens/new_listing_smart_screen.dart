@@ -34,12 +34,19 @@ class NewListingSmartScreen extends StatefulWidget {
 }
 
 class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
-  // The lengths are the server's. The price is typed in whole pesos, with "." or "," between thousands.
-  static final _titleFormatters = <TextInputFormatter>[
+  // The lengths are the server's. The title and the description stop accepting characters at
+  // their limit; emojis are kept out of the title, also when pasted (the blocker says why). The
+  // price is typed in whole pesos, with "." or "," between thousands.
+  final _titleEmoji = EmojiBlocker();
+  late final _titleFormatters = <TextInputFormatter>[
+    _titleEmoji,
     LengthLimitingTextInputFormatter(ListingRules.maxTitleLength),
   ];
   static final _descriptionFormatters = <TextInputFormatter>[
     LengthLimitingTextInputFormatter(ListingRules.maxDescriptionLength),
+  ];
+  static final _courseFormatters = <TextInputFormatter>[
+    LengthLimitingTextInputFormatter(ListingRules.maxCourseCodeLength),
   ];
   static final _priceFormatters = <TextInputFormatter>[
     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
@@ -152,6 +159,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
     _descCtrl.dispose();
     _courseCtrl.dispose();
     _priceCtrl.dispose();
+    _titleEmoji.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -404,14 +412,48 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                           controller: _titleCtrl,
                           inputFormatters: _titleFormatters,
                         ),
+                        FieldFeedback(
+                          controller: _titleCtrl,
+                          max: ListingRules.maxTitleLength,
+                          validate: ListingRules.validateTitle,
+                          emojiBlocker: _titleEmoji,
+                          emojiMessage:
+                              "Emojis aren't allowed in the title, so we removed them. Use letters, numbers and symbols.",
+                          hintKey: const Key('title-hint'),
+                          emojiNoticeKey: const Key('title-emoji-notice'),
+                          counterKey: const Key('title-counter'),
+                        ),
                         const SizedBox(height: 12),
                         _FieldLabel('Description', color: txMuted),
-                        AppTextField(
-                          key: const Key('listing-description'),
-                          placeholder: 'Condition notes, what is included, meetup details…',
+                        // The counter sits inside the box, at the bottom left; the field keeps
+                        // room under the text so what is typed never goes under it.
+                        Stack(
+                          children: [
+                            AppTextField(
+                              key: const Key('listing-description'),
+                              placeholder: 'Condition notes, what is included, meetup details…',
+                              controller: _descCtrl,
+                              maxLines: 4,
+                              inputFormatters: _descriptionFormatters,
+                              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 34),
+                            ),
+                            Positioned(
+                              left: 16,
+                              bottom: 10,
+                              child: IgnorePointer(
+                                child: CharacterCounter(
+                                  key: const Key('description-counter'),
+                                  controller: _descCtrl,
+                                  max: ListingRules.maxDescriptionLength,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        FieldFeedback(
                           controller: _descCtrl,
-                          maxLines: 4,
-                          inputFormatters: _descriptionFormatters,
+                          validate: ListingRules.validateDescription,
+                          hintKey: const Key('description-hint'),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -426,6 +468,13 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                                     key: const Key('listing-course'),
                                     placeholder: 'CS 301',
                                     controller: _courseCtrl,
+                                    inputFormatters: _courseFormatters,
+                                  ),
+                                  FieldFeedback(
+                                    controller: _courseCtrl,
+                                    max: ListingRules.maxCourseCodeLength,
+                                    counterShowFrom: 0.8,
+                                    counterKey: const Key('course-counter'),
                                   ),
                                 ],
                               ),
@@ -443,6 +492,11 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                                     // Whole pesos: digits, with "." or "," only to separate thousands.
                                     keyboardType: TextInputType.number,
                                     inputFormatters: _priceFormatters,
+                                  ),
+                                  FieldFeedback(
+                                    controller: _priceCtrl,
+                                    validate: ListingRules.validatePrice,
+                                    hintKey: const Key('price-hint'),
                                   ),
                                 ],
                               ),

@@ -1,3 +1,4 @@
+import '../rules/client_id.dart';
 import 'enums.dart';
 
 /// Something the user did that the analytics service wants to count.
@@ -26,7 +27,9 @@ class AnalyticsEvent {
   Map<String, dynamic> toJson() => {
         'client_id': clientId,
         'eventType': type.name,
-        if (materialId != null) 'materialId': materialId,
+        // The server refuses an event whose materialId is not a UUID; the event itself is still
+        // worth counting, so only the bad reference is left out.
+        if (isUuid(materialId)) 'materialId': materialId,
         if (metadata != null) 'metadata': metadata,
         'occurredAt': occurredAt.toUtc().toIso8601String(),
         'clientCreatedAt': clientCreatedAt.toUtc().toIso8601String(),

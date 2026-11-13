@@ -132,7 +132,7 @@ Map<String, dynamic> _bq10Json({int staleDays = 14, String sellerId = 'ana-id'})
       ],
       'dead_listings': [
         {
-          'id': 'mat-dead-1',
+          'id': '00000000-0000-4000-8000-00000000d001',
           'title': 'Linear Algebra 5th Ed',
           'category': 'BOOKS',
           'price': 90000,
@@ -156,7 +156,7 @@ Map<String, dynamic> _bq10Json({int staleDays = 14, String sellerId = 'ana-id'})
       ],
       'at_risk_listings': [
         {
-          'id': 'mat-dead-1',
+          'id': '00000000-0000-4000-8000-00000000d001',
           'title': 'Linear Algebra 5th Ed',
           'category': 'BOOKS',
           'price': 90000,
@@ -178,7 +178,7 @@ Map<String, dynamic> _bq10Json({int staleDays = 14, String sellerId = 'ana-id'})
           'recommendation': 'Drop price to \$52.200 COP and add a clear photo.',
         },
         {
-          'id': 'mat-risk-2',
+          'id': '00000000-0000-4000-8000-00000000d002',
           'title': 'Casio fx-991EX',
           'category': 'CALCULATORS',
           'price': 65000,
@@ -668,8 +668,8 @@ void main() {
         () async {
       final report = DeadListingsModel.fromJson(_bq10Json());
       final sellerItems = [
-        _material('mat-dead-1', price: 90000),
-        _material('mat-risk-2', title: 'Casio fx-991EX', price: 65000, category: MaterialCategoryEnum.CALCULATORS),
+        _material('00000000-0000-4000-8000-00000000d001', price: 90000),
+        _material('00000000-0000-4000-8000-00000000d002', title: 'Casio fx-991EX', price: 65000, category: MaterialCategoryEnum.CALCULATORS),
         _material(
           'mat-local-only',
           title: 'Lab Coat',
@@ -689,15 +689,15 @@ void main() {
         ],
         sellerId: 'ana-id',
         staleDays: 14,
-        dismissedIds: {'mat-risk-2'},
-        localPriceOverrides: {'mat-dead-1': 55000},
+        dismissedIds: {'00000000-0000-4000-8000-00000000d002'},
+        localPriceOverrides: {'00000000-0000-4000-8000-00000000d001': 55000},
         now: DateTime.utc(2026, 11, 10),
       );
 
       expect(res.usedLocalFallback, isFalse);
       expect(res.elapsedMicroseconds, greaterThanOrEqualTo(0));
-      expect(res.dismissedAdvisories.map((i) => i.id), ['mat-risk-2']);
-      final updatedBook = res.activeAdvisories.firstWhere((i) => i.id == 'mat-dead-1');
+      expect(res.dismissedAdvisories.map((i) => i.id), ['00000000-0000-4000-8000-00000000d002']);
+      final updatedBook = res.activeAdvisories.firstWhere((i) => i.id == '00000000-0000-4000-8000-00000000d001');
       expect(updatedBook.price, 55000);
       expect(updatedBook.riskScore, lessThan(82));
       expect(res.activeAdvisories.any((i) => i.id == 'mat-local-only'), isTrue);
@@ -752,10 +752,10 @@ void main() {
         baseUrl: 'https://api.test',
         client: MockClient((req) async {
           if (!allowServer) throw http.ClientException('offline');
-          if (req.method == 'PATCH' && req.url.path == '/materials/mat-dead-1') {
+          if (req.method == 'PATCH' && req.url.path == '/materials/00000000-0000-4000-8000-00000000d001') {
             final decoded = jsonDecode(req.body) as Map<String, dynamic>;
             patchedBodies.add(decoded);
-            return http.Response(jsonEncode(_materialPayload('mat-dead-1', price: 52200)), 200);
+            return http.Response(jsonEncode(_materialPayload('00000000-0000-4000-8000-00000000d001', price: 52200)), 200);
           }
           return http.Response('{}', 404);
         }),
@@ -776,7 +776,7 @@ void main() {
       final actionRepo = PendingActionRepositoryImpl(store, sync: sync);
       await QueuePriceUpdateUseCase(actionRepo).execute(
         ownerId: 'ana-id',
-        materialId: 'mat-dead-1',
+        materialId: '00000000-0000-4000-8000-00000000d001',
         newPrice: 52200,
         listingTitle: 'Linear Algebra 5th Ed',
       );
@@ -807,7 +807,7 @@ void main() {
 
     test('online price drop updates listing immediately; offline queues PendingAction and persists dismiss', () async {
       final healthRepo = _FakeListingHealthRepo();
-      final matRepo = _FakeMaterialRepo([_material('mat-dead-1', price: 90000)]);
+      final matRepo = _FakeMaterialRepo([_material('00000000-0000-4000-8000-00000000d001', price: 90000)]);
       final prefsRepo = ListingHealthPreferencesRepositoryImpl();
       final pendingRepo = PendingActionRepositoryImpl(store);
 
@@ -830,15 +830,15 @@ void main() {
       expect(vm.activeAdvisories.length, 2);
 
       // Dismiss one advisory and verify persistence + toggle.
-      await vm.toggleDismissAlert('mat-risk-2');
+      await vm.toggleDismissAlert('00000000-0000-4000-8000-00000000d002');
       expect(vm.activeAdvisories.length, 1);
       expect(vm.dismissedAdvisories.length, 1);
-      expect(await prefsRepo.loadDismissedIds('ana-id'), {'mat-risk-2'});
+      expect(await prefsRepo.loadDismissedIds('ana-id'), {'00000000-0000-4000-8000-00000000d002'});
 
       // Online price drop.
       final onlineItem = vm.activeAdvisories.first;
       await vm.applyPriceDrop(onlineItem, 52200);
-      expect(matRepo.updates, [('mat-dead-1', 52200.0)]);
+      expect(matRepo.updates, [('00000000-0000-4000-8000-00000000d001', 52200.0)]);
       expect(syncedEntities.last.price, 52200);
       expect(vm.activeAdvisories.first.price, 52200);
 
@@ -848,7 +848,7 @@ void main() {
       final queued = await store.actions('ana-id');
       expect(queued, hasLength(1));
       expect(queued.single.kind, PendingActionKind.updateListingPrice);
-      expect(vm.isPriceQueued('mat-dead-1'), isTrue);
+      expect(vm.isPriceQueued('00000000-0000-4000-8000-00000000d001'), isTrue);
       expect(vm.activeAdvisories.first.price, 48000);
       expect(vm.statusMessage, contains('Saved offline'));
 
@@ -874,7 +874,7 @@ void main() {
 
     Future<(AppViewModel, _FakeConnectivity, _FakeMaterialRepo)> buildAppState() async {
       final net = _FakeConnectivity();
-      final matRepo = _FakeMaterialRepo([_material('mat-dead-1', price: 90000)]);
+      final matRepo = _FakeMaterialRepo([_material('00000000-0000-4000-8000-00000000d001', price: 90000)]);
       final dummySync = OutboxSyncService(
         store: store,
         sender: _NoSender(),
@@ -1037,20 +1037,20 @@ void main() {
       }
 
       // Open What-If simulator powered by Isolate.run.
-      await scrollAndTap(find.byKey(const Key('simulate-btn-mat-dead-1')));
+      await scrollAndTap(find.byKey(const Key('simulate-btn-00000000-0000-4000-8000-00000000d001')));
       await settleWithIsolates(() => vm.simulation != null && !vm.isSimulating);
-      expect(find.byKey(const Key('simulator-panel-mat-dead-1')), findsOneWidget);
+      expect(find.byKey(const Key('simulator-panel-00000000-0000-4000-8000-00000000d001')), findsOneWidget);
 
       // Queue an offline price drop and verify the pending badge appears.
-      await scrollAndTap(find.byKey(const Key('apply-simulated-mat-dead-1')));
-      await settleWithIsolates(() => vm.isPriceQueued('mat-dead-1') && !vm.isUpdating('mat-dead-1'));
+      await scrollAndTap(find.byKey(const Key('apply-simulated-00000000-0000-4000-8000-00000000d001')));
+      await settleWithIsolates(() => vm.isPriceQueued('00000000-0000-4000-8000-00000000d001') && !vm.isUpdating('00000000-0000-4000-8000-00000000d001'));
       await tester.scrollUntilVisible(
-        find.byKey(const Key('pending-price-mat-dead-1')),
+        find.byKey(const Key('pending-price-00000000-0000-4000-8000-00000000d001')),
         -150,
         scrollable: mainScrollable,
       );
-      await tester.ensureVisible(find.byKey(const Key('pending-price-mat-dead-1')));
-      expect(find.byKey(const Key('pending-price-mat-dead-1')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('pending-price-00000000-0000-4000-8000-00000000d001')));
+      expect(find.byKey(const Key('pending-price-00000000-0000-4000-8000-00000000d001')), findsOneWidget);
       final queued = await store.actions('ana-id');
       expect(queued, hasLength(1));
     });

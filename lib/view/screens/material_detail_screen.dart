@@ -5,6 +5,7 @@ import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
 import '../../view_model/app_view_model.dart';
 import '../../model/entities/material_entity.dart';
+import '../../model/rules/client_id.dart';
 
 // ─── Material Detail Screen ───────────────────────────────────────────────────
 
@@ -22,6 +23,10 @@ class MaterialDetailScreen extends StatefulWidget {
   State<MaterialDetailScreen> createState() => _MaterialDetailScreenState();
 }
 
+/// The "Buy this item" message and its dialog are read before spending money, so they are
+/// bigger than the rest of the secondary text.
+const double _buyMessageFontSize = 16;
+
 class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   final int  _imageIndex = 0;
   bool _openingChat = false;
@@ -29,6 +34,28 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
 
   bool get _isFav => widget.appState.marketplace.isFavorite(widget.material.id);
   bool get _isMine => widget.material.sellerId == widget.appState.currentUser?.id;
+
+  /// What the listing's status means for the student and what they can still do.
+  static String statusNotice(MaterialEntity m) {
+    switch (m.status) {
+      case MaterialStatusEnum.RESERVED:
+        return 'This item is reserved: another student already placed an order and is arranging '
+            "the meetup with the seller, so it can't be bought right now. You can still message "
+            'the seller, and if the order falls through it will become available again.';
+      case MaterialStatusEnum.SOLD:
+        return "This item has already been sold, so it can't be bought anymore. You can still "
+            'message the seller to ask whether they have a similar item.';
+      case MaterialStatusEnum.AVAILABLE:
+        return 'This item is available.';
+    }
+  }
+
+  /// Explains what "Buy this item" does before the student taps it.
+  static String buyNotice(MaterialEntity m) {
+    final seller = m.seller?.fullName.split(' ').first ?? 'the seller';
+    return 'Buy this item to reserve it for you. Nothing is charged in the app: you agree on a '
+        'campus meetup with $seller and pay in person, once you have checked the item.';
+  }
 
   void _showMessage(String message) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -280,22 +307,68 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                               style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
                           const SizedBox(height: 24),
 
+                          // Still waiting to be published: the server cannot take actions on it yet.
+                          if (widget.appState.marketplace.serverIdProblem(m.id) != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.sync_rounded, size: 18, color: accentHi),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      itemSyncingMessage,
+                                      key: const Key('syncing-notice'),
+                                      style: AppTextStyles.body(txSecondary, fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                           // Action buttons
                           if (_isMine)
-                            Text('This is your listing. Manage it from your Seller Hub.',
-                                style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs))
+                            Text(
+                                "This is your listing, so you can't buy it or message yourself. "
+                                'See its views, edit it or mark it as sold from your Seller Hub.',
+                                key: const Key('own-listing-notice'),
+                                style: AppTextStyles.body(txSecondary, fontSize: 14))
                           else ...[
                             if (!m.isAvailable)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.lock_clock_outlined, size: 15, color: txMuted),
-                                    const SizedBox(width: 6),
+                                    Icon(Icons.lock_clock_outlined, size: 18, color: txMuted),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'This item is ${m.status.displayName.toLowerCase()}. You can still message the seller.',
-                                        style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                                        statusNotice(m),
+                                        key: const Key('status-notice'),
+                                        style: AppTextStyles.body(txSecondary, fontSize: 14),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.info_outline_rounded, size: 20, color: accentHi),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        buyNotice(m),
+                                        key: const Key('buy-notice'),
+                                        style: AppTextStyles.body(
+                                          txPrimary,
+                                          fontSize: _buyMessageFontSize,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -315,7 +388,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: PrimaryButton(
-                                      label: 'Buy now',
+                                      label: 'Buy this item',
                                       leadingIcon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
                                       onPressed: _buying ? null : _buy,
                                       isLoading: _buying,

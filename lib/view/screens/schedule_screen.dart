@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/common_widgets.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/meetup_entities.dart';
 import '../../view_model/app_view_model.dart';
@@ -290,6 +291,8 @@ class _AddClassSheetState extends State<_AddClassSheet> {
           TextField(
             controller: _labelCtrl,
             maxLength: 60,
+            buildCounter: (context, {required currentLength, required isFocused, required maxLength}) =>
+                CounterLabel(length: currentLength, max: maxLength ?? 60, showFrom: 0.8),
             textCapitalization: TextCapitalization.characters,
             style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs),
             decoration: InputDecoration(

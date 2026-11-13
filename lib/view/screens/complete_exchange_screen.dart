@@ -1,5 +1,6 @@
 import '../widgets/cached_photo.dart';
 import 'package:flutter/material.dart';
+import '../widgets/common_widgets.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/exchange_entity.dart';
 import '../../model/entities/material_entity.dart';
@@ -298,6 +299,8 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
         TextField(
           controller: _reviewCtrl,
           maxLength: 500,
+          buildCounter: (context, {required currentLength, required isFocused, required maxLength}) =>
+              CounterLabel(length: currentLength, max: maxLength ?? 500, showFrom: 0.8),
           minLines: 3,
           maxLines: 5,
           onChanged: _vm.setReview,

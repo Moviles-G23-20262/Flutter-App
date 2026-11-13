@@ -207,6 +207,22 @@ void main() {
       expect(vm.isPublishing, isFalse);
     });
 
+    test('refuses an emoji in the title, a title over 60 and a description over 330', () async {
+      vm.setCategory('BOOKS');
+      vm.setCondition('GOOD');
+      await vm.addPhoto(ImageSource.camera);
+
+      await vm.publish(title: 'Calculus 📚', description: 'Barely used', price: '35000');
+      expect(vm.publishError, "The title can't contain emojis.");
+      await vm.publish(title: 'a' * 61, description: 'Barely used', price: '35000');
+      expect(vm.publishError, 'The title needs 3 to 60 characters.');
+      await vm.publish(title: 'Calculus', description: 'a' * 331, price: '35000');
+      expect(vm.publishError, 'The description needs 10 to 330 characters.');
+      expect(backend.published, isEmpty);
+
+      expect(await vm.publish(title: 'a' * 60, description: 'b' * 330, price: '35000'), isTrue);
+    });
+
     test('says what is missing and sends nothing', () async {
       expect(await vm.publish(title: 'x', description: 'y', price: '10'), isFalse);
       expect(vm.publishError, 'Choose a category.');
@@ -223,11 +239,11 @@ void main() {
       await vm.publish(title: ' ', description: 'Barely used', price: '35000');
       expect(vm.publishError, 'Add a title.');
       await vm.publish(title: 'ab', description: 'Barely used', price: '35000');
-      expect(vm.publishError, 'The title needs 3 to 100 characters.');
+      expect(vm.publishError, 'The title needs 3 to 60 characters.');
       await vm.publish(title: 'Calculus', description: '', price: '35000');
       expect(vm.publishError, 'Add a description.');
       await vm.publish(title: 'Calculus', description: 'Works', price: '35000');
-      expect(vm.publishError, 'The description needs 10 to 1000 characters.');
+      expect(vm.publishError, 'The description needs 10 to 330 characters.');
       await vm.publish(title: 'Calculus', description: 'Barely used', price: '');
       expect(vm.publishError, 'Enter a price.');
       await vm.publish(title: 'Calculus', description: 'Barely used', price: 'abc');
@@ -301,6 +317,9 @@ void main() {
 
   group('Sell screen', () {
     late _NoApp app;
+
+    /// The TextField inside an AppTextField that has [key].
+    Finder innerField(String key) => find.descendant(of: find.byKey(Key(key)), matching: find.byType(TextField));
 
     Future<void> pump(WidgetTester tester) async {
       app = _NoApp();
@@ -423,6 +442,82 @@ void main() {
       expect(find.byKey(const Key('estimate-price')), findsNothing);
       expect(find.text('Suggest Fair Price'), findsOneWidget);
       expect(find.textContaining('just type yours'), findsOneWidget);
+    });
+
+    testWidgets('the title stops at 60 characters and the description at 330', (tester) async {
+      await pump(tester);
+
+      await tester.enterText(find.byKey(const Key('listing-title')), 'a' * 80);
+      await tester.enterText(find.byKey(const Key('listing-description')), 'b' * 400);
+      await tester.pump();
+
+      expect(tester.widget<TextField>(innerField('listing-title')).controller!.text, 'a' * 60);
+      expect(tester.widget<TextField>(innerField('listing-description')).controller!.text, 'b' * 330);
+      expect(find.text('60/60'), findsOneWidget);
+      expect(find.text('330/330'), findsOneWidget);
+    });
+
+    testWidgets('the description counter lives inside the box, at the bottom left, under the text', (tester) async {
+      await pump(tester);
+      await tester.enterText(find.byKey(const Key('listing-description')), 'Barely used');
+      await tester.pump();
+
+      final box = tester.getRect(find.byKey(const Key('listing-description')));
+      final counter = tester.getRect(find.byKey(const Key('description-counter')));
+      expect(find.text('11/330'), findsOneWidget);
+      expect(box.contains(counter.topLeft) && box.contains(counter.bottomRight), isTrue, reason: 'inside the box');
+      expect(counter.left - box.left, lessThan(24), reason: 'on the left');
+      expect(box.bottom - counter.bottom, lessThan(24), reason: 'at the bottom');
+
+      final field = tester.widget<TextField>(innerField('listing-description'));
+      final padding = (field.decoration!.contentPadding! as EdgeInsets).bottom;
+      expect(padding, greaterThanOrEqualTo(counter.height + 12), reason: 'room so text never goes under the counter');
+    });
+
+    testWidgets('emojis typed or pasted in the title are removed and explained', (tester) async {
+      await pump(tester);
+
+      await tester.enterText(find.byKey(const Key('listing-title')), 'Calculadora 🔧 Casio ❤️');
+      await tester.pump();
+
+      expect(tester.widget<TextField>(innerField('listing-title')).controller!.text, 'Calculadora  Casio ');
+      expect(find.byKey(const Key('title-emoji-notice')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('listing-title')), 'Calculadora Casio');
+      await tester.pump();
+      expect(find.byKey(const Key('title-emoji-notice')), findsNothing);
+    });
+
+    testWidgets('warns while typing: short title, short description and a price out of range', (tester) async {
+      await pump(tester);
+      expect(find.byKey(const Key('title-hint')), findsNothing, reason: 'nothing before the user types');
+
+      await tester.enterText(find.byKey(const Key('listing-title')), 'ab');
+      await tester.enterText(find.byKey(const Key('listing-description')), 'Works');
+      await tester.enterText(find.byKey(const Key('smart-price-field')), '500');
+      await tester.pump();
+      expect(find.text('The title needs 3 to 60 characters.'), findsOneWidget);
+      expect(find.text('The description needs 10 to 330 characters.'), findsOneWidget);
+      expect(find.text('The price must be between \$1.000 and \$50.000.000 COP.'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('smart-price-field')), '60.000.000');
+      await tester.pump();
+      expect(find.byKey(const Key('price-hint')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('listing-title')), 'Calculus');
+      await tester.enterText(find.byKey(const Key('listing-description')), 'Barely used');
+      await tester.enterText(find.byKey(const Key('smart-price-field')), '35000');
+      await tester.pump();
+      expect(find.byKey(const Key('title-hint')), findsNothing);
+      expect(find.byKey(const Key('description-hint')), findsNothing);
+      expect(find.byKey(const Key('price-hint')), findsNothing);
+    });
+
+    testWidgets('the course code stops at 20 characters', (tester) async {
+      await pump(tester);
+      await tester.enterText(find.byKey(const Key('listing-course')), 'C' * 30);
+      await tester.pump();
+      expect(tester.widget<TextField>(innerField('listing-course')).controller!.text, 'C' * 20);
     });
 
     testWidgets('an incomplete form shows what is missing', (tester) async {

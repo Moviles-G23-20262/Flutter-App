@@ -74,7 +74,7 @@ const _other = '3f2b8c1e-0000-4000-8000-000000000002';
 Map<String, dynamic> _sellerJson([String id = _other]) =>
     {'id': id, 'fullName': 'Jake Reyes', 'major': 'Chemistry', 'faculty': null, 'rating': 4.5};
 
-Map<String, dynamic> _materialJson({String id = 'm1', String price = '18.00', String sellerId = _other}) => {
+Map<String, dynamic> _materialJson({String id = _m1, String price = '18.00', String sellerId = _other}) => {
       'id': id,
       'title': 'Casio fx-991EX',
       'description': 'Barely used',
@@ -101,7 +101,14 @@ UserEntity _user() => UserEntity(
       createdAt: DateTime(2026, 1, 1),
     );
 
-MaterialEntity _material({String id = 'm1', String sellerId = _other, double price = 18}) => MaterialEntity(
+// Ids the server hands out are UUIDs, and the app refuses to send anything else.
+const _ua = '00000000-0000-4000-8000-00000000000a';
+const _ub = '00000000-0000-4000-8000-00000000000b';
+const _m1 = '00000000-0000-4000-8000-0000000000a1';
+const _m5 = '00000000-0000-4000-8000-0000000000a5';
+const _m9 = '00000000-0000-4000-8000-0000000000a9';
+
+MaterialEntity _material({String id = _m1, String sellerId = _other, double price = 18}) => MaterialEntity(
       id: id,
       title: 'Casio fx-991EX',
       description: 'Barely used',
@@ -143,17 +150,29 @@ class _FakeWishlist implements WishlistRepository {
   final List<WishlistItemEntity> items = [];
   Object? error;
 
+  /// Ids sent to the server to delete.
+  final removed = <String>[];
+
+  /// A save waits for its gate here (when there is one) before it is answered.
+  final gates = <String, Completer<void>>{};
+
+  /// Saves of these listings are refused, once their gate (if any) opens.
+  final failAdd = <String>{};
+
   @override
   Future<CachedList<WishlistItemEntity>> getWishlist() async => CachedList(List.of(items));
 
   @override
   Future<WishlistItemEntity> add(String materialId) async {
+    await gates[materialId]?.future;
+    if (failAdd.contains(materialId)) throw const DataException('Could not save');
     if (error != null) throw error!;
     return WishlistItemEntity(id: 'w-$materialId', userId: _me, materialId: materialId, createdAt: DateTime(2026, 9, 2));
   }
 
   @override
   Future<void> remove(String wishlistItemId) async {
+    removed.add(wishlistItemId);
     if (error != null) throw error!;
   }
 }
@@ -199,7 +218,7 @@ class _FakeChats implements ChatRepository {
 
 ExchangeEntity _order({
   String id = 'x1',
-  String materialId = 'm1',
+  String materialId = _m1,
   String buyerId = _me,
   String sellerId = _other,
   double price = 18,
@@ -600,7 +619,7 @@ void main() {
     test('a chat room keeps the newest message and the unread count', () {
       final room = chatRoomFromJson({
         'id': 'r1',
-        'materialId': 'm1',
+        'materialId': _m1,
         'buyerId': _me,
         'sellerId': _other,
         'createdAt': '2026-09-01T10:00:00.000Z',
@@ -688,21 +707,71 @@ void main() {
 
     test('hearts update at once and roll back when the server refuses', () async {
       final world = _World();
-      world.materials.materials = [_material(id: 'a')];
+      world.materials.materials = [_material(id: _ua)];
       await world.marketplaceState.load();
 
-      expect(await world.marketplaceState.toggleFavorite('a'), isNull);
-      expect(world.marketplaceState.isFavorite('a'), isTrue);
+      expect(await world.marketplaceState.toggleFavorite(_ua), isNull);
+      expect(world.marketplaceState.isFavorite(_ua), isTrue);
 
       world.wishlist.error = const DataException('No permission');
-      expect(await world.marketplaceState.toggleFavorite('a'), 'No permission');
-      expect(world.marketplaceState.isFavorite('a'), isTrue, reason: 'removal failed, so it stays saved');
+      expect(await world.marketplaceState.toggleFavorite(_ua), 'No permission');
+      expect(world.marketplaceState.isFavorite(_ua), isTrue, reason: 'removal failed, so it stays saved');
 
       world.wishlist.error = null;
-      expect(await world.marketplaceState.toggleFavorite('a'), isNull);
+      expect(await world.marketplaceState.toggleFavorite(_ua), isNull);
       world.wishlist.error = const DataException('Offline');
-      expect(await world.marketplaceState.toggleFavorite('a'), 'Offline');
-      expect(world.marketplaceState.isFavorite('a'), isFalse, reason: 'add failed, so the heart goes back to empty');
+      expect(await world.marketplaceState.toggleFavorite(_ua), 'Offline');
+      expect(world.marketplaceState.isFavorite(_ua), isFalse, reason: 'add failed, so the heart goes back to empty');
+    });
+
+    test('a refused heart does not undo another one saved meanwhile, and no placeholder id is sent', () async {
+      final world = _World();
+      world.materials.materials = [_material(id: _ua), _material(id: _ub)];
+      await world.marketplaceState.load();
+      world.wishlist.gates[_ua] = Completer<void>();
+      world.wishlist.gates[_ub] = Completer<void>();
+      world.wishlist.failAdd.add(_ub);
+
+      final heartA = world.marketplaceState.toggleFavorite(_ua); // in flight
+      final heartB = world.marketplaceState.toggleFavorite(_ub); // taken while A is in flight
+      world.wishlist.gates[_ua]!.complete();
+      expect(await heartA, isNull);
+      world.wishlist.gates[_ub]!.complete();
+      expect(await heartB, 'Could not save');
+
+      expect(world.marketplaceState.isFavorite(_ub), isFalse);
+      expect(world.marketplaceState.isFavorite(_ua), isTrue, reason: 'A was saved; the failure of B is is separate');
+
+      expect(await world.marketplaceState.toggleFavorite(_ua), isNull);
+      expect(world.wishlist.removed, ['w-$_ua'], reason: 'the server gets the real id, never "temp-$_ua"');
+      expect(world.marketplaceState.isFavorite(_ua), isFalse);
+    });
+
+    test('an item that is not on the server yet is never sent: no heart, chat or order', () async {
+      final world = _World();
+      world.appState.login(_user());
+      const syncing = 'This item is still syncing. Try again in a moment, once it has been published.';
+
+      for (final id in ['', 'guest', 'temp-abc', 'local-1']) {
+        expect(await world.marketplaceState.toggleFavorite(id), syncing, reason: 'heart "$id"');
+        expect(await world.appState.messageSeller(_material(id: id)), syncing, reason: 'chat "$id"');
+        expect(await world.appState.buy(_material(id: id)), syncing, reason: 'buy "$id"');
+      }
+      expect(world.wishlist.removed, isEmpty);
+      expect(world.tracker.events, isEmpty);
+      expect(world.marketplaceState.isFavorite('local-1'), isFalse, reason: 'no heart was drawn either');
+      world.chatState.clear();
+    });
+
+    test('opening an item that is not on the server yet records no view', () {
+      final world = _World();
+      world.appState.login(_user());
+
+      world.appState.openMaterialDetail(_material(id: 'temp-abc', sellerId: _other));
+
+      expect(world.tracker.events, isEmpty);
+      expect(world.appState.currentScreen, AppScreen.materialDetail, reason: 'it can still be looked at');
+      world.chatState.clear();
     });
 
     test('a listing the user publishes shows up first', () async {
@@ -736,7 +805,7 @@ void main() {
   group('ChatViewModel', () {
     ChatRoomEntity room({int unread = 0, DateTime? at}) => ChatRoomEntity(
           id: 'r1',
-          materialId: 'm1',
+          materialId: _m1,
           buyerId: _me,
           sellerId: _other,
           createdAt: DateTime(2026, 9, 1),
@@ -796,7 +865,7 @@ void main() {
       final event = world.tracker.events.single;
       expect(event.type, AnalyticsEventType.MEETING_CONFIRMED);
       expect(event.metadata, {'chatRoomId': 'r1'});
-      expect(event.materialId, 'm1');
+      expect(event.materialId, _m1);
       world.chatState.clear();
     });
 
@@ -924,7 +993,7 @@ void main() {
       expect(world.accountState.salesOf(_me).map((e) => e.id), ['d', 'p']);
       expect(world.accountState.swapCountOf(_me), 1);
       expect(world.accountState.earnedThisMonth(_me, now: DateTime(2026, 9, 20)), 18);
-      expect(world.accountState.pendingOrderFor('m1', _other)?.id, 'p');
+      expect(world.accountState.pendingOrderFor(_m1, _other)?.id, 'p');
     });
   });
 
@@ -933,10 +1002,10 @@ void main() {
       final world = _World();
       world.appState.login(_user());
 
-      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _other));
+      world.appState.openMaterialDetail(_material(id: _m5, sellerId: _other));
 
       expect(world.tracker.events.map((e) => e.type), [AnalyticsEventType.LISTING_VIEW]);
-      expect(world.tracker.events.single.materialId, 'm5');
+      expect(world.tracker.events.single.materialId, _m5);
       expect(world.appState.currentScreen, AppScreen.materialDetail);
       world.chatState.clear();
     });
@@ -945,7 +1014,7 @@ void main() {
       final world = _World();
       world.appState.login(_user());
 
-      world.appState.openMaterialDetail(_material(id: 'm5', sellerId: _me));
+      world.appState.openMaterialDetail(_material(id: _m5, sellerId: _me));
 
       expect(world.tracker.events, isEmpty);
       world.chatState.clear();
@@ -954,16 +1023,16 @@ void main() {
     test('messaging the seller records CONTACT_SELLER with the chat room', () async {
       final world = _World();
       world.chats.rooms = [
-        ChatRoomEntity(id: 'r1', materialId: 'm5', buyerId: _me, sellerId: _other, createdAt: DateTime(2026, 9, 1)),
+        ChatRoomEntity(id: 'r1', materialId: _m5, buyerId: _me, sellerId: _other, createdAt: DateTime(2026, 9, 1)),
       ];
       world.appState.login(_user());
 
-      final error = await world.appState.messageSeller(_material(id: 'm5', sellerId: _other));
+      final error = await world.appState.messageSeller(_material(id: _m5, sellerId: _other));
 
       expect(error, isNull);
       final event = world.tracker.events.single;
       expect(event.type, AnalyticsEventType.CONTACT_SELLER);
-      expect(event.materialId, 'm5');
+      expect(event.materialId, _m5);
       expect(event.metadata, {'chatRoomId': 'r1'});
       world.chatState.clear();
     });
@@ -972,7 +1041,7 @@ void main() {
       final world = _World();
       world.appState.login(_user());
 
-      await world.appState.messageSeller(_material(id: 'm5', sellerId: _me));
+      await world.appState.messageSeller(_material(id: _m5, sellerId: _me));
 
       expect(world.tracker.events, isEmpty);
       world.chatState.clear();
@@ -984,13 +1053,13 @@ void main() {
       final world = _World();
       world.appState.login(_user());
 
-      final error = await world.appState.buy(_material(id: 'm9', sellerId: _other));
+      final error = await world.appState.buy(_material(id: _m9, sellerId: _other));
 
       expect(error, isNull);
-      expect(world.exchanges.ordered, ['m9']);
+      expect(world.exchanges.ordered, [_m9]);
       expect(world.appState.currentScreen, AppScreen.confirmation);
       expect(world.appState.selectedExchange?.orderCode, 'CSW-1001');
-      expect(world.accountState.pendingOrderFor('m9', _me), isNotNull);
+      expect(world.accountState.pendingOrderFor(_m9, _me), isNotNull);
       world.chatState.clear();
     });
 
@@ -1151,7 +1220,7 @@ void main() {
       final exchange = exchangeFromJson({
         'id': 'x1',
         'orderNumber': 1001,
-        'materialId': 'm1',
+        'materialId': _m1,
         'buyerId': _me,
         'sellerId': _other,
         'price': '320000.00',

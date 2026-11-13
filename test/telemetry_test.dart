@@ -20,6 +20,9 @@ class _Recorder implements AnalyticsEventRepository {
   }
 }
 
+const _m1 = '00000000-0000-4000-8000-0000000000a1';
+const _m2 = '00000000-0000-4000-8000-0000000000a2';
+
 void main() {
   final fixedNow = DateTime.utc(2026, 10, 12, 15, 30);
 
@@ -30,13 +33,13 @@ void main() {
 
       await useCase.execute(
         AnalyticsEventType.CONTACT_SELLER,
-        materialId: 'm1',
+        materialId: _m1,
         metadata: {'chatRoomId': 'r1'},
       );
 
       final event = repo.sent.single;
       expect(event.type, AnalyticsEventType.CONTACT_SELLER);
-      expect(event.materialId, 'm1');
+      expect(event.materialId, _m1);
       expect(event.metadata, {'chatRoomId': 'r1'});
       expect(event.occurredAt, fixedNow);
     });
@@ -51,7 +54,7 @@ void main() {
         StateError('bad state'),
       ]) {
         repo.error = error;
-        await expectLater(useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: 'm1'), completes);
+        await expectLater(useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: _m1), completes);
       }
       expect(repo.sent, isEmpty);
     });
@@ -77,15 +80,15 @@ void main() {
 
       await useCase.execute(
         AnalyticsEventType.CONTACT_SELLER,
-        materialId: 'm1',
+        materialId: _m1,
         metadata: {'chatRoomId': 'r1'},
       );
-      await useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: 'm2');
+      await useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: _m2);
 
       final saved = lines();
       expect(saved, hasLength(2));
       expect(saved[0]['eventType'], 'CONTACT_SELLER');
-      expect(saved[0]['materialId'], 'm1');
+      expect(saved[0]['materialId'], _m1);
       expect(saved[0]['metadata'], {'chatRoomId': 'r1'});
       expect(saved[0]['occurredAt'], '2026-10-12T15:30:00.000Z');
       expect(saved[0]['clientCreatedAt'], '2026-10-12T15:30:00.000Z');
@@ -95,9 +98,22 @@ void main() {
       expect(saved[1]['client_id'], isNot(saved[0]['client_id']));
     });
 
+    test('a materialId that is not a UUID is left out, so the server never refuses the event', () async {
+      final useCase = TrackEventUseCase(repository, now: () => fixedNow);
+
+      for (final bad in ['', 'guest', 'temp-123', 'm1']) {
+        await useCase.execute(AnalyticsEventType.LISTING_VIEW, materialId: bad);
+      }
+      await useCase.execute(AnalyticsEventType.LISTING_VIEW);
+
+      final saved = lines();
+      expect(saved, hasLength(5), reason: 'the events are still counted');
+      expect(saved.every((line) => !line.containsKey('materialId')), isTrue);
+    });
+
     test('an event survives the JSON round trip', () async {
       final useCase = TrackEventUseCase(repository, now: () => fixedNow);
-      await useCase.execute(AnalyticsEventType.CONTACT_SELLER, materialId: 'm1', metadata: {'a': 1});
+      await useCase.execute(AnalyticsEventType.CONTACT_SELLER, materialId: _m1, metadata: {'a': 1});
 
       final event = AnalyticsEvent.fromJson(lines().single);
       expect(event.type, AnalyticsEventType.CONTACT_SELLER);

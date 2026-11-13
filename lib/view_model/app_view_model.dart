@@ -187,7 +187,10 @@ class AppViewModel extends ChangeNotifier {
 
   void openMaterialDetail(MaterialEntity material) {
     // Opening someone else's listing is a view; looking at your own is not.
-    if (_currentUser != null && material.sellerId != _currentUser?.id) {
+    // Only a listing the server knows is a view it can count.
+    if (_currentUser != null &&
+        material.sellerId != _currentUser?.id &&
+        marketplace.serverIdProblem(material.id) == null) {
       trackEvent.execute(AnalyticsEventType.LISTING_VIEW, materialId: material.id);
     }
     _selectedMaterial = material;
@@ -201,6 +204,8 @@ class AppViewModel extends ChangeNotifier {
   Future<String?> buy(MaterialEntity material) async {
     final me = _currentUser;
     if (me == null) return 'Log in to buy.';
+    final notReady = marketplace.serverIdProblem(material.id);
+    if (notReady != null) return notReady;
     try {
       final exchange = await account.order(material, buyerId: me.id);
       // The listing is reserved now; refresh so it stops showing as available.
@@ -290,6 +295,8 @@ class AppViewModel extends ChangeNotifier {
   /// Returns an error message to show the user, or `null` when the chat opened.
   Future<String?> messageSeller(MaterialEntity material) async {
     if (material.sellerId == _currentUser?.id) return 'This is your own listing.';
+    final notReady = marketplace.serverIdProblem(material.id);
+    if (notReady != null) return notReady;
     try {
       final room = await chats.openRoomFor(material.id);
       trackEvent.execute(

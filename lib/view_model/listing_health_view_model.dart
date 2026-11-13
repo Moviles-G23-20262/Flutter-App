@@ -7,6 +7,7 @@ import '../model/entities/dead_listings_insight.dart';
 import '../model/entities/material_entity.dart';
 import '../model/entities/pending_items.dart';
 import '../model/exceptions/data_exceptions.dart';
+import '../model/rules/client_id.dart';
 import '../model/repositories/listing_health_preferences_repository.dart';
 import '../model/use_cases/listing_health_use_cases.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
@@ -160,7 +161,7 @@ class ListingHealthViewModel extends ChangeNotifier {
     try {
       final result = await getInsight.execute(
         staleDays: _staleDays,
-        sellerId: userId.isEmpty ? null : userId,
+        sellerId: isUuid(userId) ? userId : null,
       );
       if (_disposed || gen != _loadGeneration) return;
       _insight = result.data;
@@ -288,6 +289,8 @@ class ListingHealthViewModel extends ChangeNotifier {
   /// SQLite (`PendingActionKind.updateListingPrice`) if the device is offline.
   Future<String?> applyPriceDrop(SellerListingHealthItem item, double newPrice) async {
     if (_updatingIds.contains(item.id)) return null;
+    // No server id yet (the listing is still waiting to be published): nothing to patch.
+    if (!isUuid(item.id)) return itemSyncingMessage;
     _updatingIds.add(item.id);
     _statusMessage = null;
     _notify();

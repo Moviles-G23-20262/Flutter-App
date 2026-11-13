@@ -1,7 +1,7 @@
 import 'input_rules.dart';
 
 /// Input rules of the sign-up form. Stricter than the server (which only needs a valid email,
-/// 2+ characters for the name and 8 to 72 for the password), so nothing Flutter lets through is
+/// 2 to 50 characters for the name, up to 50 for the major and 8 to 72 for the password), so nothing Flutter lets through is
 /// refused with a 400. Login does not use the password complexity rules: accounts created
 /// before them must still be able to sign in.
 abstract final class RegistrationRules {
@@ -13,8 +13,8 @@ abstract final class RegistrationRules {
   static const int maxPasswordLength = 72;
 
   static const int minLetters = 2;
-  static const int maxNameLength = 80;
-  static const int maxMajorLength = 80;
+  static const int maxNameLength = 50;
+  static const int maxMajorLength = 50;
 
   /// The local part of an email is at most 64 characters.
   static const int maxEmailLocalLength = 64;

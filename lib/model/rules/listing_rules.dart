@@ -9,9 +9,10 @@ abstract final class ListingRules {
   static const int maxPrice = 50000000;
 
   static const int minTitleLength = 3;
-  static const int maxTitleLength = 100;
+  static const int maxTitleLength = 60;
   static const int minDescriptionLength = 10;
-  static const int maxDescriptionLength = 1000;
+  static const int maxDescriptionLength = 330;
+  static const int maxCourseCodeLength = 20;
 
   /// Longest text a person can type in the price field ("50.000.000" is 10 characters).
   static const int maxPriceInput = 12;
@@ -62,6 +63,7 @@ abstract final class ListingRules {
   static String? validateTitle(String? raw) {
     final title = normalizeTitle(raw ?? '');
     if (title.isEmpty) return 'Add a title.';
+    if (InputRules.containsEmoji(title)) return "The title can't contain emojis.";
     if (InputRules.controlOrInvisible.hasMatch(title)) return 'The title has characters that are not allowed.';
     if (title.length < minTitleLength || title.length > maxTitleLength) {
       return 'The title needs $minTitleLength to $maxTitleLength characters.';
@@ -77,6 +79,15 @@ abstract final class ListingRules {
     }
     if (description.length < minDescriptionLength || description.length > maxDescriptionLength) {
       return 'The description needs $minDescriptionLength to $maxDescriptionLength characters.';
+    }
+    return null;
+  }
+
+  /// The course code is optional; when given it has at most [maxCourseCodeLength] characters.
+  static String? validateCourseCode(String? raw) {
+    final code = (raw ?? '').trim();
+    if (code.length > maxCourseCodeLength) {
+      return 'The course code is too long (at most $maxCourseCodeLength characters).';
     }
     return null;
   }

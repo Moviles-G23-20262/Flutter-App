@@ -17,6 +17,9 @@ import '../model/use_cases/track_event_use_case.dart';
 /// Conversations and the messages of the open one.
 /// The backend has no push channel, so while the Messages tab is visible this polls.
 class ChatViewModel extends ChangeNotifier {
+  /// The most characters a message can have (the server's limit).
+  static const int maxMessageLength = 2000;
+
   static const _messagePollInterval = Duration(seconds: 4);
   static const _roomsPollInterval = Duration(seconds: 12);
 
@@ -227,8 +230,8 @@ class ChatViewModel extends ChangeNotifier {
     if (trimmed.isEmpty) {
       return 'Write a message first.';
     }
-    if (trimmed.length > 2000) {
-      return 'Messages can have at most 2000 characters.';
+    if (trimmed.length > maxMessageLength) {
+      return 'Messages can have at most $maxMessageLength characters.';
     }
     // What is shown, queued and sent has no spaces around it, like what the server stores.
     text = trimmed;
