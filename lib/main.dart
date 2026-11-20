@@ -38,6 +38,7 @@ Future<void> main() async {
   // Key/value database (recent searches); its boxes live in the app's documents folder.
   await Hive.initFlutter();
   PaintingBinding.instance.imageCache.maximumSize = 100;
+  //2-Level Photo Cache - Sabrina
   PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
   runApp(const CampusSwapApp());
 }

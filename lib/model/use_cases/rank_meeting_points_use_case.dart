@@ -74,6 +74,8 @@ class RankMeetingPointsUseCase {
         weight += distanceWeight;
         sum += distanceWeight * distance;
       }
+
+      // Smart Meeting Point Ranking (GPS + Security/Time + BQ12 History) Sabrina
       if (history != null) {
         weight += historyWeight;
         sum += historyWeight * history;

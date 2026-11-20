@@ -107,6 +107,7 @@ class MarketplaceRemoteDataSourceImpl
   });
 
   @override
+  //OFFLINE HOME - Sabrina
   Future<List<MaterialEntity>> getMaterials() async =>
       parseListInBackground(
         await getMaterialsJson(),

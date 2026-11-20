@@ -239,8 +239,9 @@ class ChatViewModel extends ChangeNotifier {
     final senderId = _userId ?? '';
     final queue = queueMessage;
 
-    // Offline-first: saved in the outbox and shown at once with the clock icon; the sync service
+    // Offline-first: saved in the outbox and shown at once with the clock icon; the sync service 
     // sends it. The bubble keeps the queued message's id, so the sent copy replaces it.
+    // Offline first - Sabrina
     if (queue != null && senderId.isNotEmpty) {
       final queued = await queue.execute(ownerId: senderId, chatRoomId: roomId, content: text);
       _messages[roomId] = [

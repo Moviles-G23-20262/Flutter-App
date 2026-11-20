@@ -22,6 +22,8 @@ class CachedResult<T> {
   /// When the copy was saved; `null` when [data] just came from the server.
   final DateTime? savedAt;
 
+
+// Sabrina - SQLITE ResponseCache puts our 32-entry LruCache in front of SQLite cached_responses
   const CachedResult.fresh(this.data) : savedAt = null;
   const CachedResult.saved(this.data, DateTime this.savedAt);
 
@@ -47,7 +49,8 @@ class ResponseCache {
 
   static String _memoryKey(String ownerId, String key) => '$ownerId\u0000$key';
 
-  /// Replaces the saved copy of [key] for [ownerId].
+  /// Two-Level Response Cache - ResponseCache — L1 RAM LRU + L2 SQLite + Isolate.run - Sabrina 
+  /// networkFirst tries the server first, overwrites the cache on success, and falls back ONLY on NetworkException
   Future<void> save(String ownerId, String key, Object? data) async {
     final entry = CachedJson(data, _now());
     _memory.put(_memoryKey(ownerId, key), entry);
@@ -60,7 +63,6 @@ class ResponseCache {
     );
   }
 
-  /// The saved copy of [key] for [ownerId], or `null` if there is none.
   Future<CachedJson?> read(String ownerId, String key) async {
     final memoryKey = _memoryKey(ownerId, key);
     final inMemory = _memory.get(memoryKey);
