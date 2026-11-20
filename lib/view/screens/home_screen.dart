@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/formatters.dart';
 import '../../app/theme/app_theme.dart';
+import '../widgets/appearance_card.dart';
 import '../widgets/async_views.dart';
 import '../widgets/cached_photo.dart';
 import '../widgets/common_widgets.dart';
@@ -76,6 +77,37 @@ class _HomeScreenState extends State<HomeScreen> {
         widget.appState.account.load(),
       ]);
 
+  void _showThemePicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final brightness = Theme.of(context).brightness;
+        final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        final txMuted = brightness == Brightness.dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Appearance', style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
+                const SizedBox(height: 4),
+                Text(
+                  "Auto is context-aware: it follows your phone's default theme and adapts to ambient light.",
+                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs),
+                ),
+                const SizedBox(height: 14),
+                AppearanceCard(theme: widget.appState.theme),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Sellers with the most available items, computed from the listings themselves.
   List<_FeaturedSeller> _computeFeaturedSellers(List<MaterialEntity> available) {
     final bySeller = <String, _FeaturedSeller>{};
@@ -148,17 +180,51 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text('Campus Swap',
                         style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
                   ),
-                  AppIconButton(
-                    // Auto (light sensor) shows its own icon; tapping pins light or dark.
-                    icon: Icon(
-                      widget.appState.theme.preference == ThemePreference.auto
+                  ListenableBuilder(
+                    listenable: widget.appState.theme,
+                    builder: (context, _) {
+                      final pref = widget.appState.theme.preference;
+                      final icon = pref == ThemePreference.auto
                           ? Icons.brightness_auto_rounded
-                          : brightness == Brightness.dark
-                              ? Icons.light_mode_rounded
-                              : Icons.dark_mode_rounded,
-                      color: txSecondary, size: 18,
-                    ),
-                    onTap: widget.appState.toggleTheme,
+                          : pref == ThemePreference.dark
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded;
+                      final elevated = brightness == Brightness.dark ? AppColors.darkElevated : AppColors.lightElevated;
+                      final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
+                      return Tooltip(
+                        message: pref == ThemePreference.auto
+                            ? "Auto (context-aware · phone default)"
+                            : '${pref.displayName} theme',
+                        child: GestureDetector(
+                          key: const Key('home-theme-button'),
+                          onTap: _showThemePicker,
+                          child: Container(
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: elevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: borderSubtle),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, color: pref == ThemePreference.auto ? accentHi : txSecondary, size: 16),
+                                const SizedBox(width: 5),
+                                Text(
+                                  pref.displayName,
+                                  style: AppTextStyles.body(
+                                    pref == ThemePreference.auto ? accentHi : txSecondary,
+                                    fontSize: AppTextStyles.sizeXs,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(width: 8),
                   ListenableBuilder(

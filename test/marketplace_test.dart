@@ -1482,6 +1482,34 @@ void main() {
       expect(find.byType(SavedCopyBanner), findsNothing);
       world.chatState.clear();
     });
+
+    testWidgets('home theme button explicitly shows Auto and lets the user choose Auto, Light or Dark', (tester) async {
+      final world = await pumpHome(tester, [_material(id: 'a').copyWith(title: 'Server Textbook')]);
+
+      final themeButton = find.byKey(const Key('home-theme-button'));
+      expect(themeButton, findsOneWidget);
+      expect(find.descendant(of: themeButton, matching: find.text('Auto')), findsOneWidget);
+
+      await tester.tap(themeButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Appearance'), findsOneWidget);
+      expect(find.textContaining('Auto (context-aware)'), findsOneWidget);
+
+      await tester.tap(find.text('Dark'));
+      await tester.pumpAndSettle();
+      expect(world.appState.theme.preference, ThemePreference.dark);
+      expect(find.descendant(of: themeButton, matching: find.text('Dark')), findsOneWidget);
+
+      await tester.tap(find.text('Auto'));
+      await tester.pumpAndSettle();
+      expect(world.appState.theme.preference, ThemePreference.auto);
+      expect(world.appState.theme.themeMode, ThemeMode.system);
+      expect(find.descendant(of: themeButton, matching: find.text('Auto')), findsOneWidget);
+
+      world.appState.theme.dispose();
+      world.chatState.clear();
+    });
   });
 
   group('Search screen recent searches', () {

@@ -21,7 +21,11 @@ IconData zoneIcon(MeetingZoneTypeEnum type) {
 Color successColor(Brightness b) => b == Brightness.dark ? AppColors.darkSuccess : AppColors.lightSuccess;
 Color warningColor(Brightness b) => b == Brightness.dark ? AppColors.darkWarning : AppColors.lightWarning;
 
-/// "Monitored · verified safe zone", or a warning for open spots without cameras.
+/// Distinct icon for monitored safe zones (camera) vs. open public spots (group of people).
+IconData safeZoneStatusIcon({required bool monitored}) =>
+    monitored ? Icons.videocam_outlined : Icons.groups_outlined;
+
+/// "Monitored · verified safe zone", or an open public spot without cameras.
 class SafeZoneLabel extends StatelessWidget {
   final bool monitored;
   final bool compact;
@@ -38,7 +42,7 @@ class SafeZoneLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(monitored ? Icons.videocam_outlined : Icons.shield_outlined, size: 15, color: color),
+        Icon(safeZoneStatusIcon(monitored: monitored), size: 15, color: color),
         const SizedBox(width: 6),
         Flexible(
           child: Text(text,

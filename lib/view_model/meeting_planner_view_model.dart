@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../model/entities/meeting_point_density.dart';
 import '../model/entities/meetup_entities.dart';
 import '../model/exceptions/data_exceptions.dart';
+import '../model/rules/meeting_time_rules.dart';
 import '../model/use_cases/meetup_use_cases.dart';
 
 /// The "Meeting point" screen for one chat: safe zones ranked by the user's walk,
@@ -12,8 +13,14 @@ class MeetingPlannerViewModel extends ChangeNotifier {
 
   /// The signed-in user, who owns a proposal saved offline.
   final String? userId;
+  final DateTime Function() _now;
 
-  MeetingPlannerViewModel({required this.useCases, required this.chatRoomId, this.userId});
+  MeetingPlannerViewModel({
+    required this.useCases,
+    required this.chatRoomId,
+    this.userId,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   List<MeetingPointEntity> _zones = const [];
   List<RankedZone> _ranked = const [];
@@ -33,7 +40,17 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   /// Best match first; see [RankMeetingPointsUseCase].
   List<RankedZone> get zones => _ranked;
   MeetingSuggestions? get suggestions => _suggestions;
-  List<FreeSlot> get slots => _suggestions?.slots ?? const [];
+  /// Upcoming shared free slots only — times at or before now cannot be chosen.
+  List<FreeSlot> get slots {
+    final now = _now();
+    return (_suggestions?.slots ?? const [])
+        .where((s) => MeetingTimeRules.isValidStart(s.startsAt, now))
+        .toList(growable: false);
+  }
+
+  DateTime get currentTime => _now();
+
+  bool isSlotInPast(FreeSlot slot) => !MeetingTimeRules.isValidStart(slot.startsAt, _now());
   GeoPoint? get location => _location;
   bool get isLocating => _locating;
   bool get isLoading => _loading;
@@ -47,7 +64,11 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   RankedZone? get selectedZone =>
       _ranked.where((r) => r.zone.id == _selectedZoneId).firstOrNull ?? _ranked.firstOrNull;
 
-  bool get canPropose => selectedZone != null && _selectedSlot != null && !_sending;
+  bool get canPropose =>
+      selectedZone != null &&
+      _selectedSlot != null &&
+      MeetingTimeRules.isValidStart(_selectedSlot!.startsAt, _now()) &&
+      !_sending;
 
   Future<void> load() async {
     _loading = true;
@@ -63,7 +84,11 @@ class MeetingPlannerViewModel extends ChangeNotifier {
       ]);
       _zones = results[0] as List<MeetingPointEntity>;
       _suggestions = results[1] as MeetingSuggestions;
-      _selectedSlot ??= _suggestions?.suggested;
+      final now = _now();
+      final suggested = _suggestions?.suggested;
+      final validSuggested =
+          suggested != null && MeetingTimeRules.isValidStart(suggested.startsAt, now) ? suggested : null;
+      _selectedSlot ??= validSuggested ?? slots.firstOrNull;
       _rank();
     } on DataException catch (e) {
       _error = e.message;
@@ -78,10 +103,13 @@ class MeetingPlannerViewModel extends ChangeNotifier {
     _notify();
   }
 
-  void selectSlot(FreeSlot slot) {
+  /// Picks [slot] if it starts strictly in the future; past slots are rejected immediately.
+  bool selectSlot(FreeSlot slot) {
+    if (!MeetingTimeRules.isValidStart(slot.startsAt, _now())) return false;
     _selectedSlot = slot;
     _rank(); // the hour changed, so which zone suits best can change too
     _notify();
+    return true;
   }
 
   /// Sends the picked zone and hour to the chat. Returns an error message, or `null` on success.
@@ -90,12 +118,16 @@ class MeetingPlannerViewModel extends ChangeNotifier {
     final zone = selectedZone;
     final slot = _selectedSlot;
     if (zone == null || slot == null) return 'Pick a place and a time first.';
+    final now = _now();
+    if (!MeetingTimeRules.isValidStart(slot.startsAt, now)) {
+      return 'That time already passed. Pick another one.';
+    }
     _sending = true;
     _savedOffline = false;
     _notify();
     try {
       try {
-        await useCases.propose.execute(chatRoomId: chatRoomId, zone: zone.zone, slot: slot);
+        await useCases.propose.execute(chatRoomId: chatRoomId, zone: zone.zone, slot: slot, now: now);
       } on NoConnectionException {
         final queue = useCases.queuePropose;
         final owner = userId;
