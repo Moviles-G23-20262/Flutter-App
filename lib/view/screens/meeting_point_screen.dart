@@ -5,6 +5,7 @@ import '../../app/theme/app_theme.dart';
 import '../../model/entities/chat_room_entity.dart';
 import '../../model/entities/meetup_entities.dart';
 import '../../model/rules/campus_hours.dart';
+import '../../model/rules/meeting_time_rules.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/meeting_planner_view_model.dart';
 import '../widgets/async_views.dart';
@@ -74,17 +75,25 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
   }
 
   Future<void> _pickOtherTime() async {
-    final now = DateTime.now();
+    final now = _planner.currentTime;
+    final earliestDay = MeetingTimeRules.earliestDate(now);
     final date = await showDatePicker(
       context: context,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 30)),
-      initialDate: now,
+      firstDate: earliestDay,
+      lastDate: earliestDay.add(const Duration(days: 30)),
+      initialDate: earliestDay,
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: const TimeOfDay(hour: 12, minute: 0));
-    if (time == null) return;
-    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final start = await showModalBottomSheet<DateTime>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _FutureTimePickerSheet(
+        date: date,
+        nowProvider: () => _planner.currentTime,
+      ),
+    );
+    if (start == null || !mounted) return;
     _planner.selectSlot(FreeSlot(startsAt: start, endsAt: start.add(const Duration(hours: 1)), sharedBreak: false));
   }
 
@@ -341,18 +350,33 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
             top: 12,
             right: 12,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: surface,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2))],
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.videocam_outlined, size: 16, color: successColor(brightness)),
-                  const SizedBox(width: 6),
-                  Text('Monitored zones', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(safeZoneStatusIcon(monitored: true), size: 15, color: successColor(brightness)),
+                      const SizedBox(width: 6),
+                      Text('Monitored zone', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(safeZoneStatusIcon(monitored: false), size: 15, color: warningColor(brightness)),
+                      const SizedBox(width: 6),
+                      Text('Public spot', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs)),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -374,7 +398,8 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
 
 // ─── Map markers ──────────────────────────────────────────────────────────────
 
-/// A safe zone on the map: its kind of place, ringed green when monitored.
+/// A safe zone on the map: monitored zones are circular with a camera badge;
+/// open public spots use a distinct rounded-square marker with a public/people icon.
 class _ZoneMarker extends StatelessWidget {
   final MeetingPointEntity zone;
 
@@ -385,14 +410,48 @@ class _ZoneMarker extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final surface = brightness == Brightness.dark ? AppColors.darkSurface : AppColors.lightSurface;
     final ring = zone.isMonitored ? successColor(brightness) : warningColor(brightness);
-    return Container(
-      decoration: BoxDecoration(
-        color: surface,
-        shape: BoxShape.circle,
-        border: Border.all(color: ring, width: 2.5),
-        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 1))],
-      ),
-      child: Icon(zoneIcon(zone.zoneType), size: 20, color: ring),
+
+    if (!zone.isMonitored) {
+      return Container(
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: ring, width: 2.5),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 1))],
+        ),
+        child: Icon(safeZoneStatusIcon(monitored: false), size: 20, color: ring),
+      );
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              color: surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: ring, width: 2.5),
+              boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 1))],
+            ),
+            child: Icon(zoneIcon(zone.zoneType), size: 19, color: ring),
+          ),
+        ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: ring,
+              shape: BoxShape.circle,
+              border: Border.all(color: surface, width: 1.5),
+            ),
+            child: const Icon(Icons.videocam_rounded, size: 10, color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -890,7 +949,7 @@ class _OtherZonesSheet extends StatelessWidget {
                             ),
                           ),
                           Icon(
-                            r.zone.isMonitored ? Icons.videocam_outlined : Icons.shield_outlined,
+                            safeZoneStatusIcon(monitored: r.zone.isMonitored),
                             color: r.zone.isMonitored ? successColor(brightness) : warningColor(brightness),
                             size: 22,
                           ),
@@ -905,6 +964,196 @@ class _OtherZonesSheet extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Constrained time picker that only lists hours and minutes strictly after now,
+/// so the user can never select a meeting time that has already passed.
+class _FutureTimePickerSheet extends StatefulWidget {
+  final DateTime date;
+  final DateTime Function() nowProvider;
+
+  const _FutureTimePickerSheet({required this.date, required this.nowProvider});
+
+  @override
+  State<_FutureTimePickerSheet> createState() => _FutureTimePickerSheetState();
+}
+
+class _FutureTimePickerSheetState extends State<_FutureTimePickerSheet> {
+  late int _hour;
+  late int _minute;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = widget.nowProvider();
+    final hours = MeetingTimeRules.availableHours(widget.date, now);
+    // Prefer noon for future days when available; for today start at the earliest upcoming slot.
+    final isFutureDay = hours.length == 24;
+    _hour = isFutureDay ? 12 : (hours.isNotEmpty ? hours.first : 0);
+    final minutes = MeetingTimeRules.availableMinutes(widget.date, _hour, now);
+    _minute = minutes.isNotEmpty ? minutes.first : 0;
+  }
+
+  String _formatHour(int hour) {
+    final period = hour < 12 ? 'AM' : 'PM';
+    final h12 = hour % 12 == 0 ? 12 : hour % 12;
+    return '$h12 $period';
+  }
+
+  void _confirm() {
+    final now = widget.nowProvider();
+    final candidate = DateTime(widget.date.year, widget.date.month, widget.date.day, _hour, _minute);
+    if (!MeetingTimeRules.isValidStart(candidate, now)) {
+      // Clock ticked past the selected minute while the sheet was open: snap to the next valid time.
+      final hours = MeetingTimeRules.availableHours(widget.date, now);
+      if (hours.isEmpty) {
+        Navigator.pop(context);
+        return;
+      }
+      setState(() {
+        _hour = hours.contains(_hour) ? _hour : hours.first;
+        final minutes = MeetingTimeRules.availableMinutes(widget.date, _hour, now);
+        _minute = minutes.isNotEmpty ? minutes.first : 0;
+      });
+      return;
+    }
+    Navigator.pop(context, candidate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = widget.nowProvider();
+    final hours = MeetingTimeRules.availableHours(widget.date, now);
+    final effectiveHour = hours.contains(_hour) ? _hour : (hours.isNotEmpty ? hours.first : _hour);
+    final minutes = MeetingTimeRules.availableMinutes(widget.date, effectiveHour, now);
+    final effectiveMinute = minutes.contains(_minute) ? _minute : (minutes.isNotEmpty ? minutes.first : _minute);
+    _hour = effectiveHour;
+    _minute = effectiveMinute;
+
+    final brightness = Theme.of(context).brightness;
+    final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final txSecondary = brightness == Brightness.dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final elevated = brightness == Brightness.dark ? AppColors.darkElevated : AppColors.lightElevated;
+    final accent = brightness == Brightness.dark ? AppColors.darkAccent : AppColors.lightAccent;
+    final borderSubtle = brightness == Brightness.dark ? AppColors.darkBorderSubtle : AppColors.lightBorderSubtle;
+
+    final start = DateTime(widget.date.year, widget.date.month, widget.date.day, effectiveHour, effectiveMinute);
+    final end = start.add(const Duration(hours: 1));
+    final hasValidTime = hours.isNotEmpty && minutes.isNotEmpty;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Pick a start time', style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
+            const SizedBox(height: 4),
+            Text(
+              hasValidTime
+                  ? '${dayLabel(start)} · ${timeRange(start, end)}'
+                  : 'No remaining times available for this day. Pick a later date.',
+              style: AppTextStyles.mono(txSecondary, fontSize: AppTextStyles.sizeXs),
+            ),
+            if (hasValidTime) ...[
+              const SizedBox(height: 16),
+              Text('Hour', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: hours.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final h = hours[i];
+                    final selected = h == effectiveHour;
+                    return GestureDetector(
+                      key: Key('time-picker-hour-$h'),
+                      onTap: () {
+                        final nextMinutes = MeetingTimeRules.availableMinutes(widget.date, h, widget.nowProvider());
+                        setState(() {
+                          _hour = h;
+                          if (!nextMinutes.contains(_minute) && nextMinutes.isNotEmpty) {
+                            _minute = nextMinutes.first;
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: selected ? accent : elevated,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: selected ? accent : borderSubtle),
+                        ),
+                        child: Text(
+                          _formatHour(h),
+                          style: AppTextStyles.mono(
+                            selected ? Colors.white : txPrimary,
+                            fontSize: AppTextStyles.sizeXs,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Minute', style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeXs, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final m in minutes)
+                    GestureDetector(
+                      key: Key('time-picker-minute-$m'),
+                      onTap: () => setState(() => _minute = m),
+                      child: Container(
+                        width: 52,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: m == effectiveMinute ? accent : elevated,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: m == effectiveMinute ? accent : borderSubtle),
+                        ),
+                        child: Text(
+                          ':${m.toString().padLeft(2, '0')}',
+                          style: AppTextStyles.mono(
+                            m == effectiveMinute ? Colors.white : txPrimary,
+                            fontSize: AppTextStyles.sizeXs,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  key: const Key('time-picker-confirm'),
+                  onPressed: _confirm,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: const Text('Use this time'),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

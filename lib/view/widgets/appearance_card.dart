@@ -41,7 +41,7 @@ class AppearanceCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.wb_sunny_outlined, size: 16, color: accentHi),
+                Icon(_statusIcon(), size: 16, color: accentHi),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ValueListenableBuilder<double?>(
@@ -54,11 +54,13 @@ class AppearanceCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (theme.sensorStatus == LightSensorStatus.reading) ...[
+            if (theme.preference == ThemePreference.auto) ...[
               const SizedBox(height: 6),
               Text(
-                'Turns dark below ${ThemeViewModel.darkBelowLux.round()} lux and light above '
-                '${ThemeViewModel.lightAboveLux.round()} lux.',
+                theme.sensorStatus == LightSensorStatus.reading
+                    ? 'Context-aware · Turns dark below ${ThemeViewModel.darkBelowLux.round()} lux and light above '
+                        '${ThemeViewModel.lightAboveLux.round()} lux.'
+                    : "Context-aware · Automatically follows your phone's default system theme.",
                 style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.size2xs),
               ),
             ],
@@ -68,22 +70,34 @@ class AppearanceCard extends StatelessWidget {
     );
   }
 
+  IconData _statusIcon() {
+    switch (theme.preference) {
+      case ThemePreference.auto:
+        return Icons.brightness_auto_rounded;
+      case ThemePreference.light:
+        return Icons.light_mode_rounded;
+      case ThemePreference.dark:
+        return Icons.dark_mode_rounded;
+    }
+  }
+
   String _explanation(double? lux) {
+    final activeMode = theme.isDark ? 'dark' : 'light';
     switch (theme.preference) {
       case ThemePreference.light:
-        return 'Always light. Choose Auto to follow the light around you.';
+        return "Always light. Choose Auto (context-aware) to follow your phone's default theme and ambient light.";
       case ThemePreference.dark:
-        return 'Always dark. Choose Auto to follow the light around you.';
+        return "Always dark. Choose Auto (context-aware) to follow your phone's default theme and ambient light.";
       case ThemePreference.auto:
         switch (theme.sensorStatus) {
           case LightSensorStatus.reading:
-            final mode = theme.isDark ? 'dark' : 'light';
-            return 'Light sensor: ${lux?.round() ?? '–'} lux around you, so the app is $mode.';
+            return "Auto (context-aware): light sensor reads ${lux?.round() ?? '–'} lux, so the app is $activeMode. "
+                "Falls back to your phone's default theme if unavailable.";
           case LightSensorStatus.unavailable:
-            return "This phone has no light sensor, so the app follows the phone's theme.";
+            return "Auto (context-aware): following your phone's default ($activeMode) theme (no light sensor detected).";
           case LightSensorStatus.waiting:
           case LightSensorStatus.off:
-            return 'Reading the light sensor…';
+            return "Auto (context-aware): using your phone's default ($activeMode) theme while checking the light sensor…";
         }
     }
   }

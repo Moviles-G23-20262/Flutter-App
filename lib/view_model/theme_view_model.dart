@@ -95,6 +95,10 @@ class ThemeViewModel extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setPreference(ThemePreference preference) async {
     if (preference == _preference) return;
     _preference = preference;
+    if (preference == ThemePreference.auto) {
+      // Immediately follow the phone's default system theme until a fresh sensor reading arrives.
+      policy.reset();
+    }
     _apply();
     await savePreference.execute(preference);
   }
