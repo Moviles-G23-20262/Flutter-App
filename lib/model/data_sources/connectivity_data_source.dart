@@ -12,6 +12,7 @@ class ConnectivityDataSource implements ConnectivityRepository, NetworkTransport
       results.any((r) => r != ConnectivityResult.none);
 
   static NetworkTransport _transport(List<ConnectivityResult> results) {
+    //optional mobile data - Waiting for Wi-Fi - Sabrina 
     if (results.any((r) => r == ConnectivityResult.wifi || r == ConnectivityResult.ethernet)) {
       return NetworkTransport.wifi;
     }

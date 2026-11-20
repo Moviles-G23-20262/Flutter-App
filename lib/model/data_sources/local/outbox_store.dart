@@ -14,6 +14,11 @@ export '../../rules/client_id.dart' show newClientId;
 class OutboxStore {
   final AppDatabase _db;
   final DateTime Function() _now;
+  
+//Outbox Store & Sync Service - Sabrina
+// OutboxStore exposes a broadcast StreamController and reactive pendingCountStream so UI badges update without polling. 
+//Each queued message gets a client UUID (newClientId()), is queried FIFO (ORDER BY created_at, rowid), and transitions 
+//cleanly through markSent, markRetry, markRefused, retry, or discard
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   OutboxStore(this._db, {DateTime Function()? now}) : _now = now ?? DateTime.now;

@@ -11,8 +11,6 @@ import 'package:sqflite/sqflite.dart';
 /// other's data.
 class AppDatabase {
   static const String fileName = 'campus_swap.db';
-
-  /// Raise it and add a step to [_upgrade] whenever the schema changes.
   ///
   /// 1: cached_responses, pending_messages, pending_listings.
   /// 2: pending_actions (exchange completion, rating, meeting proposal).
@@ -25,6 +23,7 @@ class AppDatabase {
   AppDatabase._(this._open);
 
   /// The database file in the app's private databases folder.
+  /// Local SQLite Database Sabrina c:
   factory AppDatabase() => AppDatabase._(() async {
         final path = p.join(await getDatabasesPath(), fileName);
         return openDatabase(path, version: version, onCreate: _create, onUpgrade: _upgrade);

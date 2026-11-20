@@ -121,6 +121,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     // Both start at once. Favorites load on their own, so the saved copy still shows when the
     // listings cannot be loaded offline.
     final favorites = _loadWishlist(generation);
+    // Sabrina OFFLINE - MarketplaceViewModel.load() fetches materials, wishlist, and BQ11 in parallel, saves _materialsSavedAt so the UI knows the cache age
     final timeToSellJob = _loadTimeToSell(generation);
     try {
       final result = await getMaterials.executeCached();

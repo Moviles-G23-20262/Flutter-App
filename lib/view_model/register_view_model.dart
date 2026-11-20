@@ -185,6 +185,7 @@ class RegisterViewModel extends ChangeNotifier {
   }
 
   Future<void> _saveDraft() async => saveDraft?.execute(RegistrationDraft(
+    // draftFields explicitly includes only name, email, and major - !!passwords are NEVER written to disk - Sabrina Cache
         fullName: valueOf(RegisterField.name),
         email: valueOf(RegisterField.email),
         major: valueOf(RegisterField.major),

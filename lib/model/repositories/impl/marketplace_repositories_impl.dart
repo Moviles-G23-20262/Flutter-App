@@ -196,6 +196,7 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  // Saves chats and inbox in cache - Sabrina - Per-User Cached Rooms & Threads
   Future<CachedList<ChatRoomEntity>> getChatRoomsCached() => _cachedList(
         cache: cache,
         owner: owner,

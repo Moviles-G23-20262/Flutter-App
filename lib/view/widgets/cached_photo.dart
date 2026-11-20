@@ -82,6 +82,10 @@ class CachedPhoto extends StatelessWidget {
   }
 
   static (int?, int?) _resolveMemCacheSize({
+    // Photo cache - Sabrina
+    // CachedPhoto uses a Cache-then-Network 2-level strategy (Flutter RAM ImageCache → cached_network_image disk cache). 
+    //It calculates memCacheWidth from widget dimensions × devicePixelRatio so thumbnails never blow up RAM, and renders a 
+    //category icon placeholder if an uncached photo fails offline
     required double? logicalWidth,
     required double? logicalHeight,
     required double dpr,

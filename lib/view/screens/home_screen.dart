@@ -126,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (isOffline)
           if (materialsSavedAt != null)
             SavedCopyBanner(savedAt: materialsSavedAt, onRetry: _refresh)
+// Sabrina OFFLINE - Home shows the exact saved age (SavedCopyBanner), with Retry on first launch offline. 
           else if (market.materials.isEmpty)
             OfflineBanner.firstLaunchOffline(noun: 'listings', onRetry: _refresh)
           else

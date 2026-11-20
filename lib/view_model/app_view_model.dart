@@ -119,6 +119,7 @@ class AppViewModel extends ChangeNotifier {
   bool _wasOnline = true;
 
   void _onConnectivityChanged() {
+  // Sabrina OFFLINE - In AppViewModel._onConnectivityChanged, reconnecting automatically refreshes marketplace.load()
     marketplace.load();
     final reconnected = connectivity.isOnline && !_wasOnline;
     _wasOnline = connectivity.isOnline;

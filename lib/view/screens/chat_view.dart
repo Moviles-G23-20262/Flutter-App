@@ -238,6 +238,7 @@ class _ChatViewState extends State<ChatView> {
                       children: [
                         const Icon(Icons.cloud_upload_outlined, size: 12, color: Colors.black87),
                         const SizedBox(width: 4),
+                        // clock and options for delete and retry - offline first - Sabrina
                         Text('$count', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
                       ],
                     ),

@@ -4,6 +4,8 @@ import 'dart:collection';
 ///
 /// Built on a [LinkedHashMap], which keeps insertion order: every read or write moves the
 /// entry to the end, so the first entry is always the least recently used one.
+
+/// Custom LRU Memory Cache Sabrina
 class LruCache<K, V> {
   final int capacity;
   final LinkedHashMap<K, V> _entries = LinkedHashMap<K, V>();
