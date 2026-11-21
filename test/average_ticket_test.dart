@@ -235,6 +235,26 @@ void main() {
       expect(find.byKey(const Key('average-ticket-global')), findsNothing);
     });
 
+    testWidgets('showing the card again asks the server again, so a new sale moves the figure', (tester) async {
+      final repo = _ScriptedRepository([
+        AverageTicketModel.fromJson(_answer),
+        AverageTicketModel.fromJson({'globalAverage': 52000, 'byCondition': {'NEW': 60000}}),
+      ]);
+      final vm = AverageTicketViewModel(getAverageTicket: GetAverageTicketUseCase(repo));
+      Widget host(Widget child) => MaterialApp(home: Scaffold(body: child));
+
+      await tester.pumpWidget(host(AverageTicketCard(viewModel: vm)));
+      await tester.pumpAndSettle();
+      expect(find.text(copPrice(45000)), findsOneWidget);
+
+      await tester.pumpWidget(host(const SizedBox())); // the user leaves the Seller Hub...
+      await tester.pumpWidget(host(AverageTicketCard(viewModel: vm))); // ...and comes back
+      await tester.pumpAndSettle();
+
+      expect(repo.calls, 2);
+      expect(find.text(copPrice(52000)), findsOneWidget);
+    });
+
     testWidgets('an error offers to try again', (tester) async {
       final repo = await pump(tester, [const NoConnectionException(), AverageTicketModel.fromJson(_answer)]);
 

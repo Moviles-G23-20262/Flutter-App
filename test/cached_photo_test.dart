@@ -2,6 +2,7 @@
 // worked out from the layout); existing calls keep working without them.
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_front_end/core/cache/listing_image_cache_manager.dart';
 import 'package:flutter_front_end/view/widgets/cached_photo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,5 +44,19 @@ void main() {
 
     expect(find.byType(CachedNetworkImage), findsNothing);
     expect(find.byIcon(Icons.menu_book_rounded), findsOneWidget);
+  });
+
+  test('the image cache has explicit, documented limits', () {
+    expect(ListingImageCacheManager.stalePeriod, const Duration(days: 14));
+    expect(ListingImageCacheManager.maxNrOfCacheObjects, 150);
+  });
+
+  testWidgets('every remote photo goes through the shared ListingImageCacheManager', (tester) async {
+    await tester.pumpWidget(_host(const CachedPhoto(imageUrl: 'https://images.test/book.jpg')));
+
+    final image = tester.widget<CachedNetworkImage>(find.byType(CachedNetworkImage));
+    expect(image.cacheManager, same(ListingImageCacheManager.instance));
+    expect(image.placeholder, isNotNull);
+    expect(image.errorWidget, isNotNull);
   });
 }

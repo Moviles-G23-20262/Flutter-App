@@ -40,6 +40,12 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<PendingListing> _pendingListings = const [];
   StreamSubscription<List<PendingListing>>? _pendingSubscription;
   final Set<String> _discarded = {};
+  final StreamController<String> _publishedNotices = StreamController<String>.broadcast();
+
+  /// One message per queued listing the server accepted ("X was published"). The queue only drops
+  /// a row after the server confirmed it (or after the user discards it, which is not reported),
+  /// so the message is shown only for a real publish. The shell turns it into a SnackBar.
+  Stream<String> get publishedNotices => _publishedNotices.stream;
 
   List<MaterialEntity> _materials = const [];
   List<MaterialEntity>? _availableMaterialsCache;
@@ -88,12 +94,24 @@ class MarketplaceViewModel extends ChangeNotifier {
     _pendingSubscription = watch.execute(userId).listen((listings) {
       if (generation != _generation) return;
       final stillThere = {for (final l in listings) l.id};
-      final published = _pendingListings.any((l) => !stillThere.contains(l.id) && !_discarded.remove(l.id));
+      // Gone from the queue and not discarded by the user: the server confirmed it.
+      final published = [
+        for (final l in _pendingListings)
+          if (!stillThere.contains(l.id) && !_discarded.remove(l.id)) l,
+      ];
       _pendingListings = listings;
       notifyListeners();
-      if (published) load();
+      if (published.isNotEmpty) {
+        for (final l in published) {
+          if (!_publishedNotices.isClosed) _publishedNotices.add(publishedNoticeFor(l));
+        }
+        load();
+      }
     }, onError: (_) {});
   }
+
+  /// Text of the notice shown once a listing saved offline was published.
+  static String publishedNoticeFor(PendingListing listing) => '"${listing.title}" is now published.';
 
   /// Moves a refused listing back to `waiting` and tries publishing it again.
   Future<void> retryPending(String listingId) async {
@@ -349,6 +367,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _pendingSubscription?.cancel();
+    _publishedNotices.close();
     super.dispose();
   }
 }

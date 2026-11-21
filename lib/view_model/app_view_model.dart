@@ -184,6 +184,10 @@ class AppViewModel extends ChangeNotifier {
   void navigateTo(AppScreen screen) {
     _currentScreen = screen;
     notifyListeners();
+    // Reopening the Seller Hub with a connection is a trigger of its own: listings saved offline
+    // are sent now instead of waiting for the next retry timer. (A flush already running is not
+    // duplicated: the service lets only one run at a time.)
+    if (screen == AppScreen.sellerHub && _isLoggedIn) syncOutbox?.execute();
   }
 
   void openMaterialDetail(MaterialEntity material) {

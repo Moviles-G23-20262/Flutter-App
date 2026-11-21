@@ -28,6 +28,10 @@ class NetworkException implements Exception {
 class ApiClient {
   static const Duration _timeout = Duration(seconds: 20);
 
+  /// A photo upload sends far more bytes than a JSON call: on a slow connection 20 s would time
+  /// out every attempt of the offline queue and the listing would never get published.
+  static const Duration _uploadTimeout = Duration(seconds: 90);
+
   final String baseUrl;
   final http.Client client;
 
@@ -81,7 +85,7 @@ class ApiClient {
         ..headers.addAll(_headers())
         ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
       return http.Response.fromStream(await client.send(request));
-    });
+    }, timeout: _uploadTimeout);
   }
 
   Map<String, String> _headers({bool json = false}) {
@@ -92,10 +96,10 @@ class ApiClient {
     };
   }
 
-  Future<dynamic> _send(Future<http.Response> Function() request) async {
+  Future<dynamic> _send(Future<http.Response> Function() request, {Duration timeout = _timeout}) async {
     final http.Response response;
     try {
-      response = await request().timeout(_timeout);
+      response = await request().timeout(timeout);
     } on TimeoutException {
       throw const NetworkException('The server took too long to respond.');
     } on http.ClientException catch (e) {

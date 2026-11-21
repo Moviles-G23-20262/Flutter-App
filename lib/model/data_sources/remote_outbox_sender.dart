@@ -31,7 +31,8 @@ class RemoteOutboxSender implements OutboxSender {
 
   @override
   Future<void> createListing(Map<String, dynamic> body) async {
-    await remote.createMaterial(body);
+    // Only the 2xx matters to the queue; the published listing is read again from `GET /materials`.
+    await remote.createMaterialRaw(body);
   }
 
   @override
