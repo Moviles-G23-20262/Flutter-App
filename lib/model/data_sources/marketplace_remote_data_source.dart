@@ -16,6 +16,12 @@ abstract class MarketplaceRemoteDataSource {
     Map<String, dynamic> body,
   );
 
+  /// `POST /materials` without reading the answer: a 2xx is the confirmation. The offline queue
+  /// uses it so a body it cannot parse never leaves a published listing waiting in the queue.
+  Future<void> createMaterialRaw(
+    Map<String, dynamic> body,
+  );
+
   Future<MaterialEntity> updateMaterialPrice(
     String materialId,
     double price,
@@ -127,6 +133,13 @@ class MarketplaceRemoteDataSourceImpl
           body: body,
         ) as Json,
       );
+
+  @override
+  Future<void> createMaterialRaw(
+    Map<String, dynamic> body,
+  ) async {
+    await apiClient.post('/materials', body: body);
+  }
 
   @override
   Future<MaterialEntity> updateMaterialPrice(

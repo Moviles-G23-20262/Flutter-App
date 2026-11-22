@@ -582,7 +582,7 @@ class _PendingListingRow extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (refused && onRetry != null)
+              if (onRetry != null)
                 TextButton(
                   key: Key('retry-pending-listing-${listing.id}'),
                   onPressed: onRetry,
@@ -591,7 +591,7 @@ class _PendingListingRow extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: const Size(0, 28),
                   ),
-                  child: const Text('Retry'),
+                  child: Text(refused ? 'Retry' : 'Retry now'),
                 ),
               if (refused)
                 TextButton(
@@ -613,6 +613,13 @@ class _PendingListingRow extends StatelessWidget {
             const SizedBox(height: 6),
             Text("We'll publish it as soon as you reconnect.",
                 style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+            // The reason of the last failed attempt (server down, timeout…): never a silent wait.
+            if (listing.lastError != null) ...[
+              const SizedBox(height: 2),
+              Text('Last attempt failed: ${listing.lastError}',
+                  key: Key('pending-last-error-${listing.id}'),
+                  style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
+            ],
           ],
         ],
       ),

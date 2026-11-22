@@ -21,7 +21,8 @@ class AverageTicketViewModel extends ChangeNotifier {
   /// Set when the last load failed and there is nothing to show.
   String? get error => _error;
 
-  /// Loads the figures once; later calls do nothing unless [force] (e.g. "Try again").
+  /// Loads the figures once; later calls do nothing unless [force] ("Try again", or the card being
+  /// shown again: the figures already loaded stay on screen while the new ones arrive).
   Future<void> load({bool force = false}) async {
     if (_loading || (_ticket != null && !force)) return;
     _loading = true;

@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
+import '../../core/cache/listing_image_cache_manager.dart';
 
 /// Reusable cached image widget for listings and chat photos.
 ///
-/// Implements EC14: Caches images in memory and local disk (200 files, 30 days).
+/// Implements EC14: Caches images in memory and local disk through [ListingImageCacheManager]
+/// (150 files, 14 days; see that class for why).
 /// If an image fails to load while offline or has never been downloaded, it gracefully renders
 /// a category placeholder icon instead of a broken empty box or crash.
 ///
@@ -110,6 +112,7 @@ class CachedPhoto extends StatelessWidget {
     final explicitWidth = memCacheWidth;
     return CachedNetworkImage(
       imageUrl: imageUrl!,
+      cacheManager: ListingImageCacheManager.instance,
       width: width,
       height: height,
       fit: fit,

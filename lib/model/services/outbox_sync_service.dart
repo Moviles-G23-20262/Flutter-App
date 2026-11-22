@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
 
@@ -345,21 +346,34 @@ class OutboxSyncService {
       await store.markSent(kind, id);
       return SyncOutcome.sent;
     } on NetworkException catch (e) {
+      _log('${kind.name} $id: no answer, kept for a retry (${e.message})');
       await store.markRetry(kind, id, e.message);
       return SyncOutcome.retryLater;
     } on ApiException catch (e) {
       if (_isTemporary(e.statusCode)) {
+        _log('${kind.name} $id: HTTP ${e.statusCode}, kept for a retry (${e.message})');
         await store.markRetry(kind, id, e.message);
         return SyncOutcome.retryLater;
       }
+      _log('${kind.name} $id: refused with HTTP ${e.statusCode} (${e.message})');
       await store.markRefused(kind, id, e.message);
       return SyncOutcome.refused;
     } on FileSystemException {
       // A queued photo was deleted from the phone; sending again cannot fix that.
+      _log('${kind.name} $id: a queued photo is missing from the phone');
       await store.markRefused(kind, id, 'A photo of this listing is no longer on the phone.');
       return SyncOutcome.refused;
+    } catch (e) {
+      // Anything else (a bad response body, a plugin error…) must not abort the whole flush
+      // silently with the row stuck: keep the reason on the row and try again later.
+      _log('${kind.name} $id: unexpected error, kept for a retry ($e)');
+      await store.markRetry(kind, id, 'Unexpected error: $e');
+      return SyncOutcome.retryLater;
     }
   }
+
+  /// Why an item was not delivered, for `flutter logs` / DevTools.
+  void _log(String message) => developer.log(message, name: 'OutboxSync');
 
   /// 401: expired session (sent after the next login); 408 / 429 / 5xx: the server may accept it later.
   static bool _isTemporary(int status) => status == 401 || status == 408 || status == 429 || status >= 500;

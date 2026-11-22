@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'app/app_dependencies.dart';
 import 'view_model/account_view_model.dart';
@@ -52,6 +54,8 @@ class CampusSwapApp extends StatefulWidget {
 
 class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserver {
   final AppDependencies _deps = AppDependencies.create();
+  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
+  StreamSubscription<String>? _publishedNoticesSubscription;
   late final AppViewModel _appState = AppViewModel(
     onLogout: _deps.logout.execute,
     marketplace: MarketplaceViewModel(
@@ -136,6 +140,12 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     _appState.power.start();
     _appState.connectivity.start();
     _deps.analyticsSync.start();
+    // A listing saved offline was accepted by the server: tell the user, whatever screen is open.
+    _publishedNoticesSubscription = _appState.marketplace.publishedNotices.listen((message) {
+      _messengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(key: const Key('listing-published-snackbar'), content: Text(message)));
+    });
     _restoreSession();
   }
 
@@ -169,6 +179,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _publishedNoticesSubscription?.cancel();
     _deps.analyticsSync.stop();
     _appState.dispose();
     super.dispose();
@@ -180,6 +191,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       listenable: _appState,
       builder: (context, _) {
         return MaterialApp(
+          scaffoldMessengerKey: _messengerKey,
           title: 'Campus Swap',
           debugShowCheckedModeBanner: false,
           themeMode: _appState.themeMode,

@@ -23,7 +23,12 @@ import 'package:flutter_front_end/model/use_cases/connectivity_use_cases.dart';
 import 'package:flutter_front_end/model/use_cases/pending_listing_use_cases.dart';
 import 'package:flutter_front_end/model/use_cases/price_estimator_use_case.dart';
 import 'package:flutter_front_end/view/screens/new_listing_smart_screen.dart';
+import 'package:flutter_front_end/model/entities/wishlist_item_entity.dart';
+import 'package:flutter_front_end/model/entities/cached_list.dart';
+import 'package:flutter_front_end/model/repositories/marketplace_repositories.dart';
+import 'package:flutter_front_end/model/use_cases/marketplace_use_cases.dart';
 import 'package:flutter_front_end/view_model/app_view_model.dart';
+import 'package:flutter_front_end/view_model/marketplace_view_model.dart';
 import 'package:flutter_front_end/view_model/smart_listing_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
@@ -83,6 +88,34 @@ class _Sender implements OutboxSender {
 
   @override
   Future<void> sendAction(PendingAction action) async {}
+}
+
+/// Counts how many times the published listings are read again.
+class _CountingMaterials implements MaterialRepository {
+  final List<int> loads;
+  _CountingMaterials(this.loads);
+
+  @override
+  Future<List<MaterialEntity>> getMaterials() async => [];
+  @override
+  Future<CachedList<MaterialEntity>> getMaterialsCached() async {
+    loads.add(loads.length + 1);
+    return const CachedList([]);
+  }
+
+  @override
+  Future<MaterialEntity> createListing(NewListingData data) => throw UnimplementedError();
+  @override
+  Future<MaterialEntity> updatePrice(String materialId, double newPrice) => throw UnimplementedError();
+}
+
+class _EmptyWishlist implements WishlistRepository {
+  @override
+  Future<CachedList<WishlistItemEntity>> getWishlist() async => const CachedList([]);
+  @override
+  Future<WishlistItemEntity> add(String materialId) => throw UnimplementedError();
+  @override
+  Future<void> remove(String wishlistItemId) => throw UnimplementedError();
 }
 
 /// "The upload of [path] fails with no network."
@@ -306,6 +339,141 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       expect(sender.listings, hasLength(1));
+    });
+  });
+
+  group('offline queue -> reconnection -> published (pending listings end to end)', () {
+    late _Sender sender;
+    late _Online network;
+    late OutboxSyncService sync;
+
+    setUp(() {
+      sender = _Sender();
+      network = _Online();
+      sync = OutboxSyncService(
+        store: store,
+        sender: sender,
+        connectivity: network,
+        baseRetryDelay: const Duration(hours: 1),
+      );
+    });
+    tearDown(() => sync.dispose());
+
+    MarketplaceViewModel marketplaceVm({required List<int> loads}) {
+      final repo = PendingListingRepositoryImpl(store, sync: sync);
+      return MarketplaceViewModel(
+        getMaterials: GetMaterialsUseCase(_CountingMaterials(loads)),
+        createListing: CreateListingUseCase(_CountingMaterials(loads)),
+        getWishlist: GetWishlistUseCase(_EmptyWishlist()),
+        addToWishlist: AddToWishlistUseCase(_EmptyWishlist()),
+        removeFromWishlist: RemoveFromWishlistUseCase(_EmptyWishlist()),
+        watchPendingListings: WatchPendingListingsUseCase(repo),
+        retryPendingListing: RetryPendingListingUseCase(repo),
+        discardPendingListing: DiscardPendingListingUseCase(repo),
+      );
+    }
+
+    test('offline it waits with the reason; on reconnection it is posted once and leaves the queue', () async {
+      final a = photoFile('a.jpg');
+      final repo = PendingListingRepositoryImpl(store, sync: sync);
+      sync.start('ana');
+      sender.failures.add(const NetworkException('offline')); // the POST finds no network
+
+      await repo.queue(ownerId: 'ana', data: _data(), photoPaths: [a]);
+      await sync.flush();
+
+      final waiting = (await store.listings('ana')).single;
+      expect(waiting.status, PendingStatus.waiting);
+      expect(waiting.lastError, 'offline', reason: 'the reason of the failed attempt is kept, not swallowed');
+      expect(sender.listings, isEmpty);
+
+      network.changes.add(true); // connectivity_plus reports the connection back
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      expect(sender.listings, hasLength(1), reason: 'one POST /materials, no duplicates');
+      expect(sender.listings.single['imageUrls'], ['https://cdn.test/a.jpg']);
+      expect(await store.listings('ana'), isEmpty, reason: 'removed from the pending list only after the success');
+    });
+
+    test('several triggers at once (reconnect + resume + retry) publish the listing only once', () async {
+      await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      sync.start('ana');
+
+      await Future.wait([sync.flush(), sync.flush(), sync.flush(), sync.flush()]);
+      network.changes.add(true);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(sender.listings, hasLength(1));
+      expect(await store.listings('ana'), isEmpty);
+    });
+
+    test('a refused listing is never deleted silently: it stays with the server reason, and Retry sends it again', () async {
+      final queued = await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      sender.failures.add(const ApiException(400, 'title must be shorter than 60 characters'));
+      sync.start('ana');
+      await sync.flush();
+
+      final row = (await store.listings('ana')).single;
+      expect(row.status, PendingStatus.refused);
+      expect(row.lastError, 'title must be shorter than 60 characters');
+
+      await PendingListingRepositoryImpl(store, sync: sync).retry(queued.id);
+
+      expect(sender.listings, hasLength(1));
+      expect(await store.listings('ana'), isEmpty);
+    });
+
+    test('the marketplace is told "is now published" and reloads only when the server confirmed it', () async {
+      final loads = <int>[];
+      final vm = marketplaceVm(loads: loads);
+      addTearDown(vm.dispose);
+      final notices = <String>[];
+      vm.publishedNotices.listen(notices.add);
+      sender.failures.add(const NetworkException('offline'));
+
+      sync.start('ana');
+      vm.watchPending('ana');
+      await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      await sync.flush(); // fails: still queued
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(vm.pendingListings, hasLength(1));
+      expect(notices, isEmpty);
+      expect(loads, isEmpty);
+
+      await sync.flush(); // succeeds
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(vm.pendingListings, isEmpty);
+      expect(notices, ['"Calculus" is now published.']);
+      expect(loads, hasLength(1), reason: 'the published listings are read again');
+    });
+
+    test('discarding a pending listing is not reported as published', () async {
+      final loads = <int>[];
+      final vm = marketplaceVm(loads: loads);
+      addTearDown(vm.dispose);
+      final notices = <String>[];
+      vm.publishedNotices.listen(notices.add);
+      final queued = await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      vm.watchPending('ana');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      await vm.discardPending(queued.id);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(notices, isEmpty);
+      expect(loads, isEmpty);
+    });
+
+    test('an unexpected error while sending keeps the listing queued with the reason', () async {
+      await store.enqueueListing(ownerId: 'ana', payload: {'title': 'Calculus'});
+      sender.failures.add(StateError('bad state'));
+      sync.start('ana');
+      await sync.flush();
+
+      final row = (await store.listings('ana')).single;
+      expect(row.status, PendingStatus.waiting);
+      expect(row.lastError, contains('bad state'));
     });
   });
 

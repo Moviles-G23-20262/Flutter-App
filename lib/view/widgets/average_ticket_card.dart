@@ -7,7 +7,9 @@ import 'common_widgets.dart';
 import 'formatters.dart';
 
 /// Average ticket of completed campus sales: the overall figure in COP and a bar per condition.
-/// Starts loading when shown; it only reacts to [viewModel].
+/// Loads when shown and asks again every time it is shown (the figures stay on screen while the new
+/// ones arrive), so a sale completed in the meantime is not hidden by an old copy. It only reacts
+/// to [viewModel].
 class AverageTicketCard extends StatefulWidget {
   final AverageTicketViewModel viewModel;
 
@@ -21,7 +23,7 @@ class _AverageTicketCardState extends State<AverageTicketCard> {
   @override
   void initState() {
     super.initState();
-    widget.viewModel.load();
+    widget.viewModel.load(force: true);
   }
 
   @override
