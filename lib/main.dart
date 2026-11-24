@@ -144,6 +144,8 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     _appState.theme.start();
     _appState.power.start();
+    _deps.apiClient.onNetworkError = _appState.connectivity.reportNetworkError;
+    _deps.apiClient.onNetworkSuccess = _appState.connectivity.reportNetworkSuccess;
     _appState.connectivity.start();
     _deps.analyticsSync.start();
     // A listing saved offline was accepted by the server: tell the user, whatever screen is open.
@@ -166,7 +168,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     // With a fingerprint enrolled and an account enrolled for it, the session is not restored by
     // itself: the login screen offers "Quick Unlock", which signs in after the sensor verifies the user.
     final lockedBehindFingerprint = await _deps.canQuickUnlock.execute() != null;
-    final user = lockedBehindFingerprint ? null : await _deps.restoreSession.execute();
+    final user = lockedBehindFingerprint ? null : await _deps.restoreSession.execute().catchError((Object _) => null);
     if (!mounted) return;
     // From here on a rejected token means the session expired mid-use: sign out.
     _deps.apiClient.onUnauthorized = _appState.logout;

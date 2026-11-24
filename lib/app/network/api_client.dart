@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../model/services/background_json.dart';
@@ -40,6 +41,13 @@ class ApiClient {
 
   /// Called when the server rejects the token we sent (expired or revoked), so the app can sign out.
   void Function()? onUnauthorized;
+
+  /// Called when a request fails before receiving an HTTP response (offline, DNS failure, socket
+  /// error, timeout), so connectivity state reflects real unreachability.
+  void Function()? onNetworkError;
+
+  /// Called whenever an HTTP response arrives from the server, confirming live reachability.
+  void Function()? onNetworkSuccess;
 
   ApiClient({required String baseUrl, required this.client})
       // Config files may end with "/", which would turn "$baseUrl/auth" into "//auth".
@@ -101,10 +109,25 @@ class ApiClient {
     try {
       response = await request().timeout(timeout);
     } on TimeoutException {
+      onNetworkError?.call();
       throw const NetworkException('The server took too long to respond.');
     } on http.ClientException catch (e) {
+      onNetworkError?.call();
       throw NetworkException(e.message);
+    } on SocketException catch (e) {
+      onNetworkError?.call();
+      throw NetworkException(e.message);
+    } on HandshakeException catch (e) {
+      onNetworkError?.call();
+      throw NetworkException(e.message);
+    } on HttpException catch (e) {
+      onNetworkError?.call();
+      throw NetworkException(e.message);
+    } on IOException catch (e) {
+      onNetworkError?.call();
+      throw NetworkException(e.toString());
     }
+    onNetworkSuccess?.call();
     return _processResponse(response);
   }
 

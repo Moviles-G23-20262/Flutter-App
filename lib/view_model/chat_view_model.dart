@@ -74,6 +74,13 @@ class ChatViewModel extends ChangeNotifier {
       stopPolling();
     } else {
       startPolling();
+      if (_userId != null) {
+        if (_activeRoomId != null) {
+          refreshMessages();
+        } else {
+          loadRooms();
+        }
+      }
     }
     notifyListeners();
   }
@@ -93,6 +100,8 @@ class ChatViewModel extends ChangeNotifier {
   String? _roomsError;
   String? _messagesError;
   Timer? _timer;
+  StreamSubscription<int>? _pendingCountSubscription;
+  int? _lastPendingCount;
   int _generation = 0;
   ConversationInsight? _insight;
   bool _loadingInsight = false;
@@ -113,8 +122,8 @@ class ChatViewModel extends ChangeNotifier {
   Stream<int> get pendingCountStream => watchPendingCount?.execute() ?? const Stream.empty();
 
   /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just falls back to cache or hides.
-  Future<void> loadInsight() async {
-    if (_insight != null || _loadingInsight) return;
+  Future<void> loadInsight({bool force = false}) async {
+    if ((!force && _insight != null) || _loadingInsight) return;
     _loadingInsight = true;
     try {
       final insight = await getConversationInsight.execute();
@@ -172,7 +181,30 @@ class ChatViewModel extends ChangeNotifier {
 
   void start(String userId) {
     _userId = userId;
+    _subscribePendingChanges();
     loadRooms();
+  }
+
+  /// Watches outbox count changes so that when [OutboxSyncService] delivers a queued message
+  /// after Wi-Fi returns, the open chat refreshes immediately and turns the clock into a tick.
+  void _subscribePendingChanges() {
+    _pendingCountSubscription?.cancel();
+    _lastPendingCount = null;
+    final watch = watchPendingCount;
+    if (watch == null) return;
+    final generation = _generation;
+    _pendingCountSubscription = watch.execute().listen((count) {
+      if (generation != _generation) return;
+      final previous = _lastPendingCount;
+      _lastPendingCount = count;
+      if (previous != null && count < previous && _userId != null) {
+        if (_activeRoomId != null) {
+          refreshMessages();
+        } else {
+          loadRooms();
+        }
+      }
+    }, onError: (_) {});
   }
 
   Future<void> loadRooms() async {
@@ -362,6 +394,26 @@ class ChatViewModel extends ChangeNotifier {
       .where((m) => m.meetingProposal?.isAccepted ?? false)
       .lastOrNull;
 
+  Future<List<MessageEntity>> _loadPendingEntities(String roomId) async {
+    final readPending = getPendingMessages;
+    final uid = _userId;
+    if (readPending == null || uid == null) return const [];
+    final pending = await readPending.execute(uid, roomId);
+    return pending
+        .map((p) => MessageEntity(
+              id: p.id,
+              chatRoomId: p.chatRoomId,
+              senderId: p.ownerId,
+              content: p.content,
+              isRead: false,
+              createdAt: p.createdAt,
+              isPending: p.status == PendingStatus.waiting,
+              isFailed: p.status == PendingStatus.refused,
+              failureReason: p.lastError,
+            ))
+        .toList();
+  }
+
   Future<void> refreshMessages({bool showSpinner = false}) async {
     final roomId = _activeRoomId;
     if (roomId == null) return;
@@ -376,22 +428,8 @@ class ChatViewModel extends ChangeNotifier {
       _messagesSavedAt[roomId] = result.savedAt;
 
       // Pending messages from outbox
-      List<MessageEntity> pendingEntities = [];
-      final readPending = getPendingMessages;
-      if (readPending != null && _userId != null) {
-        final pending = await readPending.execute(_userId!, roomId);
-        pendingEntities = pending.map((p) => MessageEntity(
-          id: p.id,
-          chatRoomId: p.chatRoomId,
-          senderId: p.ownerId,
-          content: p.content,
-          isRead: false,
-          createdAt: p.createdAt,
-          isPending: p.status == PendingStatus.waiting,
-          isFailed: p.status == PendingStatus.refused,
-          failureReason: p.lastError,
-        )).toList();
-      }
+      final pendingEntities = await _loadPendingEntities(roomId);
+      if (generation != _generation || _activeRoomId != roomId) return;
 
       // Combine server/cached messages with pending ones
       final serverIds = result.items.map((m) => m.id).toSet();
@@ -406,8 +444,19 @@ class ChatViewModel extends ChangeNotifier {
         await _acknowledge(roomId, result.items);
       }
     } on DataException catch (e) {
-      if (generation != _generation) return;
-      if (!_messages.containsKey(roomId)) _messagesError = e.message;
+      if (generation != _generation || _activeRoomId != roomId) return;
+      // Even when this thread was never cached before going offline, still show queued outbox
+      // messages saved in SQLite so the user never sees an error screen hiding their own messages.
+      final pending = await _loadPendingEntities(roomId);
+      if (generation != _generation || _activeRoomId != roomId) return;
+      if (pending.isNotEmpty) {
+        final existing = messagesOf(roomId).where((m) => !m.isPending && !m.isFailed).toList();
+        final existingIds = existing.map((m) => m.id).toSet();
+        _messages[roomId] = [...existing, ...pending.where((p) => !existingIds.contains(p.id))];
+        _messagesError = null;
+      } else if (!_messages.containsKey(roomId)) {
+        _messagesError = e.message;
+      }
     }
     if (generation != _generation) return;
     _loadingMessages = false;
@@ -508,6 +557,9 @@ class ChatViewModel extends ChangeNotifier {
   void clear() {
     _generation++;
     stopPolling();
+    _pendingCountSubscription?.cancel();
+    _pendingCountSubscription = null;
+    _lastPendingCount = null;
     _userId = null;
     _rooms = const [];
     _messages.clear();
@@ -526,6 +578,7 @@ class ChatViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _pendingCountSubscription?.cancel();
     super.dispose();
   }
 

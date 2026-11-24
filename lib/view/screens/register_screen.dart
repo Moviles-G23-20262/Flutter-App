@@ -148,7 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               if (widget.appState.connectivity.isOffline)
                 const OfflineBanner(
-                  message: 'Waiting for connection. Connect to the internet to create an account.',
+                  message: 'No Wi-Fi or internet connection. Check your network to create an account — your draft is saved.',
                 ),
               Expanded(
                 child: SingleChildScrollView(

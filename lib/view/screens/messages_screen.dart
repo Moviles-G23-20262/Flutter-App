@@ -27,6 +27,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
     super.initState();
     // Fresh data as soon as the tab opens, then keep it fresh while it stays visible.
     final chats = widget.appState.chats;
+    chats.setOffline(widget.appState.connectivity.isOffline);
     chats.startPolling();
     if (chats.activeRoomId == null) {
       chats.loadRooms();
@@ -47,7 +48,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       listenable: Listenable.merge([widget.appState.chats, widget.appState.connectivity]),
       builder: (context, _) {
         final chats = widget.appState.chats;
-        chats.setOffline(widget.appState.connectivity.isOffline);
+
         return chats.activeRoom != null
             ? ChatView(appState: widget.appState, room: chats.activeRoom!)
             : _ConversationList(appState: widget.appState);
@@ -83,7 +84,7 @@ class _ConversationList extends StatelessWidget {
 
     return Column(
       children: [
-        if (isOffline)
+        if (isOffline || savedAt != null)
           if (savedAt != null)
             SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
           else if (chats.rooms.isEmpty)

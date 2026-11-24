@@ -26,7 +26,7 @@ final class InvalidCredentialsException extends AuthException {
 
 final class AuthNetworkException extends AuthException {
   const AuthNetworkException()
-      : super("Can't reach the server. Check your connection and try again.");
+      : super('No internet connection. Please check your Wi-Fi or mobile data and try again.');
 }
 
 /// The server refused a profile edit; [message] says why, in words for the user.

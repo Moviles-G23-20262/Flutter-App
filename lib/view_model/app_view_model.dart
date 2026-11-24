@@ -99,7 +99,6 @@ class AppViewModel extends ChangeNotifier {
   /// Checks a session that was opened offline once the server can be reached.
   final VerifySessionUseCase? verifySession;
 
-
   AppViewModel({
     this.onLogout,
     required this.marketplace,
@@ -128,15 +127,21 @@ class AppViewModel extends ChangeNotifier {
   bool _wasOnline = true;
 
   void _onConnectivityChanged() {
-  // Sabrina OFFLINE - In AppViewModel._onConnectivityChanged, reconnecting automatically refreshes marketplace.load()
-    marketplace.load();
-    final reconnected = connectivity.isOnline && !_wasOnline;
-    _wasOnline = connectivity.isOnline;
-    // BQ15 refreshes by itself when the network comes back (it may be showing a saved copy or an error).
-    if (reconnected) averageTicket?.load(force: true);
-    if (connectivity.isOnline) {
-      _verifyOfflineSession();
+    final isOnline = connectivity.isOnline;
+    if (isOnline == _wasOnline) return;
+    final reconnected = isOnline && !_wasOnline;
+    _wasOnline = isOnline;
+
+    if (isOnline) {
       chats.setOffline(false);
+      if (reconnected && _isLoggedIn) {
+        // Sabrina OFFLINE - Reconnecting flushes queued messages/listings and refreshes live data.
+        syncOutbox?.execute();
+        marketplace.load();
+        account.load();
+        averageTicket?.load(force: true);
+        _verifyOfflineSession();
+      }
     } else {
       chats.setOffline(true);
     }
@@ -193,10 +198,11 @@ class AppViewModel extends ChangeNotifier {
   void navigateTo(AppScreen screen) {
     _currentScreen = screen;
     notifyListeners();
-    // Reopening the Seller Hub with a connection is a trigger of its own: listings saved offline
-    // are sent now instead of waiting for the next retry timer. (A flush already running is not
-    // duplicated: the service lets only one run at a time.)
-    if (screen == AppScreen.sellerHub && _isLoggedIn) syncOutbox?.execute();
+    // Reopening the Seller Hub or Messages with a connection is a trigger of its own: queued
+    // items saved offline are sent now instead of waiting for the next retry timer.
+    if ((screen == AppScreen.sellerHub || screen == AppScreen.messages) && _isLoggedIn) {
+      syncOutbox?.execute();
+    }
   }
 
   void openMaterialDetail(MaterialEntity material) {
@@ -297,8 +303,10 @@ class AppViewModel extends ChangeNotifier {
     _restoringSession = false;
     _currentUser = user;
     _isLoggedIn = true;
+    _wasOnline = connectivity.isOnline;
     _currentScreen = AppScreen.home;
     notifyListeners();
+    chats.setOffline(connectivity.isOffline);
     marketplace.load();
     chats.start(user.id);
     account.load();

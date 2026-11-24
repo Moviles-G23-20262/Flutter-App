@@ -39,6 +39,8 @@ enum SyncOutcome {
 /// - when the connection returns, when the app comes back to the foreground ([flush]) and on a
 ///   retry timer with exponential backoff while something is still waiting;
 /// - one flush at a time: a second trigger while flushing waits for the running one;
+/// - resets backoff on reconnect so a brief DNS warm-up on real Wi-Fi retries quickly instead of
+///   waiting minutes;
 /// - respects `allow_mobile_data` when [transport] and [mobileDataPreference] are provided, pausing
 ///   auto-sync on cellular connections unless [flush] is called with `overMobileData: true`;
 /// - listings first (one `POST /uploads` per photo that is not on the server yet, then one
@@ -56,6 +58,10 @@ class OutboxSyncService {
   /// First retry delay; it doubles after every flush that could not deliver everything.
   final Duration baseRetryDelay;
   final Duration maxRetryDelay;
+
+  /// Fast retry delay used right after Wi-Fi/network reconnects, because Android/iOS often emit
+  /// `ConnectivityResult.wifi` 1–2 seconds before DNS/routing is actually ready.
+  final Duration reconnectRetryDelay;
   final DateTime Function() _now;
 
   OutboxSyncService({
@@ -66,6 +72,7 @@ class OutboxSyncService {
     this.mobileDataPreference,
     this.baseRetryDelay = const Duration(seconds: 5),
     this.maxRetryDelay = const Duration(minutes: 5),
+    this.reconnectRetryDelay = const Duration(seconds: 2),
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -80,6 +87,11 @@ class OutboxSyncService {
   /// A trigger arrived during a flush (e.g. a new item was queued): flush once more after it.
   bool _flushAgain = false;
   bool _flushAgainOverMobileData = false;
+
+  /// True when connectivity or Wi-Fi returned during/just before this flush, so a stale offline
+  /// attempt finishing with an error must NOT discard `_flushAgain` or use a huge old backoff.
+  bool _reconnectedDuringFlush = false;
+  bool _justReconnected = false;
 
   bool _waitingForWifi = false;
   final StreamController<bool> _waitingForWifiController = StreamController<bool>.broadcast();
@@ -103,13 +115,22 @@ class OutboxSyncService {
     }
   }
 
+  void _onNetworkRestored() {
+    // Reset backoff so queued messages resend immediately instead of waiting minutes from earlier
+    // offline failures.
+    _failedFlushes = 0;
+    _justReconnected = true;
+    if (_running != null) _reconnectedDuringFlush = true;
+    flush();
+  }
+
   /// Starts syncing [ownerId]'s outbox (on login or session restore) and flushes once.
   void start(String ownerId) {
     if (_ownerId != ownerId) stop();
     _ownerId = ownerId;
     _connectivitySubscription ??= connectivity.watch().listen((online) {
       if (online) {
-        flush();
+        _onNetworkRestored();
       } else {
         _setWaitingForWifi(false);
       }
@@ -119,11 +140,11 @@ class OutboxSyncService {
       _transportSubscription ??= netTransport.watchTransport().listen((kind) {
         if (kind == NetworkTransport.wifi) {
           _setWaitingForWifi(false);
-          flush();
+          _onNetworkRestored();
         } else if (kind == NetworkTransport.none) {
           _setWaitingForWifi(false);
         } else {
-          flush();
+          _onNetworkRestored();
         }
       }, onError: (_) {});
     }
@@ -148,6 +169,8 @@ class OutboxSyncService {
     _failedFlushes = 0;
     _flushAgain = false;
     _flushAgainOverMobileData = false;
+    _reconnectedDuringFlush = false;
+    _justReconnected = false;
     _setWaitingForWifi(false);
   }
 
@@ -218,10 +241,12 @@ class OutboxSyncService {
     _running = completer;
     _retryTimer?.cancel();
     _retryTimer = null;
+    _reconnectedDuringFlush = false;
     _runFlush(ownerId, overMobileData: overMobileData).then((deliveredEverything) {
       if (_ownerId != ownerId) return;
       if (deliveredEverything) {
         _failedFlushes = 0;
+        _justReconnected = false;
       } else {
         _scheduleRetry();
       }
@@ -229,14 +254,17 @@ class OutboxSyncService {
       if (_ownerId == ownerId) _scheduleRetry();
     }).whenComplete(() {
       _running = null;
-      if (_flushAgain && _ownerId == ownerId) {
+      final runNow = _flushAgain && _ownerId == ownerId;
+      if (runNow) {
         final nextOverMobile = _flushAgainOverMobileData;
         _flushAgain = false;
         _flushAgainOverMobileData = false;
+        _reconnectedDuringFlush = false;
         flush(overMobileData: nextOverMobile).whenComplete(completer.complete);
       } else {
         _flushAgain = false;
         _flushAgainOverMobileData = false;
+        _reconnectedDuringFlush = false;
         completer.complete();
       }
     });
@@ -263,12 +291,24 @@ class OutboxSyncService {
   }
 
   /// The server could not be reached, so flushing again right away would fail too: the backoff
-  /// timer takes over, including for triggers that arrived during this flush.
+  /// timer takes over, EXCEPT when Wi-Fi/connectivity came back while this flush was still running
+  /// (then keep `_flushAgain` so the newly available network is tried immediately).
   void _scheduleRetry() {
+    if (_reconnectedDuringFlush) {
+      // Connectivity came back mid-flush: let `.whenComplete` run the follow-up flush right away.
+      _flushAgain = true;
+      return;
+    }
     _flushAgain = false;
     _flushAgainOverMobileData = false;
-    final delay = _retryDelay(_failedFlushes);
-    _failedFlushes++;
+    final Duration delay;
+    if (_justReconnected) {
+      _justReconnected = false;
+      delay = reconnectRetryDelay < baseRetryDelay ? reconnectRetryDelay : baseRetryDelay;
+    } else {
+      delay = _retryDelay(_failedFlushes);
+      _failedFlushes++;
+    }
     _retryTimer = Timer(delay, () {
       _retryTimer = null;
       flush();

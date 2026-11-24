@@ -64,6 +64,13 @@ class ConnectivityViewModel extends ChangeNotifier {
     }
   }
 
+  /// Called by [ApiClient] when a request fails with a transport/DNS/timeout error (e.g. Wi-Fi is
+  /// associated to a router without internet), so offline banners appear reliably.
+  void reportNetworkError() => _setOnline(false);
+
+  /// Called by [ApiClient] when an HTTP response succeeds, confirming the network is reachable.
+  void reportNetworkSuccess() => _setOnline(true);
+
   /// Toggles the `allow_mobile_data` preference (`SharedPreferences`) and triggers an outbox
   /// flush immediately when turned on.
   Future<void> setAllowMobileData(bool allowed) async {
@@ -88,7 +95,13 @@ class ConnectivityViewModel extends ChangeNotifier {
   void _setTransport(NetworkTransport kind) {
     if (_disposed || kind == _transport) return;
     _transport = kind;
-    if (kind != NetworkTransport.mobile) _waitingForWifi = false;
+    if (kind == NetworkTransport.none) {
+      _online = false;
+      _waitingForWifi = false;
+    } else if (kind == NetworkTransport.wifi || kind == NetworkTransport.mobile) {
+      _online = true;
+      if (kind != NetworkTransport.mobile) _waitingForWifi = false;
+    }
     notifyListeners();
   }
 

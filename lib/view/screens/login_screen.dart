@@ -83,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             if (widget.appState.connectivity.isOffline)
               const OfflineBanner(
-                message: 'Waiting for connection. Connect to the internet to log in.',
+                message: 'No Wi-Fi or internet connection. Check your network to log in.',
               ),
             Expanded(
               child: SingleChildScrollView(

@@ -11,5 +11,5 @@ class DataException implements Exception {
 /// on the phone and sent later.
 class NoConnectionException extends DataException {
   const NoConnectionException()
-      : super("Can't reach the server. Check your connection and try again.");
+      : super('No internet connection. Please check your Wi-Fi or mobile data and try again.');
 }

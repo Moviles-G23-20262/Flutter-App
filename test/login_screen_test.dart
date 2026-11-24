@@ -239,7 +239,7 @@ void main() {
       await type(tester, email: 'ana@uniandes.edu.co', password: 'secret-pass');
 
       const cases = {
-        'network': (AuthNetworkException(), "Can't reach the server. Check your connection and try again."),
+        'network': (AuthNetworkException(), 'No internet connection. Please check your Wi-Fi or mobile data and try again.'),
         'server': (AuthServerException(), 'Something went wrong on our side. Please try again later.'),
       };
       for (final entry in cases.entries) {

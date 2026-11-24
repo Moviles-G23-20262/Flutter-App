@@ -367,7 +367,7 @@ void main() {
       auth.restoreError = const AuthNetworkException();
       var result = await useCase.execute();
       expect(result.outcome, QuickUnlockOutcome.unreachable);
-      expect(result.message, contains("Can't reach the server"));
+      expect(result.message, contains('No internet connection'));
 
       auth.restoreError = const AuthServerException();
       result = await useCase.execute();
@@ -621,7 +621,7 @@ void main() {
 
       await tapQuickUnlock(tester);
 
-      expect(find.textContaining("Can't reach the server"), findsOneWidget);
+      expect(find.textContaining('No internet connection'), findsOneWidget);
       expect(find.byKey(const Key('quick-unlock')), findsOneWidget);
       expect(app.loggedIn, isEmpty);
     });
