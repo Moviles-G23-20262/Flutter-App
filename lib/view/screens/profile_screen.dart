@@ -22,6 +22,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsOn    = true;
   bool _availableForChat   = true;
 
+  void _openEditProfile() => widget.appState.navigateTo(AppScreen.editProfile);
+
+  /// FIX4: signing out asks first, and says that what is waiting to be sent stays on the phone.
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final txPrimary = dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        final txSecondary = dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+        final errorColor = dark ? AppColors.darkError : AppColors.lightError;
+        return AlertDialog(
+          key: const Key('logout-confirm-dialog'),
+          title: Semantics(
+            header: true,
+            child: Text('Sign out?', style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd)),
+          ),
+          content: Text(
+            'Anything still waiting in the offline queue stays saved on this device: nothing is deleted. '
+            'Messages, listings, exchange steps and ratings are sent when you sign in again with this '
+            'account and have a connection; usage events keep uploading on their own.',
+            key: const Key('logout-confirm-message'),
+            style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeSm),
+          ),
+          actions: [
+            TextButton(
+              key: const Key('logout-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              key: const Key('logout-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: errorColor),
+              child: const Text('Sign out'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && mounted) widget.appState.logout();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -60,7 +103,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Icon(Icons.person_outline_rounded, color: accentHi, size: 20),
               const SizedBox(width: 8),
               Expanded(child: Text('Profile', style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd))),
-              AppIconButton(icon: Icon(Icons.edit_outlined, color: txSecondary, size: 18)),
+              Semantics(
+                button: true,
+                label: 'Edit profile',
+                excludeSemantics: true,
+                child: AppIconButton(
+                  key: const Key('profile-edit-button'),
+                  icon: Icon(Icons.edit_outlined, color: txSecondary, size: 18),
+                  onTap: _openEditProfile,
+                ),
+              ),
             ],
           ),
         ),
@@ -177,9 +229,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       _SettingsRow(
+                        key: const Key('profile-personal-info-row'),
                         icon: Icons.person_outline_rounded,
                         title: 'Personal Information',
-                        detail: 'Name, email, faculty and major',
+                        detail: 'Name, major and faculty',
+                        onTap: _openEditProfile,
                         brightness: brightness,
                       ),
                       _SettingsRow(
@@ -235,8 +289,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 // Sign out
                 const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: widget.appState.logout,
+                Semantics(
+                  button: true,
+                  label: 'Sign out. Asks for confirmation first',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                  key: const Key('profile-sign-out'),
+                  onTap: _confirmLogout,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
                     child: Row(
@@ -263,6 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
+                ),
                 ),
                 const SizedBox(height: 16),
 
@@ -397,6 +457,7 @@ class _SettingsRow extends StatelessWidget {
   final Brightness brightness;
 
   const _SettingsRow({
+    super.key,
     required this.icon,
     required this.title,
     required this.detail,

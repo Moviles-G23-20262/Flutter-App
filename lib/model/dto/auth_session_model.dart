@@ -24,8 +24,12 @@ UserEntity userEntityFromJson(Map<String, dynamic> json) {
     faculty: json['faculty'] as String?,
     rating: (json['rating'] as num).toDouble(),
     createdAt: DateTime.parse(json['createdAt'] as String),
+    // Absent in sessions saved before this field existed, and null while unverified.
+    emailVerifiedAt: _optionalDate(json['emailVerifiedAt']),
   );
 }
+
+DateTime? _optionalDate(Object? value) => value is String ? DateTime.tryParse(value) : null;
 
 /// The same shape as `GET /auth/me`, for the profile saved on the phone.
 Map<String, dynamic> userEntityToJson(UserEntity user) => {
@@ -36,4 +40,5 @@ Map<String, dynamic> userEntityToJson(UserEntity user) => {
       'faculty': user.faculty,
       'rating': user.rating,
       'createdAt': user.createdAt.toIso8601String(),
+      'emailVerifiedAt': user.emailVerifiedAt?.toIso8601String(),
     };

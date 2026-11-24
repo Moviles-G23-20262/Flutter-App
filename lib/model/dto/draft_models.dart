@@ -1,6 +1,7 @@
 import '../entities/listing_draft.dart';
 import '../entities/material_entity.dart';
 import '../entities/new_listing_data.dart';
+import '../entities/profile_draft.dart';
 import '../entities/rating_draft.dart';
 import '../entities/registration_draft.dart';
 
@@ -36,6 +37,19 @@ RegistrationDraft registrationDraftFromJson(Map<String, dynamic> json) => Regist
       email: json['email'] as String? ?? '',
       major: json['major'] as String? ?? '',
       faculty: json['faculty'] as String?,
+    );
+
+Map<String, dynamic> profileDraftToJson(ProfileDraft draft) => {
+      'fullName': draft.fullName,
+      'major': draft.major,
+      'faculty': draft.faculty,
+      'savedAt': DateTime.now().toIso8601String(),
+    };
+
+ProfileDraft profileDraftFromJson(Map<String, dynamic> json) => ProfileDraft(
+      fullName: json['fullName'] as String? ?? '',
+      major: json['major'] as String? ?? '',
+      faculty: json['faculty'] as String? ?? '',
     );
 
 /// The photos are files; the JSON only names them by [photoPaths].

@@ -247,7 +247,7 @@ class MarketplaceRemoteDataSourceImpl
         await apiClient.post(
           '/messages',
           body: {
-            if (id != null) 'id': id,
+            'id': ?id,
             'chatRoomId': chatRoomId,
             'content': content,
             if (clientCreatedAt != null)
@@ -294,8 +294,7 @@ class MarketplaceRemoteDataSourceImpl
         await apiClient.post(
           '/exchanges/$exchangeId/complete',
           body: {
-            if (receivedCondition != null)
-              'receivedCondition': receivedCondition,
+            'receivedCondition': ?receivedCondition,
           },
         ) as Json,
       );
