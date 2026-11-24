@@ -184,6 +184,40 @@ class AuthRepositoryImpl implements AuthRepository {
     if (apiClient.authToken == null) await _forgetProfile();
   }
 
+  @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) async {
+    final UserEntity updated;
+    try {
+      updated = await remote.updateProfile(userId: userId, fullName: fullName, major: major, faculty: faculty);
+    } on ApiException catch (e) {
+      throw _mapProfileError(e);
+    }
+    // Saved right away, so closing the app and opening it offline shows the new profile.
+    final cache = profileCache;
+    if (cache != null) await _safely(() => cache.save(_profileOwner, _profileKey, userEntityToJson(updated)));
+    return updated;
+  }
+
+  ProfileUpdateException _mapProfileError(ApiException e) {
+    switch (e.statusCode) {
+      case 400:
+        return ProfileUpdateException(ApiValidationMessages.friendly(e.message));
+      case 401:
+        return const ProfileUpdateException('Your session expired. Please log in again.');
+      case 403:
+        return const ProfileUpdateException('You can only edit your own profile.');
+      case 404:
+        return const ProfileUpdateException('Your account could not be found. Please log in again.');
+      default:
+        return const ProfileUpdateException('Something went wrong on our side. Please try again later.');
+    }
+  }
+
   Future<UserEntity> _startSession(AuthSessionModel session) async {
     // The server accepted the credentials: the user is in, even if the token cannot be kept
     // on this device (secure storage unavailable). The session then just won't survive a restart.

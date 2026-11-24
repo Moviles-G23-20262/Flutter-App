@@ -93,6 +93,15 @@ class _FakeRemote implements AuthRemoteDataSource {
     if (error != null) throw error!;
     return _user;
   }
+
+  @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) =>
+      throw UnimplementedError();
 }
 
 class _RecordingRepository implements AuthRepository {
@@ -124,6 +133,15 @@ class _RecordingRepository implements AuthRepository {
 
   @override
   Future<void> forgetBiometrics() async {}
+
+  @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) =>
+      throw UnimplementedError();
 
   @override
   Future<void> logout() => throw UnimplementedError();

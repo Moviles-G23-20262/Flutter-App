@@ -35,16 +35,25 @@ class AnalyticsEventRepositoryImpl implements AnalyticsEventRepository {
 
   final Future<Directory> Function() _directory;
 
-  AnalyticsEventRepositoryImpl({Future<Directory> Function()? directory})
+  /// Told about every event written, inside the queue lock, so the uploader keeps its count in
+  /// memory instead of reading the file (`AnalyticsSyncService.recordQueued`).
+  final void Function()? onQueued;
+
+  AnalyticsEventRepositoryImpl({Future<Directory> Function()? directory, this.onQueued})
       : _directory = directory ?? getApplicationDocumentsDirectory;
 
   @override
   Future<void> track(AnalyticsEvent event) async {
     final path = p.join((await _directory()).path, fileName);
     // Encoding and the disk write run off the UI thread.
-    await AnalyticsQueueLock.run(() => Isolate.run(() {
-          final file = File(path);
-          file.writeAsStringSync('${jsonEncode(event.toJson())}\n', mode: FileMode.append, flush: true);
-        }));
+    await AnalyticsQueueLock.run(() async {
+      await _append(path, event);
+      onQueued?.call();
+    });
   }
 }
+
+/// Top-level, so the closure sent to the isolate captures only the path and the event.
+Future<void> _append(String path, AnalyticsEvent event) => Isolate.run(() {
+      File(path).writeAsStringSync('${jsonEncode(event.toJson())}\n', mode: FileMode.append, flush: true);
+    });

@@ -9,6 +9,15 @@ abstract class AuthRemoteDataSource {
 
   /// Needs [ApiClient.authToken] to be set.
   Future<UserEntity> me();
+
+  /// `PATCH /users/:id` with only the editable profile fields (never the email or the password).
+  /// Returns the profile as the server saved it. Needs [ApiClient.authToken] to be set.
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -43,6 +52,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserEntity> me() async {
     final response = await apiClient.get('/auth/me');
+    return userEntityFromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) async {
+    final response = await apiClient.patch(
+      '/users/${Uri.encodeComponent(userId)}',
+      // A null faculty clears it on the server.
+      body: {'fullName': fullName, 'major': major, 'faculty': faculty},
+    );
     return userEntityFromJson(response as Map<String, dynamic>);
   }
 }

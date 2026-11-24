@@ -8,6 +8,7 @@ import '../model/entities/user_entity.dart';
 import '../model/exceptions/data_exceptions.dart';
 import 'account_view_model.dart';
 import 'average_ticket_view_model.dart';
+import 'category_performance_view_model.dart';
 import 'recent_searches_view_model.dart';
 import 'chat_view_model.dart';
 import 'marketplace_view_model.dart';
@@ -48,6 +49,9 @@ enum AppScreen {
 
   /// The user's weekly classes.
   schedule,
+
+  /// Edit name, major and faculty (PATCH /users/:id).
+  editProfile,
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -67,6 +71,10 @@ class AppViewModel extends ChangeNotifier {
 
   /// The average ticket card in the Seller Hub; without it the card is not shown.
   final AverageTicketViewModel? averageTicket;
+
+  /// BQ6, listings and completed exchanges per category, in the Seller Hub; without it the card
+  /// is not shown.
+  final CategoryPerformanceViewModel? categoryPerformance;
 
   /// The recent searches under the search box (kept on the phone); without it none are shown.
   final RecentSearchesViewModel? recentSearches;
@@ -100,6 +108,7 @@ class AppViewModel extends ChangeNotifier {
     required this.schedule,
     required this.meetups,
     this.averageTicket,
+    this.categoryPerformance,
     this.recentSearches,
     required this.theme,
     required this.power,
@@ -266,6 +275,22 @@ class AppViewModel extends ChangeNotifier {
 
   void closeSchedule() => navigateTo(_scheduleReturnTo);
 
+  /// The Seller Hub figures that come from analytics, all requested at once. Each one keeps its
+  /// own loading, saved-copy and error state, so one failing never hides the others.
+  Future<void> loadSellerHubMetrics() => Future.wait<void>([
+        if (averageTicket != null) averageTicket!.load(force: true),
+        if (categoryPerformance != null) categoryPerformance!.load(force: true),
+      ]);
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+
+  /// The server accepted a profile edit: everything showing the user shows the new data.
+  void updateCurrentUser(UserEntity user) {
+    if (!_isLoggedIn || user.id != _currentUser?.id) return;
+    _currentUser = user;
+    notifyListeners();
+  }
+
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   void login(UserEntity user) {
@@ -289,8 +314,13 @@ class AppViewModel extends ChangeNotifier {
   /// Sends waiting outbox items immediately over mobile data for a single sync (EC13).
   Future<void> syncOverMobileData() => syncOutbox?.execute(overMobileData: true) ?? Future.value();
 
-  /// The app came back to the foreground: send what was queued while it was in the background.
+  /// The app went to the background: the chat stops polling at once.
+  void appPaused() => chats.pauseForBackground();
+
+  /// The app came back to the foreground: the chat polls again (refreshing now) and what was
+  /// queued while it was in the background is sent.
   void appResumed() {
+    chats.resumeFromBackground();
     if (!_isLoggedIn) return;
     syncOutbox?.execute();
     _verifyOfflineSession();
@@ -351,6 +381,7 @@ class AppViewModel extends ChangeNotifier {
     account.dispose();
     schedule.dispose();
     averageTicket?.dispose();
+    categoryPerformance?.dispose();
     recentSearches?.dispose();
     theme.removeListener(notifyListeners);
     theme.dispose();

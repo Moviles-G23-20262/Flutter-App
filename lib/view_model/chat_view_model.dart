@@ -447,8 +447,50 @@ class ChatViewModel extends ChangeNotifier {
     _timer = null;
   }
 
+  bool _inBackground = false;
+
+  /// Whether polling was running when the app went to the background, to restart it on return.
+  bool _pollingBeforeBackground = false;
+
+  /// True while the app is in the background (no polling then).
+  bool get isInBackground => _inBackground;
+
+  /// Whether the poll timer is running right now.
+  bool get isPolling => _timer != null;
+
+  /// The app went to the background: the poll timer stops at once, so no request wakes the radio.
+  void pauseForBackground() {
+    if (_inBackground) return;
+    _inBackground = true;
+    _pollingBeforeBackground = _timer != null;
+    stopPolling();
+  }
+
+  /// The app is back in the foreground: if it was polling, it polls again and refreshes right
+  /// away (only with a connection and a signed-in user).
+  void resumeFromBackground() {
+    if (!_inBackground) return;
+    _inBackground = false;
+    final wasPolling = _pollingBeforeBackground;
+    _pollingBeforeBackground = false;
+    if (!wasPolling || _isOffline || _userId == null) return;
+    _restartTimer();
+    if (_activeRoomId != null) {
+      refreshMessages();
+    } else {
+      loadRooms();
+    }
+  }
+
   void _restartTimer() {
     _timer?.cancel();
+    _timer = null;
+    if (_inBackground) {
+      // Nothing polls in the background; asked to poll (e.g. the network came back), it does
+      // so when the app returns.
+      _pollingBeforeBackground = true;
+      return;
+    }
     if (_isOffline) return; // Pause polling when offline to save battery & avoid wasted requests
     if (_activeRoomId != null) {
       _timer = Timer.periodic(

@@ -2,20 +2,107 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/formatters.dart';
+import '../../view_model/account_view_model.dart';
 import '../../view_model/app_view_model.dart';
+import '../../model/entities/chat_room_entity.dart';
+import '../../model/entities/exchange_entity.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/pending_items.dart';
 import '../widgets/average_ticket_card.dart';
 import '../widgets/cached_photo.dart';
+import '../widgets/category_performance_card.dart';
 import '../../model/entities/time_to_sell.dart';
 import '../widgets/offline_banner.dart';
 
 // ─── Seller Hub Screen ────────────────────────────────────────────────────────
 
-class SellerHubScreen extends StatelessWidget {
+/// The Seller Hub's sublists, memoized: they are filtered again only when the user or one of the
+/// source lists changes. The view models replace a list (never mutate it) when it changes, so
+/// comparing references is enough and a rebuild for anything else costs no filtering.
+class SellerHubLists {
+  String? _userId;
+  List<MaterialEntity>? _materials;
+  List<ExchangeEntity>? _exchanges;
+  List<ChatRoomEntity>? _rooms;
+  DateTime? _month;
+
+  List<MaterialEntity> _myListings = const [];
+  int _activeCount = 0;
+  List<ExchangeEntity> _recentSales = const [];
+  double _earnedThisMonth = 0;
+  List<ChatRoomEntity> _buyerChats = const [];
+
+  /// How many times each sublist was actually computed (for tests and profiling).
+  int listingsComputations = 0;
+  int salesComputations = 0;
+  int chatsComputations = 0;
+
+  List<MaterialEntity> get myListings => _myListings;
+  int get activeCount => _activeCount;
+
+  /// The five most recent sales.
+  List<ExchangeEntity> get recentSales => _recentSales;
+  double get earnedThisMonth => _earnedThisMonth;
+
+  /// Up to five conversations on the user's listings that already have a message.
+  List<ChatRoomEntity> get buyerChats => _buyerChats;
+
+  void update({
+    required String userId,
+    required List<MaterialEntity> materials,
+    required List<ExchangeEntity> exchanges,
+    required List<ChatRoomEntity> rooms,
+    required AccountViewModel account,
+    DateTime? now,
+  }) {
+    final today = now ?? DateTime.now();
+    final month = DateTime(today.year, today.month);
+    final userChanged = userId != _userId;
+    if (userChanged || !identical(materials, _materials)) {
+      _materials = materials;
+      _myListings = materials.where((m) => m.sellerId == userId).toList(growable: false);
+      _activeCount = _myListings.where((m) => m.isAvailable).length;
+      listingsComputations++;
+    }
+    if (userChanged || !identical(exchanges, _exchanges) || month != _month) {
+      _exchanges = exchanges;
+      _month = month;
+      _recentSales = account.salesOf(userId).take(5).toList(growable: false);
+      _earnedThisMonth = account.earnedThisMonth(userId, now: today);
+      salesComputations++;
+    }
+    if (userChanged || !identical(rooms, _rooms)) {
+      _rooms = rooms;
+      _buyerChats = rooms
+          .where((r) => r.sellerId == userId && r.lastMessage != null)
+          .take(5)
+          .toList(growable: false);
+      chatsComputations++;
+    }
+    _userId = userId;
+  }
+}
+
+class SellerHubScreen extends StatefulWidget {
   final AppViewModel appState;
 
   const SellerHubScreen({super.key, required this.appState});
+
+  @override
+  State<SellerHubScreen> createState() => _SellerHubScreenState();
+}
+
+class _SellerHubScreenState extends State<SellerHubScreen> {
+  final _lists = SellerHubLists();
+
+  AppViewModel get appState => widget.appState;
+
+  @override
+  void initState() {
+    super.initState();
+    // The analytics figures (average ticket, BQ6 categories) are requested in parallel.
+    appState.loadSellerHubMetrics();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,16 +126,21 @@ class SellerHubScreen extends StatelessWidget {
 
     final me         = appState.currentUser;
     final myId       = me?.id ?? '';
-    final myListings = appState.marketplace.listingsOf(myId);
+    // Filtered only when the listings, exchanges or chats change, not on every rebuild.
+    _lists.update(
+      userId: myId,
+      materials: appState.marketplace.materials,
+      exchanges: appState.account.exchanges,
+      rooms: appState.chats.rooms,
+      account: appState.account,
+    );
+    final myListings = _lists.myListings;
     // Saved on the phone and not published yet: shown first, with a badge.
     final pendingListings = appState.marketplace.pendingListings;
-    final activeCount = myListings.where((m) => m.isAvailable).length;
-    final mySales    = appState.account.salesOf(myId).take(5).toList();
+    final activeCount = _lists.activeCount;
+    final mySales    = _lists.recentSales;
     // Conversations on my listings that already have a message from a buyer.
-    final buyerChats = appState.chats.rooms
-        .where((r) => r.sellerId == myId && r.lastMessage != null)
-        .take(5)
-        .toList();
+    final buyerChats = _lists.buyerChats;
 
     return Scaffold(
       body: SafeArea(
@@ -105,7 +197,7 @@ class SellerHubScreen extends StatelessWidget {
                   children: [
                     _StatCard(icon: Icons.inventory_2_outlined, value: '$activeCount', label: 'Active Listings', brightness: brightness),
                     const SizedBox(width: 10),
-                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: copPrice(appState.account.earnedThisMonth(myId)), label: 'Earned This Month', brightness: brightness),
+                    _StatCard(icon: Icons.account_balance_wallet_outlined, value: copPrice(_lists.earnedThisMonth), label: 'Earned This Month', brightness: brightness),
                     const SizedBox(width: 10),
                     _StatCard(icon: Icons.trending_up_rounded, value: (me?.rating ?? 0).toStringAsFixed(1), label: 'Your Rating', brightness: brightness),
                   ],
@@ -126,6 +218,10 @@ class SellerHubScreen extends StatelessWidget {
                 ],
                 if (appState.averageTicket != null) ...[
                   AverageTicketCard(viewModel: appState.averageTicket!),
+                  const SizedBox(height: 20),
+                ],
+                if (appState.categoryPerformance != null) ...[
+                  CategoryPerformanceCard(viewModel: appState.categoryPerformance!),
                   const SizedBox(height: 20),
                 ],
                 _ListingHealthEntryCard(

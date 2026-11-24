@@ -120,6 +120,15 @@ class _FakeAuth implements AuthRepository {
   }
 
   @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) =>
+      throw UnimplementedError();
+
+  @override
   Future<UserEntity> login({required String email, required String password}) => throw UnimplementedError();
 
   @override

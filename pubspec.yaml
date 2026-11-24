@@ -43,3 +43,4 @@ flutter:
 
   assets:
     - assets/campus_zones.json
+    - assets/data/uniandes_programs.json

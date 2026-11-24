@@ -31,6 +31,10 @@ class UserEntity {
   /// Timestamp when the account was created.
   final DateTime createdAt;
 
+  /// When the e-mail address was verified; `null` while it is not (or for a profile saved by an
+  /// app version that did not know this field).
+  final DateTime? emailVerifiedAt;
+
   const UserEntity({
     required this.id,
     required this.email,
@@ -39,7 +43,10 @@ class UserEntity {
     this.faculty,
     required this.rating,
     required this.createdAt,
+    this.emailVerifiedAt,
   });
+
+  bool get isEmailVerified => emailVerifiedAt != null;
 
   // ── Convenience getters ───────────────────────────────────────────────────────
 
@@ -69,6 +76,7 @@ class UserEntity {
     Object? faculty = _sentinel,
     double? rating,
     DateTime? createdAt,
+    Object? emailVerifiedAt = _sentinel,
   }) {
     return UserEntity(
       id:        id        ?? this.id,
@@ -78,6 +86,7 @@ class UserEntity {
       faculty:   faculty   == _sentinel ? this.faculty : faculty as String?,
       rating:    rating    ?? this.rating,
       createdAt: createdAt ?? this.createdAt,
+      emailVerifiedAt: emailVerifiedAt == _sentinel ? this.emailVerifiedAt : emailVerifiedAt as DateTime?,
     );
   }
 

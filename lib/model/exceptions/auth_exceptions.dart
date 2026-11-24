@@ -29,6 +29,11 @@ final class AuthNetworkException extends AuthException {
       : super("Can't reach the server. Check your connection and try again.");
 }
 
+/// The server refused a profile edit; [message] says why, in words for the user.
+final class ProfileUpdateException extends AuthException {
+  const ProfileUpdateException(super.message);
+}
+
 final class AuthServerException extends AuthException {
   const AuthServerException([
     super.message = 'Something went wrong on our side. Please try again later.',

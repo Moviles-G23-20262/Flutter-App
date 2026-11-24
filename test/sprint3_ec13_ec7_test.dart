@@ -864,5 +864,76 @@ void main() {
       expect(find.byKey(Key('pending-listing-${pendingListing.id}')), findsNothing);
       appState.chats.clear();
     });
+
+    // Sprint 4 · FIX4: signing out asks first and says the offline queue stays on the device.
+    testWidgets('FIX4: Sign Out asks for confirmation and warns that queued items stay saved', (tester) async {
+      _ignoreFontOverflows();
+      // The server cannot be reached: the message stays in the outbox while the user signs out.
+      sender.failures.add(const NetworkException('offline'));
+      await store.enqueueMessage(ownerId: _ana.id, chatRoomId: 'r1', content: 'queued offline');
+      appState.login(_ana);
+      await tester.pump();
+      await tester.binding.setSurfaceSize(const Size(420, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: ProfileScreen(appState: appState))));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('profile-sign-out')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('logout-confirm-dialog')), findsOneWidget);
+      expect(find.textContaining('stays saved on this device'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('logout-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('logout-confirm-dialog')), findsNothing);
+      expect(appState.isLoggedIn, isTrue);
+
+      await tester.tap(find.byKey(const Key('profile-sign-out')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('logout-confirm'), skipOffstage: false));
+      await tester.pumpAndSettle();
+
+      expect(appState.isLoggedIn, isFalse);
+      expect(appState.currentScreen, AppScreen.login);
+      // Nothing queued was deleted by signing out.
+      expect(await store.messages(_ana.id), hasLength(1));
+    });
+
+    testWidgets('the edit button and Personal Information open Edit Profile', (tester) async {
+      _ignoreFontOverflows();
+      appState.login(_ana);
+      await tester.pump();
+      await tester.binding.setSurfaceSize(const Size(420, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: ProfileScreen(appState: appState))));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('profile-edit-button')));
+      expect(appState.currentScreen, AppScreen.editProfile);
+
+      appState.navigateTo(AppScreen.profile);
+      await tester.tap(find.byKey(const Key('profile-personal-info-row')));
+      expect(appState.currentScreen, AppScreen.editProfile);
+
+      appState.updateCurrentUser(_ana.copyWith(fullName: 'Ana Editada'));
+      expect(appState.currentUser?.fullName, 'Ana Editada');
+      appState.updateCurrentUser(_ana.copyWith(id: 'someone-else', fullName: 'Intruso'));
+      expect(appState.currentUser?.fullName, 'Ana Editada');
+    });
+
+    testWidgets('lifecycle: appPaused stops chat polling, appResumed restarts it', (tester) async {
+      appState.login(_ana);
+      await tester.pump();
+      appState.chats.startPolling();
+      expect(appState.chats.isPolling, isTrue);
+
+      appState.appPaused();
+      expect(appState.chats.isPolling, isFalse);
+
+      appState.appResumed();
+      expect(appState.chats.isPolling, isTrue);
+      await tester.pump();
+      appState.chats.clear();
+    });
   });
 }

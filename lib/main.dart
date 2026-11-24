@@ -6,6 +6,7 @@ import 'view_model/account_view_model.dart';
 import 'view_model/app_view_model.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'view_model/average_ticket_view_model.dart';
+import 'view_model/category_performance_view_model.dart';
 import 'view_model/recent_searches_view_model.dart';
 import 'view_model/login_view_model.dart';
 import 'view_model/register_view_model.dart';
@@ -33,6 +34,7 @@ import 'view/screens/meeting_point_screen.dart';
 import 'view/screens/schedule_screen.dart';
 import 'view/screens/favorites_screen.dart';
 import 'view/screens/notifications_screen.dart';
+import 'view/screens/edit_profile_screen.dart';
 import 'view/widgets/common_widgets.dart';
 
 Future<void> main() async {
@@ -103,6 +105,10 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     ),
     meetups: _deps.meetups,
     averageTicket: AverageTicketViewModel(getAverageTicket: _deps.getAverageTicket),
+    categoryPerformance: CategoryPerformanceViewModel(
+      getCategoryPerformance: _deps.getCategoryPerformance,
+      connectivity: _deps.connectivityRepository,
+    ),
     recentSearches: RecentSearchesViewModel(
       getRecent: _deps.getRecentSearches,
       saveRecent: _deps.saveRecentSearch,
@@ -173,7 +179,19 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _appState.appResumed();
+    switch (state) {
+      case AppLifecycleState.paused:
+        // Background: no analytics timer and no chat polling wake the phone up.
+        _deps.analyticsSync.pause();
+        _appState.appPaused();
+      case AppLifecycleState.resumed:
+        _deps.analyticsSync.resume();
+        _appState.appResumed();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   @override
@@ -290,6 +308,16 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
         return MeetingPointScreen(appState: _appState, room: room);
       case AppScreen.schedule:
         return ScheduleScreen(appState: _appState);
+      case AppScreen.editProfile:
+        final me = _appState.currentUser;
+        if (me == null) return AppShell(appState: _appState);
+        return EditProfileScreen(
+          onClose: () => _appState.navigateTo(AppScreen.profile),
+          createViewModel: () => _deps.createEditProfileViewModel(
+            user: me,
+            onSaved: _appState.updateCurrentUser,
+          ),
+        );
       case AppScreen.home:
       case AppScreen.search:
       case AppScreen.messages:

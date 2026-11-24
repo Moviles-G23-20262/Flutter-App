@@ -1,4 +1,5 @@
 import '../entities/listing_draft.dart';
+import '../entities/profile_draft.dart';
 import '../entities/rating_draft.dart';
 import '../entities/registration_draft.dart';
 
@@ -14,6 +15,14 @@ abstract class RegistrationDraftRepository {
   Future<RegistrationDraft?> load();
   Future<void> save(RegistrationDraft draft);
   Future<void> clear();
+}
+
+/// The unsaved Edit Profile form, per signed-in user (kept until the server accepts it or the
+/// user discards it).
+abstract class ProfileDraftRepository {
+  Future<ProfileDraft?> load(String userId);
+  Future<void> save(String userId, ProfileDraft draft);
+  Future<void> clear(String userId);
 }
 
 /// The unfinished "sell an item" form, per signed-in user.

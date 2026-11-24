@@ -37,4 +37,15 @@ abstract class AuthRepository {
 
   /// Removes the enrolled account, so the next sign-in starts from scratch.
   Future<void> forgetBiometrics();
+
+  /// Saves the editable profile fields of the signed-in user and returns the updated profile,
+  /// which also replaces the copy saved on the phone (an offline launch then shows it).
+  /// Throws `NetworkException` when the server cannot be reached (nothing changes then) and
+  /// [ProfileUpdateException] when the server refuses the change.
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  });
 }

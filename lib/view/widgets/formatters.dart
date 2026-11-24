@@ -27,10 +27,16 @@ String clockTime(DateTime moment) {
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+/// Patterns compiled once for the whole app instead of on every call.
+abstract final class _Patterns {
+  /// Each position followed by a whole number of digit triples: where a thousands dot goes.
+  static final RegExp thousands = RegExp(r'\B(?=(\d{3})+(?!\d))');
+}
+
 /// "$320.000 COP": Colombian pesos, dot as thousands separator, no cents.
 String copPrice(double amount) {
   final digits = amount.round().toString();
-  final grouped = digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+  final grouped = digits.replaceAllMapped(_Patterns.thousands, (_) => '.');
   return '\$$grouped COP';
 }
 

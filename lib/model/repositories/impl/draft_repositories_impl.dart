@@ -2,6 +2,7 @@ import '../../data_sources/local/draft_photo_store.dart';
 import '../../data_sources/local/draft_store.dart';
 import '../../dto/draft_models.dart';
 import '../../entities/listing_draft.dart';
+import '../../entities/profile_draft.dart';
 import '../../entities/rating_draft.dart';
 import '../../entities/registration_draft.dart';
 import '../draft_repositories.dart';
@@ -59,6 +60,31 @@ class RegistrationDraftRepositoryImpl implements RegistrationDraftRepository {
 
   @override
   Future<void> clear() => store.remove(key);
+}
+
+class ProfileDraftRepositoryImpl implements ProfileDraftRepository {
+  final DraftStore store;
+
+  ProfileDraftRepositoryImpl(this.store);
+
+  static String key(String userId) => 'profile_draft:$userId';
+
+  @override
+  Future<ProfileDraft?> load(String userId) async {
+    final json = await store.read(key(userId));
+    if (json == null) return null;
+    try {
+      return profileDraftFromJson(json);
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> save(String userId, ProfileDraft draft) => store.write(key(userId), profileDraftToJson(draft));
+
+  @override
+  Future<void> clear(String userId) => store.remove(key(userId));
 }
 
 /// The text and choices go to shared_preferences as one JSON; the photos are files in the
