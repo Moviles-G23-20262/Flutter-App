@@ -47,6 +47,15 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> forgetBiometrics() async {}
 
   @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) =>
+      throw UnimplementedError();
+
+  @override
   Future<void> logout() async {}
 }
 

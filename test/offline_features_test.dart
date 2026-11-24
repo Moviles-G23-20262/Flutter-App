@@ -64,6 +64,15 @@ class _FakeAuthRemote implements AuthRemoteDataSource {
     if (meError != null) throw meError!;
     return me_;
   }
+
+  @override
+  Future<UserEntity> updateProfile({
+    required String userId,
+    required String fullName,
+    required String major,
+    String? faculty,
+  }) =>
+      throw UnimplementedError();
 }
 
 class _MemorySession implements SessionStorage {

@@ -7,7 +7,6 @@ import 'package:flutter_front_end/model/data_sources/local/app_database.dart';
 import 'package:flutter_front_end/model/data_sources/local/response_cache.dart';
 import 'package:flutter_front_end/model/dto/time_to_sell_model.dart';
 import 'package:flutter_front_end/model/entities/cached_list.dart';
-import 'package:flutter_front_end/model/entities/enums.dart';
 import 'package:flutter_front_end/model/entities/material_entity.dart';
 import 'package:flutter_front_end/model/entities/new_listing_data.dart';
 import 'package:flutter_front_end/model/entities/price_stats.dart';
