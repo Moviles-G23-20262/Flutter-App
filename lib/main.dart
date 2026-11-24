@@ -173,7 +173,19 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _appState.appResumed();
+    switch (state) {
+      case AppLifecycleState.paused:
+        // Background: no analytics timer and no chat polling wake the phone up.
+        _deps.analyticsSync.pause();
+        _appState.appPaused();
+      case AppLifecycleState.resumed:
+        _deps.analyticsSync.resume();
+        _appState.appResumed();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   @override

@@ -1,12 +1,14 @@
 import '../../app/network/api_client.dart';
 import '../../core/isolates/listing_health_analyzer.dart';
 import '../dto/average_ticket_model.dart';
+import '../dto/category_performance_model.dart';
 import '../dto/chat_agreement_model.dart';
 import '../dto/conversation_insight_model.dart';
 import '../dto/dead_listings_model.dart';
 import '../dto/meeting_point_density_model.dart';
 import '../dto/price_stats_model.dart';
 import '../dto/time_to_sell_model.dart';
+import '../entities/category_performance.dart';
 import '../entities/meeting_point_density.dart';
 import '../entities/price_stats.dart';
 
@@ -44,6 +46,12 @@ class AnalyticsRemoteDataSource {
   Future<AverageTicketModel> getAverageTicket() async {
     final json = await apiClient.get('/analytics/average-ticket/');
     return AverageTicketModel.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// BQ6: listings and completed exchanges per item category, most completed exchanges first.
+  Future<List<CategoryPerformance>> getCategoryPerformance() async {
+    final json = await apiClient.get('/analytics/categories/');
+    return CategoryPerformanceModel.listFromJson(json);
   }
 
   /// BQ11: average time (in days) it takes for a newly listed academic item to be marked as sold.

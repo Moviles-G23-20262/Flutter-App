@@ -415,6 +415,11 @@ class AppDependencies {
     final ratingDrafts = RatingDraftRepositoryImpl(draftStore);
     final registrationDrafts = RegistrationDraftRepositoryImpl(draftStore);
     final listingDrafts = ListingDraftRepositoryImpl(draftStore, DraftPhotoStore());
+    // Telemetry: the repository tells the uploader about each queued event (count kept in memory).
+    final analyticsSync = AnalyticsSyncService(
+      remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
+      connectivity: connectivity,
+    );
 
     return AppDependencies._(
       login: LoginUseCase(authRepository),
@@ -475,11 +480,8 @@ class AppDependencies {
       loadThemePreference: LoadThemePreferenceUseCase(themePreferences),
       saveThemePreference: SaveThemePreferenceUseCase(themePreferences),
       watchBattery: WatchBatteryUseCase(BatteryDataSource()),
-      trackEvent: TrackEventUseCase(AnalyticsEventRepositoryImpl()),
-      analyticsSync: AnalyticsSyncService(
-        remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
-        connectivity: connectivity,
-      ),
+      trackEvent: TrackEventUseCase(AnalyticsEventRepositoryImpl(onQueued: analyticsSync.recordQueued)),
+      analyticsSync: analyticsSync,
       classifyItemPhoto: ClassifyItemPhotoUseCase(
         // Gemini API key, only from the run configuration (config/development.json:
         // "VISION_API_KEY"), never in source control.
