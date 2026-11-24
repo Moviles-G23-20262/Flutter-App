@@ -295,6 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   excludeSemantics: true,
                   child: GestureDetector(
                   key: const Key('profile-sign-out'),
+                  behavior: HitTestBehavior.opaque,
                   onTap: _confirmLogout,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),

@@ -73,6 +73,13 @@ import '../model/repositories/impl/pending_listing_repository_impl.dart';
 import '../model/use_cases/listing_draft_use_cases.dart';
 import '../model/use_cases/pending_listing_use_cases.dart';
 import '../model/repositories/impl/mobile_data_preference_repository_impl.dart';
+import '../model/entities/user_entity.dart';
+import '../model/repositories/connectivity_repository.dart';
+import '../model/repositories/impl/category_performance_repository_impl.dart';
+import '../model/repositories/impl/uniandes_programs_repository_impl.dart';
+import '../model/use_cases/get_category_performance_use_case.dart';
+import '../model/use_cases/profile_use_cases.dart';
+import '../view_model/edit_profile_view_model.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -189,6 +196,20 @@ class AppDependencies {
 
   /// Average ticket of completed sales, for the Seller Hub.
   final GetAverageTicketUseCase getAverageTicket;
+
+  /// BQ6: listings and completed exchanges per category, for the Seller Hub.
+  final GetCategoryPerformanceUseCase getCategoryPerformance;
+
+  /// The device's network state, for view-models that follow it themselves.
+  final ConnectivityRepository connectivityRepository;
+
+  /// Edit Profile: the request, the Uniandes catalog and the draft kept on the phone.
+  final UpdateProfileUseCase updateProfile;
+  final GetUniandesProgramsUseCase getUniandesPrograms;
+  final SearchUniandesProgramsUseCase searchUniandesPrograms;
+  final LoadProfileDraftUseCase loadProfileDraft;
+  final SaveProfileDraftUseCase saveProfileDraft;
+  final ClearProfileDraftUseCase clearProfileDraft;
   final GetRecentSearchesUseCase getRecentSearches;
   final SaveRecentSearchUseCase saveRecentSearch;
   final RemoveRecentSearchUseCase removeRecentSearch;
@@ -235,6 +256,14 @@ class AppDependencies {
     required this.getChatAgreement,
     required this.getTimeToSell,
     required this.getAverageTicket,
+    required this.getCategoryPerformance,
+    required this.connectivityRepository,
+    required this.updateProfile,
+    required this.getUniandesPrograms,
+    required this.searchUniandesPrograms,
+    required this.loadProfileDraft,
+    required this.saveProfileDraft,
+    required this.clearProfileDraft,
     required this.getRecentSearches,
     required this.saveRecentSearch,
     required this.removeRecentSearch,
@@ -329,6 +358,23 @@ class AppDependencies {
         baselineSellDays: baselineSellDays,
       );
 
+  /// A fresh ViewModel for the Edit Profile screen; owned and disposed by the screen.
+  EditProfileViewModel createEditProfileViewModel({
+    required UserEntity user,
+    void Function(UserEntity user)? onSaved,
+  }) =>
+      EditProfileViewModel(
+        user: user,
+        updateProfile: updateProfile,
+        getPrograms: getUniandesPrograms,
+        searchPrograms: searchUniandesPrograms,
+        loadDraft: loadProfileDraft,
+        saveDraft: saveProfileDraft,
+        clearDraft: clearProfileDraft,
+        connectivity: connectivityRepository,
+        onSaved: onSaved,
+      );
+
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
     if (baseUrl.isEmpty) {
@@ -358,6 +404,10 @@ class AppDependencies {
     final meetingDensity = MeetingDensityRepositoryImpl(analyticsRemote);
     final timeToSellRepository = TimeToSellRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final averageTicketRepository = AverageTicketRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final categoryPerformanceRepository =
+        CategoryPerformanceRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    // Parsed once in an isolate, then answered from memory.
+    final uniandesPrograms = UniandesProgramsRepositoryImpl();
     final recentSearchesRepository = RecentSearchesRepositoryImpl(RecentSearchesStore());
     final listingHealthRepository = ListingHealthRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final listingHealthPrefsRepository = ListingHealthPreferencesRepositoryImpl();
@@ -415,6 +465,7 @@ class AppDependencies {
     final ratingDrafts = RatingDraftRepositoryImpl(draftStore);
     final registrationDrafts = RegistrationDraftRepositoryImpl(draftStore);
     final listingDrafts = ListingDraftRepositoryImpl(draftStore, DraftPhotoStore());
+    final profileDrafts = ProfileDraftRepositoryImpl(draftStore);
     // Telemetry: the repository tells the uploader about each queued event (count kept in memory).
     final analyticsSync = AnalyticsSyncService(
       remote: AnalyticsEventRemoteDataSource(apiClient: apiClient),
@@ -469,6 +520,14 @@ class AppDependencies {
       getChatAgreement: GetChatAgreementUseCase(conversationInsights),
       getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
       getAverageTicket: GetAverageTicketUseCase(averageTicketRepository),
+      getCategoryPerformance: GetCategoryPerformanceUseCase(categoryPerformanceRepository),
+      connectivityRepository: connectivity,
+      updateProfile: UpdateProfileUseCase(authRepository),
+      getUniandesPrograms: GetUniandesProgramsUseCase(uniandesPrograms),
+      searchUniandesPrograms: SearchUniandesProgramsUseCase(uniandesPrograms),
+      loadProfileDraft: LoadProfileDraftUseCase(profileDrafts),
+      saveProfileDraft: SaveProfileDraftUseCase(profileDrafts),
+      clearProfileDraft: ClearProfileDraftUseCase(profileDrafts),
       getRecentSearches: GetRecentSearchesUseCase(recentSearchesRepository),
       saveRecentSearch: SaveRecentSearchUseCase(recentSearchesRepository),
       removeRecentSearch: RemoveRecentSearchUseCase(recentSearchesRepository),

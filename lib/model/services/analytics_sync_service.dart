@@ -67,6 +67,7 @@ class AnalyticsSyncService extends ChangeNotifier {
   bool _started = false;
   Future<void>? _init;
   int _pendingCount = 0;
+  bool _flushAgain = false;
 
   /// Whether events are being uploaded right now.
   bool get isSyncing => _isSyncing;
@@ -136,6 +137,11 @@ class AnalyticsSyncService extends ChangeNotifier {
 
   Future<void> _flushIfQueued() async {
     if (_pendingCount == 0) return;
+    if (_running) {
+      // A pass is running (it may have started offline): run one more right after it.
+      _flushAgain = true;
+      return;
+    }
     await syncNow();
   }
 
@@ -163,6 +169,10 @@ class AnalyticsSyncService extends ChangeNotifier {
     } finally {
       _running = false;
       _setSyncing(false);
+      if (_flushAgain) {
+        _flushAgain = false;
+        unawaited(_flushIfQueued());
+      }
     }
   }
 
@@ -173,7 +183,7 @@ class AnalyticsSyncService extends ChangeNotifier {
   }
 
   Future<void> _upload(String pending, String sending) async {
-    final events = await AnalyticsQueueLock.run(() => Isolate.run(() => _takeQueue(pending, sending)));
+    final events = await AnalyticsQueueLock.run(() => _takeQueueInIsolate(pending, sending));
     for (var i = 0; i < events.length; i += batchSize) {
       final batch = events.sublist(i, i + batchSize > events.length ? events.length : i + batchSize);
       try {
@@ -193,6 +203,9 @@ class AnalyticsSyncService extends ChangeNotifier {
 // Top-level, so the closures sent to the isolate capture only their arguments, never the service.
 Future<int> _countInIsolate(String pending, String sending) =>
     Isolate.run(() => _countEvents(pending) + _countEvents(sending));
+
+Future<List<AnalyticsEvent>> _takeQueueInIsolate(String pending, String sending) =>
+    Isolate.run(() => _takeQueue(pending, sending));
 
 Future<int> _returnToQueueInIsolate(String pending, String sending) =>
     Isolate.run(() => _returnToQueue(pending, sending));

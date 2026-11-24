@@ -312,7 +312,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
         final me = _appState.currentUser;
         if (me == null) return AppShell(appState: _appState);
         return EditProfileScreen(
-          appState: _appState,
+          onClose: () => _appState.navigateTo(AppScreen.profile),
           createViewModel: () => _deps.createEditProfileViewModel(
             user: me,
             onSaved: _appState.updateCurrentUser,

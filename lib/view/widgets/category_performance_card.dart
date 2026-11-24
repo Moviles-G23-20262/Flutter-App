@@ -143,6 +143,7 @@ class _CategoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final percent = (category.completionRate * 100).round();
     return Semantics(
+      container: true,
       label: '${category.displayName}: ${category.totalListings} listings, '
           '${category.completedExchanges} completed exchanges, $percent percent completed',
       excludeSemantics: true,

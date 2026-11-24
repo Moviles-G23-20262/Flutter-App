@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../../app/theme/app_theme.dart';
 import '../../model/entities/uniandes_program.dart';
 import '../../model/rules/profile_rules.dart';
-import '../../view_model/app_view_model.dart';
 import '../../view_model/edit_profile_view_model.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/offline_banner.dart';
@@ -12,12 +11,13 @@ import '../widgets/offline_banner.dart';
 /// Edit name, major and faculty. Only draws [EditProfileViewModel] and forwards input: the draft,
 /// the connection and the request all live in the view-model.
 class EditProfileScreen extends StatefulWidget {
-  final AppViewModel appState;
-
   /// Builds this screen's view-model; called once, and the screen disposes it.
   final EditProfileViewModel Function() createViewModel;
 
-  const EditProfileScreen({super.key, required this.appState, required this.createViewModel});
+  /// Leaves the screen (back, or after a successful save).
+  final VoidCallback onClose;
+
+  const EditProfileScreen({super.key, required this.createViewModel, required this.onClose});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -71,7 +71,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _close() {
     if (_vm.isSaving) return;
     // Nothing is lost: the draft stays on the phone until it is saved or discarded.
-    widget.appState.navigateTo(AppScreen.profile);
+    widget.onClose();
   }
 
   Future<void> _save() async {
@@ -82,7 +82,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     messenger
       ?..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(key: Key('profile-saved-snackbar'), content: Text('Profile updated.')));
-    widget.appState.navigateTo(AppScreen.profile);
+    widget.onClose();
   }
 
   Future<void> _discard() async {
