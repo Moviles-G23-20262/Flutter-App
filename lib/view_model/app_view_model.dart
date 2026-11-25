@@ -5,6 +5,7 @@ import '../model/entities/enums.dart';
 import '../model/entities/material_entity.dart';
 import '../model/use_cases/meetup_use_cases.dart';
 import '../model/entities/user_entity.dart';
+import '../model/entities/user_summary.dart';
 import '../model/exceptions/data_exceptions.dart';
 import 'account_view_model.dart';
 import 'average_ticket_view_model.dart';
@@ -52,6 +53,9 @@ enum AppScreen {
 
   /// Edit name, major and faculty (PATCH /users/:id).
   editProfile,
+
+  /// Public seller profile: ratings breakdown, top tags, BQ 17 benchmark & active listings.
+  sellerProfile,
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -165,6 +169,8 @@ class AppViewModel extends ChangeNotifier {
   ChatRoomEntity? _plannerRoom;
   AppScreen _scheduleReturnTo = AppScreen.profile;
   AppScreen _exchangeReturnTo = AppScreen.home;
+  UserSummary? _selectedSeller;
+  AppScreen _sellerReturnTo = AppScreen.home;
   UserEntity? _currentUser;
   bool _isLoggedIn = false;
   bool _restoringSession = true;
@@ -176,6 +182,9 @@ class AppViewModel extends ChangeNotifier {
 
   /// The order shown on the confirmation and complete-exchange screens.
   ExchangeEntity? get selectedExchange => _selectedExchange;
+
+  /// The seller whose public profile is currently open.
+  UserSummary? get selectedSeller => _selectedSeller;
 
   /// The chat the meeting planner proposes into.
   ChatRoomEntity? get plannerRoom => _plannerRoom;
@@ -275,6 +284,15 @@ class AppViewModel extends ChangeNotifier {
 
   void closeSchedule() => navigateTo(_scheduleReturnTo);
 
+  /// Opens a seller's public profile screen (Sprint 4); back returns to the caller screen.
+  void openSellerProfile(UserSummary seller) {
+    _selectedSeller = seller;
+    _sellerReturnTo = _currentScreen == AppScreen.sellerProfile ? _sellerReturnTo : _currentScreen;
+    navigateTo(AppScreen.sellerProfile);
+  }
+
+  void closeSellerProfile() => navigateTo(_sellerReturnTo);
+
   /// The Seller Hub figures that come from analytics, all requested at once. Each one keeps its
   /// own loading, saved-copy and error state, so one failing never hides the others.
   Future<void> loadSellerHubMetrics() => Future.wait<void>([
@@ -366,6 +384,7 @@ class AppViewModel extends ChangeNotifier {
     schedule.clear();
     _selectedExchange = null;
     _plannerRoom = null;
+    _selectedSeller = null;
     _currentUser = null;
     recentSearches?.load(null); // nobody signed in: nothing shown, nothing saved
     _isLoggedIn = false;

@@ -348,53 +348,89 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  UserAvatar(
-                                    initials: seller?.initials ?? '?',
-                                    size: 42,
-                                    outlined: true,
-                                  ),
-                                  const SizedBox(width: 12),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          seller?.fullName ?? 'Campus seller',
-                                          style: AppTextStyles.body(
-                                            txPrimary,
-                                            fontSize: AppTextStyles.sizeXs,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
+                                    child: Semantics(
+                                      label: seller == null
+                                          ? 'Seller'
+                                          : 'View seller profile of ${seller.fullName}',
+                                      button: seller != null,
+                                      child: GestureDetector(
+                                        key: const Key('material-detail-seller-row'),
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: seller == null
+                                            ? null
+                                            : () => widget.appState.openSellerProfile(seller),
+                                        child: Row(
                                           children: [
-                                            Icon(
-                                              Icons.star_rounded,
-                                              color: accentHi,
-                                              size: 12,
+                                            UserAvatar(
+                                              initials: seller?.initials ?? '?',
+                                              size: 42,
+                                              outlined: true,
                                             ),
-                                            const SizedBox(width: 3),
-                                            Flexible(
-                                              child: Text(
-                                                seller == null
-                                                    ? 'Seller'
-                                                    : '${seller.rating.toStringAsFixed(1)} · ${seller.major}',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: AppTextStyles.mono(
-                                                  txMuted,
-                                                  fontSize:
-                                                      AppTextStyles.size2xs,
-                                                ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Flexible(
+                                                        child: Text(
+                                                          seller?.fullName ?? 'Campus seller',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: AppTextStyles.body(
+                                                            txPrimary,
+                                                            fontSize: AppTextStyles.sizeXs,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (seller != null) ...[
+                                                        const SizedBox(width: 2),
+                                                        Icon(
+                                                          Icons.chevron_right_rounded,
+                                                          color: txMuted,
+                                                          size: 15,
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.star_rounded,
+                                                        color: accentHi,
+                                                        size: 12,
+                                                      ),
+                                                      const SizedBox(width: 3),
+                                                      Flexible(
+                                                        child: Text(
+                                                          seller == null
+                                                              ? 'Seller'
+                                                              : '${seller.rating.toStringAsFixed(1)} · ${seller.major}',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: AppTextStyles.mono(
+                                                            txMuted,
+                                                            fontSize:
+                                                                AppTextStyles.size2xs,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   if (!_isMine)
                                     GestureDetector(
                                       onTap: _messageSeller,

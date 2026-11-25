@@ -562,6 +562,8 @@ class _ListingRow extends StatelessWidget {
                 width: 58,
                 height: 58,
                 fit: BoxFit.cover,
+                memCacheWidth: CachedPhoto.thumbnailMemCacheWidth,
+                maxWidthDiskCache: CachedPhoto.thumbnailDiskCacheWidth,
               ),
             ),
           ),

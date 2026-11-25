@@ -35,6 +35,7 @@ import 'view/screens/schedule_screen.dart';
 import 'view/screens/favorites_screen.dart';
 import 'view/screens/notifications_screen.dart';
 import 'view/screens/edit_profile_screen.dart';
+import 'view/screens/seller_profile_screen.dart';
 import 'view/widgets/common_widgets.dart';
 
 Future<void> main() async {
@@ -160,6 +161,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     super.didHaveMemoryPressure();
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+    _deps.getSellerProfile.clearCache();
   }
 
   Future<void> _restoreSession() async {
@@ -323,6 +325,17 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       case AppScreen.messages:
       case AppScreen.profile:
         return AppShell(appState: _appState);
+      case AppScreen.sellerProfile:
+        final seller = _appState.selectedSeller;
+        if (seller == null) return AppShell(appState: _appState);
+        return SellerProfileScreen(
+          onClose: _appState.closeSellerProfile,
+          onOpenMaterial: _appState.openMaterialDetail,
+          createViewModel: () => _deps.createSellerProfileViewModel(
+            seller: seller,
+            knownMaterials: () => _appState.marketplace.materials,
+          ),
+        );
     }
   }
 }
