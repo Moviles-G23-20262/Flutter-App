@@ -23,6 +23,15 @@ abstract class OutboxSender {
   Future<void> sendAction(PendingAction action);
 }
 
+/// Live state of [OutboxSyncService], broadcast over [OutboxSyncService.syncStatusStream]
+/// so screens like ChatView can reactively show "Syncing…" without polling.
+enum OutboxSyncStatus {
+  idle,
+  syncing,
+  waitingForWifi,
+  retrying,
+}
+
 /// How one delivery attempt ended.
 enum SyncOutcome {
   /// Confirmed by the server; removed from the outbox.
@@ -95,8 +104,24 @@ class OutboxSyncService {
 
   bool _waitingForWifi = false;
   final StreamController<bool> _waitingForWifiController = StreamController<bool>.broadcast();
+  OutboxSyncStatus _syncStatus = OutboxSyncStatus.idle;
+  final StreamController<OutboxSyncStatus> _syncStatusController = StreamController<OutboxSyncStatus>.broadcast();
 
   bool get isFlushing => _running != null;
+
+  /// Current outbox sync status (for immediate read + broadcast stream).
+  OutboxSyncStatus get syncStatus => _syncStatus;
+
+  /// Reactive broadcast stream of outbox sync status transitions (Sprint 3 multi-threading - Sabrina).
+  Stream<OutboxSyncStatus> get syncStatusStream => _syncStatusController.stream;
+
+  void _setSyncStatus(OutboxSyncStatus next) {
+    if (_syncStatus == next) return;
+    _syncStatus = next;
+    if (!_syncStatusController.isClosed) {
+      _syncStatusController.add(next);
+    }
+  }
 
   /// Whether an automatic retry is scheduled.
   bool get retryScheduled => _retryTimer != null;
@@ -112,6 +137,11 @@ class OutboxSyncService {
     _waitingForWifi = value;
     if (!_waitingForWifiController.isClosed) {
       _waitingForWifiController.add(value);
+    }
+    if (value) {
+      _setSyncStatus(OutboxSyncStatus.waitingForWifi);
+    } else if (_syncStatus == OutboxSyncStatus.waitingForWifi) {
+      _setSyncStatus(OutboxSyncStatus.idle);
     }
   }
 
@@ -172,6 +202,7 @@ class OutboxSyncService {
     _reconnectedDuringFlush = false;
     _justReconnected = false;
     _setWaitingForWifi(false);
+    _setSyncStatus(OutboxSyncStatus.idle);
   }
 
   Future<void> _refreshWaitingState() async {
@@ -281,10 +312,16 @@ class OutboxSyncService {
       return true;
     }
     _setWaitingForWifi(false);
+    _setSyncStatus(OutboxSyncStatus.syncing);
     final delivered = await _deliverAll(ownerId);
     if (!delivered && !overMobileData && await _hasDeliverableWaitingItems(ownerId) && await _isBlockedOnMobileData(ownerId)) {
       _setWaitingForWifi(true);
       return true;
+    }
+    if (delivered) {
+      _setSyncStatus(OutboxSyncStatus.idle);
+    } else {
+      _setSyncStatus(OutboxSyncStatus.retrying);
     }
     await _refreshWaitingState();
     return delivered;
@@ -421,5 +458,6 @@ class OutboxSyncService {
   void dispose() {
     stop();
     _waitingForWifiController.close();
+    _syncStatusController.close();
   }
 }

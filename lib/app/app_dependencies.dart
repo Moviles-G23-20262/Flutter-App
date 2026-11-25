@@ -123,6 +123,7 @@ class AppDependencies {
   final LoadAllowMobileDataUseCase loadAllowMobileData;
   final SaveAllowMobileDataUseCase saveAllowMobileData;
   final WatchWaitingForWifiUseCase watchWaitingForWifi;
+  final WatchOutboxSyncStatusUseCase watchOutboxSyncStatus;
 
   /// Local storage for offline use: saved server answers and the outbox (sqflite).
   final ResponseCache responseCache;
@@ -287,6 +288,7 @@ class AppDependencies {
     required this.loadAllowMobileData,
     required this.saveAllowMobileData,
     required this.watchWaitingForWifi,
+    required this.watchOutboxSyncStatus,
     required this.responseCache,
     required this.outbox,
     required this.outboxSync,
@@ -555,6 +557,7 @@ class AppDependencies {
       loadAllowMobileData: LoadAllowMobileDataUseCase(mobileDataPreferences),
       saveAllowMobileData: SaveAllowMobileDataUseCase(mobileDataPreferences),
       watchWaitingForWifi: WatchWaitingForWifiUseCase(outboxSync),
+      watchOutboxSyncStatus: WatchOutboxSyncStatusUseCase(outboxSync),
       responseCache: responseCache,
       outbox: outbox,
       outboxSync: outboxSync,

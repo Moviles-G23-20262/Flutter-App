@@ -10,6 +10,8 @@ import '../model/exceptions/data_exceptions.dart';
 import '../model/use_cases/conversation_insight_use_case.dart';
 import '../model/use_cases/marketplace_use_cases.dart';
 import '../model/use_cases/meetup_use_cases.dart';
+import '../model/services/outbox_sync_service.dart';
+import '../model/use_cases/outbox_use_cases.dart';
 import '../model/use_cases/pending_message_use_cases.dart';
 import '../model/rules/client_id.dart';
 import '../model/use_cases/track_event_use_case.dart';
@@ -45,6 +47,7 @@ class ChatViewModel extends ChangeNotifier {
   final DeletePendingMessageUseCase? deletePendingMessage;
   final GetPendingMessagesUseCase? getPendingMessages;
   final WatchPendingCountUseCase? watchPendingCount;
+  final WatchOutboxSyncStatusUseCase? watchSyncStatus;
   final GetChatAgreementUseCase getChatAgreement;
   final TrackEventUseCase trackEvent;
 
@@ -65,6 +68,7 @@ class ChatViewModel extends ChangeNotifier {
     this.deletePendingMessage,
     this.getPendingMessages,
     this.watchPendingCount,
+    this.watchSyncStatus,
     required this.getChatAgreement,
     required this.trackEvent,
     this.onMeetingConfirmed,
@@ -125,6 +129,10 @@ class ChatViewModel extends ChangeNotifier {
   ConversationInsight? get insight => _insight;
 
   Stream<int> get pendingCountStream => watchPendingCount?.execute() ?? const Stream.empty();
+
+  /// Broadcast stream of live outbox sync status (`idle`, `syncing`, `waitingForWifi`, `retrying`).
+  Stream<OutboxSyncStatus> get syncStatusStream => watchSyncStatus?.execute() ?? const Stream.empty();
+  OutboxSyncStatus get currentSyncStatus => watchSyncStatus?.current ?? OutboxSyncStatus.idle;
 
   /// Loads the BQ4 insight once. It is a nice-to-have, so any failure just falls back to cache or hides.
   Future<void> loadInsight({bool force = false}) async {

@@ -34,3 +34,12 @@ class WatchWaitingForWifiUseCase {
   bool get current => sync.isWaitingForWifi;
   Stream<bool> execute() => sync.waitingForWifiStream;
 }
+
+/// Observes live [OutboxSyncStatus] transitions (`idle`, `syncing`, `waitingForWifi`, `retrying`).
+class WatchOutboxSyncStatusUseCase {
+  final OutboxSyncService sync;
+  WatchOutboxSyncStatusUseCase(this.sync);
+
+  OutboxSyncStatus get current => sync.syncStatus;
+  Stream<OutboxSyncStatus> execute() => sync.syncStatusStream;
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/formatters.dart';
 import '../../app/theme/app_theme.dart';
+import '../../core/isolates/home_feed_isolate.dart';
 import '../widgets/appearance_card.dart';
 import '../widgets/async_views.dart';
 import '../widgets/cached_photo.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MaterialEntity> _cachedOffers = const [];
   List<MaterialEntity> _cachedRecommended = const [];
   List<_FeaturedSeller> _cachedSellers = const [];
+  int _sellerComputeGeneration = 0;
 
   @override
   void dispose() {
@@ -44,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final sourceChanged = !identical(available, _cachedAvailable);
     if (sourceChanged) {
       _cachedSellers = _computeFeaturedSellers(available);
+      _scheduleBackgroundSellerRanking(available);
     }
     if (sourceChanged || _cachedCategory != activeCategory) {
       final offers = activeCategory == 'All'
@@ -106,6 +109,21 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  /// Runs featured seller ranking off the UI thread via Flutter's `compute()` isolate for large
+  /// catalogs, dropping stale results if the catalog changes while the isolate is running.
+  void _scheduleBackgroundSellerRanking(List<MaterialEntity> available) {
+    if (available.length < 25) return;
+    final gen = ++_sellerComputeGeneration;
+    computeHomeFeedProjection(available).then((projection) {
+      if (!mounted || gen != _sellerComputeGeneration) return;
+      setState(() {
+        _cachedSellers = [
+          for (final item in projection.featuredSellers) _FeaturedSeller(item.seller, item.items),
+        ];
+      });
+    }).catchError((Object _) {});
   }
 
   /// Sellers with the most available items, computed from the listings themselves.

@@ -84,6 +84,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       deletePendingMessage: _deps.deletePendingMessage,
       getPendingMessages: _deps.getPendingMessages,
       watchPendingCount: _deps.watchPendingCount,
+      watchSyncStatus: _deps.watchOutboxSyncStatus,
       getChatAgreement: _deps.getChatAgreement,
       trackEvent: _deps.trackEvent,
       onMeetingConfirmed: _deps.analyticsSync.syncNow,

@@ -5,6 +5,7 @@ import '../../model/entities/chat_room_entity.dart';
 import '../../model/entities/exchange_entity.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/meetup_entities.dart';
+import '../../model/services/outbox_sync_service.dart';
 import '../../view_model/app_view_model.dart';
 import '../../view_model/chat_view_model.dart';
 import '../widgets/async_views.dart';
@@ -220,6 +221,35 @@ class _ChatViewState extends State<ChatView> {
                           style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.sizeXs)),
                   ],
                 ),
+              ),
+              StreamBuilder<OutboxSyncStatus>(
+                stream: chats.syncStatusStream,
+                initialData: chats.currentSyncStatus,
+                builder: (context, syncSnap) {
+                  final syncing = syncSnap.data == OutboxSyncStatus.syncing;
+                  if (!syncing) return const SizedBox.shrink();
+                  return Container(
+                    key: const Key('chat-syncing-pill'),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: accentHi.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(strokeWidth: 1.6, color: accentHi),
+                        ),
+                        const SizedBox(width: 4),
+                        Text('Syncing…', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: accentHi)),
+                      ],
+                    ),
+                  );
+                },
               ),
               StreamBuilder<int>(
                 stream: chats.pendingCountStream,
