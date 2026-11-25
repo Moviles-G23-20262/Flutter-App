@@ -79,7 +79,13 @@ import '../model/repositories/impl/category_performance_repository_impl.dart';
 import '../model/repositories/impl/uniandes_programs_repository_impl.dart';
 import '../model/use_cases/get_category_performance_use_case.dart';
 import '../model/use_cases/profile_use_cases.dart';
+import '../model/data_sources/local/seller_profile_store.dart';
+import '../model/entities/user_summary.dart';
+import '../model/repositories/impl/seller_profile_repository_impl.dart';
+import '../model/repositories/impl/seller_reputation_repository_impl.dart';
+import '../model/use_cases/seller_profile_use_cases.dart';
 import '../view_model/edit_profile_view_model.dart';
+import '../view_model/seller_profile_view_model.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -200,6 +206,10 @@ class AppDependencies {
   /// BQ6: listings and completed exchanges per category, for the Seller Hub.
   final GetCategoryPerformanceUseCase getCategoryPerformance;
 
+  /// Sprint 4 Seller Profile + BQ17 campus reputation benchmark.
+  final GetSellerProfileUseCase getSellerProfile;
+  final GetSellerReputationUseCase getSellerReputation;
+
   /// The device's network state, for view-models that follow it themselves.
   final ConnectivityRepository connectivityRepository;
 
@@ -257,6 +267,8 @@ class AppDependencies {
     required this.getTimeToSell,
     required this.getAverageTicket,
     required this.getCategoryPerformance,
+    required this.getSellerProfile,
+    required this.getSellerReputation,
     required this.connectivityRepository,
     required this.updateProfile,
     required this.getUniandesPrograms,
@@ -375,6 +387,18 @@ class AppDependencies {
         onSaved: onSaved,
       );
 
+  /// A fresh ViewModel for the Seller Profile screen (Sprint 4); owned and disposed by the screen.
+  SellerProfileViewModel createSellerProfileViewModel({
+    required UserSummary seller,
+    List<MaterialEntity> Function()? knownMaterials,
+  }) =>
+      SellerProfileViewModel(
+        initialSeller: seller,
+        getSellerProfile: getSellerProfile,
+        connectivity: connectivityRepository,
+        knownMaterials: knownMaterials,
+      );
+
   factory AppDependencies.create() {
     const baseUrl = String.fromEnvironment('API_BASE_URL');
     if (baseUrl.isEmpty) {
@@ -406,6 +430,9 @@ class AppDependencies {
     final averageTicketRepository = AverageTicketRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final categoryPerformanceRepository =
         CategoryPerformanceRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final sellerReputationRepository =
+        SellerReputationRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final sellerProfileStore = SellerProfileStore(database);
     // Parsed once in an isolate, then answered from memory.
     final uniandesPrograms = UniandesProgramsRepositoryImpl();
     final recentSearchesRepository = RecentSearchesRepositoryImpl(RecentSearchesStore());
@@ -424,6 +451,11 @@ class AppDependencies {
     final biometrics = BiometricAuthService();
 
     final marketplaceRemote = MarketplaceRemoteDataSourceImpl(apiClient: apiClient);
+    final sellerProfileRepository = SellerProfileRepositoryImpl(
+      remote: marketplaceRemote,
+      store: sellerProfileStore,
+      reputationRepository: sellerReputationRepository,
+    );
     final materials = MaterialRepositoryImpl(
       marketplaceRemote,
       cache: responseCache,
@@ -521,6 +553,8 @@ class AppDependencies {
       getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
       getAverageTicket: GetAverageTicketUseCase(averageTicketRepository),
       getCategoryPerformance: GetCategoryPerformanceUseCase(categoryPerformanceRepository),
+      getSellerProfile: GetSellerProfileUseCase(sellerProfileRepository),
+      getSellerReputation: GetSellerReputationUseCase(sellerReputationRepository),
       connectivityRepository: connectivity,
       updateProfile: UpdateProfileUseCase(authRepository),
       getUniandesPrograms: GetUniandesProgramsUseCase(uniandesPrograms),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import '../model/entities/material_entity.dart';
@@ -50,6 +51,7 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<MaterialEntity> _materials = const [];
   List<MaterialEntity>? _availableMaterialsCache;
   List<WishlistItemEntity> _wishlist = const [];
+  Set<String>? _wishlistIdsCache;
   DateTime? _wishlistSavedAt;
   DateTime? _materialsSavedAt;
   bool _loading = false;
@@ -65,6 +67,11 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<MaterialEntity> get availableMaterials =>
       _availableMaterialsCache ??= List.unmodifiable(_materials.where((m) => m.isAvailable));
   List<WishlistItemEntity> get wishlist => _wishlist;
+
+  void _setWishlist(List<WishlistItemEntity> items) {
+    _wishlist = items;
+    _wishlistIdsCache = null;
+  }
 
   /// Set while the favorites shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get wishlistSavedAt => _wishlistSavedAt;
@@ -127,7 +134,9 @@ class MarketplaceViewModel extends ChangeNotifier {
   List<MaterialEntity> listingsOf(String sellerId) =>
       _materials.where((m) => m.sellerId == sellerId).toList(growable: false);
 
-  bool isFavorite(String materialId) => _wishlist.any((w) => w.materialId == materialId);
+  /// O(1) favorite membership lookup backed by a lazily materialized [Set<String>] (MO4).
+  bool isFavorite(String materialId) =>
+      (_wishlistIdsCache ??= {for (final w in _wishlist) w.materialId}).contains(materialId);
 
   Future<void> load() async {
     final generation = _generation;
@@ -166,7 +175,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     try {
       final result = await getWishlist.execute();
       if (generation != _generation) return;
-      _wishlist = result.items;
+      _setWishlist(result.items);
       _wishlistSavedAt = result.savedAt;
     } on DataException catch (e) {
       if (generation == _generation) _error ??= e.message;
@@ -216,9 +225,9 @@ class MarketplaceViewModel extends ChangeNotifier {
 
     // Optimistic: toggle right away.
     if (existing != null) {
-      _wishlist = _wishlist.where((w) => w.materialId != materialId).toList(growable: false);
+      _setWishlist(_wishlist.where((w) => w.materialId != materialId).toList(growable: false));
     } else {
-      _wishlist = [
+      _setWishlist([
         WishlistItemEntity(
           id: '$_placeholderPrefix$materialId',
           userId: '',
@@ -226,7 +235,7 @@ class MarketplaceViewModel extends ChangeNotifier {
           createdAt: DateTime.now(),
         ),
         ..._wishlist,
-      ];
+      ]);
     }
     notifyListeners();
 
@@ -238,7 +247,7 @@ class MarketplaceViewModel extends ChangeNotifier {
       } else {
         final created = await addToWishlist.execute(materialId);
         if (generation == _generation) {
-          _wishlist = [created, ..._wishlist.where((w) => w.materialId != materialId)];
+          _setWishlist([created, ..._wishlist.where((w) => w.materialId != materialId)]);
           notifyListeners();
         }
       }
@@ -247,9 +256,11 @@ class MarketplaceViewModel extends ChangeNotifier {
       if (generation == _generation) {
         // Undo only this heart. Restoring a snapshot taken before the tap would also undo a
         // favorite saved meanwhile, and bring its placeholder back.
-        _wishlist = existing != null
-            ? [existing, ..._wishlist.where((w) => w.materialId != materialId)]
-            : _wishlist.where((w) => w.materialId != materialId).toList(growable: false);
+        _setWishlist(
+          existing != null
+              ? [existing, ..._wishlist.where((w) => w.materialId != materialId)]
+              : _wishlist.where((w) => w.materialId != materialId).toList(growable: false),
+        );
         notifyListeners();
       }
       return e.message;
@@ -266,29 +277,70 @@ class MarketplaceViewModel extends ChangeNotifier {
   double _maxSearchPrice = 200;
   SortStrategy _searchSort = const RelevanceSortStrategy();
 
+  // MO4 memoization state for [filteredSearchResults].
+  List<MaterialEntity>? _filteredSource;
+  String? _filteredQuery;
+  MaterialCategoryEnum? _filteredCategory;
+  MaterialConditionEnum? _filteredCondition;
+  double? _filteredMaxPrice;
+  String? _filteredSortId;
+  List<MaterialEntity> _filteredResultsCache = const [];
+  int _searchFilterComputations = 0;
+
+  /// Counts how many times [filteredSearchResults] actually executed a filter + sort pass (MO4).
+  @visibleForTesting
+  int get searchFilterComputations => _searchFilterComputations;
+
   String get searchQuery => _searchQuery;
   MaterialCategoryEnum? get searchCategory => _searchCategory;
   MaterialConditionEnum? get searchCondition => _searchCondition;
   double get maxSearchPrice => _maxSearchPrice;
   SortStrategy get searchSort => _searchSort;
 
+  /// Memoized filter & sort over [_materials] (MO4). Re-runs only when the backing list or
+  /// any search filter/sort input changes, avoiding redundant allocations on unrelated rebuilds.
   List<MaterialEntity> get filteredSearchResults {
-    final list = _materials.where((m) {
-      if (!m.isAvailable) return false;
-      if (_searchCategory != null && m.category != _searchCategory) return false;
-      if (_searchCondition != null && m.condition != _searchCondition) return false;
-      if (m.price > _maxSearchPrice) return false;
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final matchTitle = m.title.toLowerCase().contains(q);
-        final matchDesc  = m.description.toLowerCase().contains(q);
-        final matchCourse = m.courseCode?.toLowerCase().contains(q) ?? false;
-        if (!matchTitle && !matchDesc && !matchCourse) return false;
-      }
-      return true;
-    }).toList();
+    final sortId = _searchSort.id;
+    if (identical(_materials, _filteredSource) &&
+        _filteredQuery == _searchQuery &&
+        _filteredCategory == _searchCategory &&
+        _filteredCondition == _searchCondition &&
+        _filteredMaxPrice == _maxSearchPrice &&
+        _filteredSortId == sortId) {
+      return _filteredResultsCache;
+    }
 
-    return _searchSort.sort(list);
+    developer.Timeline.startSync('Marketplace.filterSearch');
+    try {
+      _searchFilterComputations++;
+      final hasQuery = _searchQuery.isNotEmpty;
+      final q = hasQuery ? _searchQuery.toLowerCase() : '';
+      final list = <MaterialEntity>[];
+      for (var i = 0; i < _materials.length; i++) {
+        final m = _materials[i];
+        if (!m.isAvailable) continue;
+        if (_searchCategory != null && m.category != _searchCategory) continue;
+        if (_searchCondition != null && m.condition != _searchCondition) continue;
+        if (m.price > _maxSearchPrice) continue;
+        if (hasQuery) {
+          final matchTitle = m.title.toLowerCase().contains(q);
+          final matchDesc = m.description.toLowerCase().contains(q);
+          final matchCourse = m.courseCode?.toLowerCase().contains(q) ?? false;
+          if (!matchTitle && !matchDesc && !matchCourse) continue;
+        }
+        list.add(m);
+      }
+
+      _filteredSource = _materials;
+      _filteredQuery = _searchQuery;
+      _filteredCategory = _searchCategory;
+      _filteredCondition = _searchCondition;
+      _filteredMaxPrice = _maxSearchPrice;
+      _filteredSortId = sortId;
+      return _filteredResultsCache = List.unmodifiable(_searchSort.sort(list));
+    } finally {
+      developer.Timeline.finishSync();
+    }
   }
 
   void setSearchQuery(String query) {
@@ -353,7 +405,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _discarded.clear();
     _materials = const [];
     _availableMaterialsCache = null;
-    _wishlist = const [];
+    _setWishlist(const []);
     _wishlistSavedAt = null;
     _materialsSavedAt = null;
     _loading = false;

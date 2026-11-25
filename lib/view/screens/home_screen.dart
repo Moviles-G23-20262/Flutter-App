@@ -486,6 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     initials: sellers[i].seller.initials,
                                     rating: sellers[i].seller.rating,
                                     items: sellers[i].items,
+                                    onTap: () => widget.appState.openSellerProfile(sellers[i].seller),
                                   ),
                                 ),
                               ),
@@ -614,6 +615,8 @@ class _ProductCard extends StatelessWidget {
                 width: width.isFinite ? width : double.infinity,
                 height: 110,
                 fit: BoxFit.cover,
+                memCacheWidth: CachedPhoto.thumbnailMemCacheWidth,
+                maxWidthDiskCache: CachedPhoto.thumbnailDiskCacheWidth,
               ),
             ),
             // Content
@@ -691,6 +694,8 @@ class _RecommendedRow extends StatelessWidget {
                 width: 68,
                 height: 68,
                 fit: BoxFit.cover,
+                memCacheWidth: CachedPhoto.thumbnailMemCacheWidth,
+                maxWidthDiskCache: CachedPhoto.thumbnailDiskCacheWidth,
               ),
             ),
           ),
@@ -755,12 +760,14 @@ class _SellerCard extends StatelessWidget {
   final String initials;
   final double rating;
   final int items;
+  final VoidCallback? onTap;
 
   const _SellerCard({
     required this.name,
     required this.initials,
     required this.rating,
     required this.items,
+    this.onTap,
   });
 
   @override
@@ -769,8 +776,12 @@ class _SellerCard extends StatelessWidget {
     final txPrimary = brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final txMuted   = brightness == Brightness.dark ? AppColors.darkTextMuted   : AppColors.lightTextMuted;
 
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Semantics(
+      label: 'View seller profile of $name',
+      button: true,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -782,6 +793,7 @@ class _SellerCard extends StatelessWidget {
           StarRating(rating: rating),
           Text('$items items', style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
         ],
+      ),
       ),
     );
   }

@@ -6,16 +6,18 @@ import 'package:sqflite/sqflite.dart';
 /// - `cached_responses`: the last server answer per user and screen, for offline reading.
 /// - `pending_messages`, `pending_listings`, `pending_actions`: the outbox. Actions saved on the
 ///   phone first and sent to the server later by the sync service.
+/// - `seller_profiles`: visited seller profile snapshots, pruned to the 30 most recent.
 ///
 /// Every row stores its `owner_id`, so two accounts on the same phone never see or send each
 /// other's data.
 class AppDatabase {
   static const String fileName = 'campus_swap.db';
-  ///
+
   /// 1: cached_responses, pending_messages, pending_listings.
   /// 2: pending_actions (exchange completion, rating, meeting proposal).
   /// 3: pending_listings.uploaded_urls (photos that already reached the server).
-  static const int version = 3;
+  /// 4: seller_profiles (cached seller profiles, pruned to 30 most recent).
+  static const int version = 4;
 
   final Future<Database> Function() _open;
   Future<Database>? _database;
@@ -87,6 +89,7 @@ class AppDatabase {
       ..execute('CREATE INDEX idx_pending_messages_owner ON pending_messages (owner_id, created_at)')
       ..execute('CREATE INDEX idx_pending_listings_owner ON pending_listings (owner_id, created_at)');
     _createPendingActions(batch);
+    _createSellerProfiles(batch);
     await batch.commit(noResult: true);
   }
 
@@ -105,12 +108,22 @@ class AppDatabase {
       )''')
     ..execute('CREATE INDEX idx_pending_actions_owner ON pending_actions (owner_id, created_at)');
 
+  static void _createSellerProfiles(Batch batch) => batch
+    ..execute('''
+      CREATE TABLE IF NOT EXISTS seller_profiles (
+        seller_id TEXT PRIMARY KEY,
+        body TEXT NOT NULL,
+        saved_at INTEGER NOT NULL
+      )''')
+    ..execute('CREATE INDEX IF NOT EXISTS idx_seller_profiles_saved_at ON seller_profiles (saved_at DESC)');
+
   /// Runs every step between the installed schema and [version], in order, so a phone that skips
   /// an app update still ends up with the newest schema. Queued rows and saved copies are kept.
   static Future<void> _upgrade(Database db, int from, int to) async {
     final batch = db.batch();
     if (from < 2) _createPendingActions(batch);
     if (from < 3) batch.execute("ALTER TABLE pending_listings ADD COLUMN uploaded_urls TEXT NOT NULL DEFAULT '[]'");
+    if (from < 4) _createSellerProfiles(batch);
     await batch.commit(noResult: true);
   }
 }

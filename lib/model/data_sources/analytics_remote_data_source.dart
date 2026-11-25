@@ -7,10 +7,12 @@ import '../dto/conversation_insight_model.dart';
 import '../dto/dead_listings_model.dart';
 import '../dto/meeting_point_density_model.dart';
 import '../dto/price_stats_model.dart';
+import '../dto/seller_reputation_model.dart';
 import '../dto/time_to_sell_model.dart';
 import '../entities/category_performance.dart';
 import '../entities/meeting_point_density.dart';
 import '../entities/price_stats.dart';
+import '../entities/seller_reputation.dart';
 
 /// Talks to the Django analytics service (a different base URL than the NestJS API).
 class AnalyticsRemoteDataSource {
@@ -72,5 +74,11 @@ class AnalyticsRemoteDataSource {
     final query = Uri(queryParameters: params).query;
     final json = await apiClient.get('/analytics/dead-listings/?$query');
     return parseDeadListingsInBackground(json as Map<String, dynamic>);
+  }
+
+  /// BQ17: Seller reputation (star rating & review volume) vs buyer interest and time to sell.
+  Future<SellerReputationInsight> getSellerReputation() async {
+    final json = await apiClient.get('/analytics/seller-reputation/');
+    return SellerReputationModel.fromJson(json);
   }
 }

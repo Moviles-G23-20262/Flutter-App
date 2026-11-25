@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
@@ -12,9 +14,14 @@ import '../../core/cache/listing_image_cache_manager.dart';
 ///
 /// A photo is usually shown much smaller than it was uploaded. By default the decode size follows
 /// the widget's size and the device pixel ratio. [memCacheWidth] and [maxWidthDiskCache] (both in
-/// pixels, both optional) set the limits explicitly: the image is resized before it is kept in the
-/// memory cache and in the disk cache, so thumbnails do not hold full-size bitmaps.
+/// pixels, both optional) set the limits explicitly — feed thumbnails share
+/// [thumbnailMemCacheWidth] (360 px) and [thumbnailDiskCacheWidth] (720 px) (MO5).
 class CachedPhoto extends StatelessWidget {
+  /// Shared decode & disk-cache limits for feed thumbnails across Home, Favorites,
+  /// Seller Hub, and Seller Profile (MO5).
+  static const int thumbnailMemCacheWidth = 360;
+  static const int thumbnailDiskCacheWidth = 720;
+
   final String? imageUrl;
   final String? category;
   final double? width;
@@ -22,7 +29,7 @@ class CachedPhoto extends StatelessWidget {
   final BoxFit fit;
   final BorderRadius? borderRadius;
 
-  /// Width in pixels the decoded image is limited to in the memory cache; null keeps it as is.
+  /// Width in pixels the decoded image is limited to in the memory cache; null follows layout × DPR.
   final int? memCacheWidth;
 
   /// Width in pixels the image file is limited to in the disk cache; null keeps it as is.
@@ -83,27 +90,45 @@ class CachedPhoto extends StatelessWidget {
     return child;
   }
 
+  /// Exposed for unit tests & micro-optimization benchmarks (MO5).
+  @visibleForTesting
+  static (int?, int?) resolveMemCacheSizeForTest({
+    required double? logicalWidth,
+    required double? logicalHeight,
+    required double dpr,
+  }) =>
+      _resolveMemCacheSize(
+        logicalWidth: logicalWidth,
+        logicalHeight: logicalHeight,
+        dpr: dpr,
+      );
+
   static (int?, int?) _resolveMemCacheSize({
     // Photo cache - Sabrina
-    // CachedPhoto uses a Cache-then-Network 2-level strategy (Flutter RAM ImageCache → cached_network_image disk cache). 
-    //It calculates memCacheWidth from widget dimensions × devicePixelRatio so thumbnails never blow up RAM, and renders a 
-    //category icon placeholder if an uncached photo fails offline
+    // CachedPhoto uses a Cache-then-Network 2-level strategy (Flutter RAM ImageCache → cached_network_image disk cache).
+    // It calculates memCacheWidth from widget dimensions × devicePixelRatio so thumbnails never blow up RAM, and renders a
+    // category icon placeholder if an uncached photo fails offline
     required double? logicalWidth,
     required double? logicalHeight,
     required double dpr,
   }) {
-    final pxW = (logicalWidth != null && logicalWidth.isFinite && logicalWidth > 0)
-        ? (logicalWidth * dpr).round().clamp(1, _maxDecodeDimension)
-        : null;
-    final pxH = (logicalHeight != null && logicalHeight.isFinite && logicalHeight > 0)
-        ? (logicalHeight * dpr).round().clamp(1, _maxDecodeDimension)
-        : null;
-    if (pxW == null && pxH == null) return (null, null);
-    // Pass at most one decode bound so ResizeImage preserves the photo's aspect ratio.
-    if (pxW != null && (pxH == null || pxW >= pxH)) {
-      return (pxW, null);
+    developer.Timeline.startSync('CachedPhoto.resolveDecodeBounds');
+    try {
+      final pxW = (logicalWidth != null && logicalWidth.isFinite && logicalWidth > 0)
+          ? (logicalWidth * dpr).round().clamp(1, _maxDecodeDimension)
+          : null;
+      final pxH = (logicalHeight != null && logicalHeight.isFinite && logicalHeight > 0)
+          ? (logicalHeight * dpr).round().clamp(1, _maxDecodeDimension)
+          : null;
+      if (pxW == null && pxH == null) return (null, null);
+      // Pass at most one decode bound so ResizeImage preserves the photo's aspect ratio.
+      if (pxW != null && (pxH == null || pxW >= pxH)) {
+        return (pxW, null);
+      }
+      return (null, pxH);
+    } finally {
+      developer.Timeline.finishSync();
     }
-    return (null, pxH);
   }
 
   /// [autoWidth] / [autoHeight] are the decode size worked out from the layout. An explicit
