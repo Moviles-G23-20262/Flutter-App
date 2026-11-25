@@ -26,7 +26,7 @@ enum ExchangeStatusEnum {
 }
 
 /// An order for a [MaterialEntity]: placed by the buyer, completed after they meet
-/// on campus and the buyer checks the item, or cancelled by either side.
+/// on campus and both buyer and seller confirm, or cancelled by either side.
 @immutable
 class ExchangeEntity {
   /// Unique identifier (UUID).
@@ -52,7 +52,13 @@ class ExchangeEntity {
   /// When the order was placed.
   final DateTime? createdAt;
 
-  /// When the buyer confirmed the exchange. `null` while pending or if cancelled.
+  /// When the buyer confirmed receiving the item.
+  final DateTime? buyerConfirmedAt;
+
+  /// When the seller confirmed handing over the item.
+  final DateTime? sellerConfirmedAt;
+
+  /// When both sides confirmed and the exchange completed. `null` while pending or if cancelled.
   final DateTime? completedAt;
 
   /// The condition the buyer says they received.
@@ -84,6 +90,8 @@ class ExchangeEntity {
     required this.price,
     required this.status,
     this.createdAt,
+    this.buyerConfirmedAt,
+    this.sellerConfirmedAt,
     this.completedAt,
     this.receivedCondition,
     this.meetingPointId,
@@ -105,6 +113,22 @@ class ExchangeEntity {
   bool get isPending => status == ExchangeStatusEnum.PENDING;
 
   bool get isCompleted => status == ExchangeStatusEnum.COMPLETED;
+
+  /// Whether [myId] has already confirmed their half of the exchange.
+  bool hasConfirmed(String myId) {
+    if (isCompleted) return true;
+    if (myId == buyerId) return buyerConfirmedAt != null;
+    if (myId == sellerId) return sellerConfirmedAt != null;
+    return false;
+  }
+
+  /// Whether the other side has already confirmed their half of the exchange.
+  bool otherHasConfirmed(String myId) {
+    if (isCompleted) return true;
+    if (myId == buyerId) return sellerConfirmedAt != null;
+    if (myId == sellerId) return buyerConfirmedAt != null;
+    return false;
+  }
 
   /// Returns `true` when a geo-coordinate meeting point has been specified.
   bool get hasMeetingLocation => lat != null && lng != null;

@@ -95,6 +95,8 @@ ExchangeEntity exchangeFromJson(Json json) => ExchangeEntity(
       price: _toDouble(json['price']),
       status: ExchangeStatusEnum.values.byName(json['status'] as String),
       createdAt: _optionalDate(json['createdAt']),
+      buyerConfirmedAt: _optionalDate(json['buyerConfirmedAt']),
+      sellerConfirmedAt: _optionalDate(json['sellerConfirmedAt']),
       completedAt: _optionalDate(json['completedAt']),
       receivedCondition: json['receivedCondition'] == null
           ? null

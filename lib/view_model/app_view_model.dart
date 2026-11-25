@@ -284,8 +284,17 @@ class AppViewModel extends ChangeNotifier {
   /// The Seller Hub figures that come from analytics, all requested at once. Each one keeps its
   /// own loading, saved-copy and error state, so one failing never hides the others.
   Future<void> loadSellerHubMetrics() => Future.wait<void>([
+        marketplace.refreshTimeToSell(),
         if (averageTicket != null) averageTicket!.load(force: true),
         if (categoryPerformance != null) categoryPerformance!.load(force: true),
+      ]);
+
+  /// Refreshes listings, exchanges and all Seller Hub analytics (BQ 11, BQ 15, BQ 6) right after
+  /// an exchange is confirmed/completed so live numbers reflect the new sale immediately.
+  Future<void> onSaleCompleted() => Future.wait<void>([
+        marketplace.load(),
+        account.load(),
+        loadSellerHubMetrics(),
       ]);
 
   // ── Profile ───────────────────────────────────────────────────────────────

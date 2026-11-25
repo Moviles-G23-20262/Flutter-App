@@ -53,15 +53,19 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    final completing = _vm.needsCheck;
+    final completing = _vm.needsCheck || _vm.needsSellerConfirmation;
     final other = _vm.otherFirstName;
     final outcome = await _vm.submit();
     if (!mounted) return;
     switch (outcome) {
       case ExchangeSubmitOutcome.sent:
         // The listing is sold now.
-        if (completing) widget.appState.marketplace.load();
-        _showMessage(completing ? 'Exchange completed. Thanks for rating $other!' : 'Thanks for rating $other!');
+        if (completing) widget.appState.onSaleCompleted();
+        _showMessage(completing
+            ? (_vm.exchange.isCompleted
+                ? 'Exchange completed. Thanks for rating $other!'
+                : 'Confirmed! Waiting for $other to confirm so the sale completes.')
+            : 'Thanks for rating $other!');
         widget.appState.closeCompleteExchange();
       case ExchangeSubmitOutcome.savedOffline:
         _showMessage("You're offline. It's saved on your phone and will be sent when you're back online.");
@@ -97,10 +101,12 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
     final String buttonLabel;
     if (_vm.needsCheck && !_vm.allChecked) {
       buttonLabel = 'Check the item to continue';
+    } else if (_vm.needsSellerConfirmation && !_vm.showsRatingSection) {
+      buttonLabel = 'Confirm handoff';
     } else if (_vm.stars == 0) {
       buttonLabel = 'Rate $otherFirst to continue';
     } else {
-      buttonLabel = _vm.needsCheck ? 'Complete exchange' : 'Submit rating';
+      buttonLabel = _vm.needsCheck || _vm.needsSellerConfirmation ? 'Complete exchange' : 'Submit rating';
     }
 
     return Scaffold(
@@ -127,7 +133,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                   ),
                   const SizedBox(width: 14),
                   Text(
-                    _vm.needsCheck || waitingForBuyer || cancelled ? 'Complete exchange' : 'Rate $otherFirst',
+                    _vm.needsCheck || _vm.needsSellerConfirmation || waitingForBuyer || cancelled ? 'Complete exchange' : 'Rate $otherFirst',
                     style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd),
                   ),
                 ],
@@ -162,7 +168,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                   else if (waitingForBuyer)
                     _InfoCard(
                       icon: Icons.hourglass_top_rounded,
-                      text: '$otherFirst confirms the exchange after checking the item at your meetup. '
+                      text: 'You already confirmed this exchange. Waiting for $otherFirst to confirm so the sale completes. '
                           'You can rate each other once it is completed.',
                     )
                   else ...[
@@ -170,7 +176,17 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                       _checkSection(brightness),
                       const SizedBox(height: 14),
                     ],
-                    _rateSection(brightness, step: _vm.needsCheck ? 2 : 1),
+                    if (_vm.needsSellerConfirmation) ...[
+                      _InfoCard(
+                        icon: Icons.handshake_outlined,
+                        text: _vm.exchange.otherHasConfirmed(_vm.userId)
+                            ? '$otherFirst already confirmed receiving the item. Confirm handoff below to complete the sale.'
+                            : 'Confirm that you handed the item over to $otherFirst. Once both sides confirm, the sale is completed.',
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (_vm.showsRatingSection)
+                      _rateSection(brightness, step: _vm.needsCheck ? 2 : 1),
                   ],
                 ],
               ),

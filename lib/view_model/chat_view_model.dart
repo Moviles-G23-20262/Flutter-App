@@ -48,6 +48,10 @@ class ChatViewModel extends ChangeNotifier {
   final GetChatAgreementUseCase getChatAgreement;
   final TrackEventUseCase trackEvent;
 
+  /// Optional callback invoked right after a meeting proposal is accepted (e.g. to flush
+  /// queued analytics events immediately so BQ 4 updates without waiting 30 s).
+  final Future<void> Function()? onMeetingConfirmed;
+
   ChatViewModel({
     required this.getChatRooms,
     required this.openChatRoom,
@@ -63,6 +67,7 @@ class ChatViewModel extends ChangeNotifier {
     this.watchPendingCount,
     required this.getChatAgreement,
     required this.trackEvent,
+    this.onMeetingConfirmed,
   });
 
   bool _isOffline = false;
@@ -371,7 +376,23 @@ class ChatViewModel extends ChangeNotifier {
     } on DataException catch (e) {
       return e.message;
     }
-    if (answer == ProposalAnswer.accept) _trackMeetingConfirmed();
+    if (answer == ProposalAnswer.accept) {
+      _trackMeetingConfirmed();
+      final roomId = _activeRoomId;
+      // Flush telemetry immediately and refresh BQ4 insight + this chat's agreement card.
+      final flush = onMeetingConfirmed;
+      if (flush != null) {
+        unawaited(flush().then((_) {
+          loadInsight(force: true);
+          if (roomId != null) {
+            _agreementLastTry.remove(roomId);
+            _loadAgreementIfNeeded(roomId);
+          }
+        }).catchError((Object _) {}));
+      } else {
+        unawaited(loadInsight(force: true));
+      }
+    }
     // Accepting also posts a confirmation message; show it together with the card's new status.
     await refreshMessages();
     return null;

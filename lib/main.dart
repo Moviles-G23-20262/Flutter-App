@@ -86,6 +86,7 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
       watchPendingCount: _deps.watchPendingCount,
       getChatAgreement: _deps.getChatAgreement,
       trackEvent: _deps.trackEvent,
+      onMeetingConfirmed: _deps.analyticsSync.syncNow,
     ),
     account: AccountViewModel(
       getExchanges: _deps.getExchanges,

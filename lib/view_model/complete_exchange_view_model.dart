@@ -12,7 +12,7 @@ import '../model/use_cases/rating_draft_use_cases.dart';
 
 /// How a submit ended.
 enum ExchangeSubmitOutcome {
-  /// The server has it: the exchange is completed (buyer) and/or the rating is in.
+  /// The server has it: the exchange was confirmed/completed and/or the rating is in.
   sent,
 
   /// No connection: saved on the phone, and sent by the outbox when the connection is back.
@@ -22,7 +22,8 @@ enum ExchangeSubmitOutcome {
   failed,
 }
 
-/// The complete-exchange screen: the buyer's item check and the rating of the other person.
+/// The complete-exchange screen: two-sided handoff confirmation (buyer item check, seller handoff
+/// confirmation) and peer rating once the exchange is completed.
 ///
 /// What is entered is saved as a draft 0.4 s after the last change and restored when the screen
 /// opens again. Without a connection, the completion and the rating are queued in the outbox.
@@ -51,7 +52,7 @@ class CompleteExchangeViewModel extends ChangeNotifier {
   final SaveRatingDraftUseCase saveDraft;
   final ClearRatingDraftUseCase clearDraft;
 
-  /// The server returned the completed exchange; the app updates its lists with it.
+  /// The server returned the updated/completed exchange; the app updates its lists with it.
   final void Function(ExchangeEntity exchange) onExchangeUpdated;
 
   CompleteExchangeViewModel({
@@ -99,20 +100,41 @@ class CompleteExchangeViewModel extends ChangeNotifier {
   bool get isBuyer => _exchange.buyerId == userId;
   bool get isCancelled => _exchange.status == ExchangeStatusEnum.CANCELLED;
 
-  /// The buyer confirmed it offline; it counts as done here while it waits to be sent.
+  /// Confirmed offline; it counts as done here while it waits to be sent.
   bool get completionQueued => _completionQueued;
 
   /// Everything is saved and waiting for the connection: nothing left to fill in.
   bool get ratingQueued => _ratingQueued;
 
-  /// The buyer still has to check the item and confirm the exchange.
-  bool get needsCheck => isBuyer && _exchange.isPending && !_completionQueued;
+  /// The buyer still has to check the item and confirm their side of the exchange.
+  bool get needsCheck => isBuyer && _exchange.isPending && !_exchange.hasConfirmed(userId) && !_completionQueued;
 
-  /// The seller waits until the buyer confirms.
-  bool get waitingForBuyer => !isBuyer && _exchange.isPending;
+  /// The seller still has to confirm handing over the item so the sale can close.
+  bool get needsSellerConfirmation =>
+      !isBuyer && _exchange.isPending && !_exchange.hasConfirmed(userId) && !_completionQueued;
+
+  /// True when this user already confirmed their side and is waiting for the other party.
+  bool get waitingForOther => _exchange.isPending && _exchange.hasConfirmed(userId) && !_completionQueued;
+
+  /// Backwards-compatible alias: true only when the user has nothing left to confirm while pending.
+  bool get waitingForBuyer => waitingForOther;
+
+  /// Whether the user should fill in a peer rating on this submission (either the exchange is
+  /// already completed, or the buyer is submitting the checklist/rating flow, or the seller is
+  /// closing an exchange the buyer already confirmed).
+  bool get showsRatingSection =>
+      !isCancelled && !waitingForOther && (!needsSellerConfirmation || _exchange.otherHasConfirmed(userId));
 
   bool get allChecked => _checked.length == checklist.length;
-  bool get canSubmit => !_submitting && !_ratingQueued && _stars > 0 && (!needsCheck || allChecked);
+
+  bool get canSubmit {
+    if (_submitting || _ratingQueued || waitingForOther || isCancelled) return false;
+    if (needsSellerConfirmation && !_exchange.otherHasConfirmed(userId)) {
+      return true;
+    }
+    return _stars > 0 && (!needsCheck || allChecked);
+  }
+
   String get otherFirstName => _exchange.otherParty(userId)?.fullName.split(' ').first ?? 'them';
 
   /// Restores the draft, if there is one. Call once when the screen opens.
@@ -165,39 +187,57 @@ class CompleteExchangeViewModel extends ChangeNotifier {
     _errorMessage = '';
     _notify();
 
-    final rating = NewRating(
-      exchangeId: _exchange.id,
-      ratedId: isBuyer ? _exchange.sellerId : _exchange.buyerId,
-      stars: _stars,
-      tags: _tags.toList(),
-      review: _review,
-    );
+    final needsConfirm = needsCheck || needsSellerConfirmation;
+    final hasRating = _stars > 0;
+    final rating = hasRating
+        ? NewRating(
+            exchangeId: _exchange.id,
+            ratedId: isBuyer ? _exchange.sellerId : _exchange.buyerId,
+            stars: _stars,
+            tags: _tags.toList(),
+            review: _review,
+          )
+        : null;
     var offline = false;
     try {
-      if (needsCheck) {
+      if (needsConfirm) {
         try {
-          _exchange = await completeExchange.execute(_exchange, receivedCondition: _received);
+          _exchange = await completeExchange.execute(
+            _exchange,
+            receivedCondition: isBuyer ? _received : null,
+          );
           onExchangeUpdated(_exchange);
         } on NoConnectionException {
           offline = true;
-          await queueCompletion.execute(ownerId: userId, exchange: _exchange, receivedCondition: _received);
+          await queueCompletion.execute(
+            ownerId: userId,
+            exchange: _exchange,
+            receivedCondition: isBuyer ? _received : null,
+          );
           _completionQueued = true;
         }
       }
       if (offline) {
         // The rating must follow the completion, so it waits in the outbox behind it.
-        await queueRating.execute(ownerId: userId, rating: rating);
-      } else {
+        if (rating != null) {
+          await queueRating.execute(ownerId: userId, rating: rating);
+          _ratingQueued = true;
+        }
+      } else if ((_exchange.isCompleted || _completionQueued) && rating != null) {
+        // Only post the rating once the server confirms both sides completed the exchange;
+        // otherwise keep the rating draft so the user can rate once the other side confirms.
         try {
           await rateUser.execute(rating);
         } on NoConnectionException {
           offline = true;
           await queueRating.execute(ownerId: userId, rating: rating);
+          _ratingQueued = true;
         }
       }
-      if (offline) _ratingQueued = true;
-      _draftTimer?.cancel();
-      await clearDraft.execute(userId: userId, exchangeId: _exchange.id);
+      if (_exchange.isCompleted || offline) {
+        _draftTimer?.cancel();
+        await clearDraft.execute(userId: userId, exchangeId: _exchange.id);
+      }
       return offline ? ExchangeSubmitOutcome.savedOffline : ExchangeSubmitOutcome.sent;
     } on DataException catch (e) {
       // The exchange may have been completed even if the rating failed; the form follows suit.

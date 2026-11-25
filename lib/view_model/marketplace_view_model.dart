@@ -133,7 +133,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     final generation = _generation;
     _loading = true;
     _error = null;
-    _timeToSell = null;
+
     notifyListeners();
 
     // Both start at once. Favorites load on their own, so the saved copy still shows when the
@@ -173,6 +173,14 @@ class MarketplaceViewModel extends ChangeNotifier {
     } catch (_) {
       if (generation == _generation) _error ??= 'Unexpected error. Please try again.';
     }
+  }
+
+  /// Refreshes BQ 11 (average time to sell) directly from analytics (or cache offline)
+  /// so Seller Hub and New Listing immediately reflect newly completed sales.
+  Future<void> refreshTimeToSell() async {
+    final generation = _generation;
+    await _loadTimeToSell(generation);
+    if (generation == _generation) notifyListeners();
   }
 
   Future<void> _loadTimeToSell(int generation) async {
@@ -359,6 +367,7 @@ class MarketplaceViewModel extends ChangeNotifier {
     _loading = false;
     _loadedOnce = false;
     _error = null;
+
     _timeToSell = null;
     _togglingFavorites.clear();
     notifyListeners();
