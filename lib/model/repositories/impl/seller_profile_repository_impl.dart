@@ -7,10 +7,12 @@ import '../../dto/marketplace_models.dart';
 import '../../entities/material_entity.dart';
 import '../../entities/rating_entity.dart';
 import '../../entities/seller_profile_entity.dart';
+import '../../entities/major_activity.dart';
 import '../../entities/seller_reputation.dart';
 import '../../entities/user_summary.dart';
 import '../../exceptions/data_exceptions.dart';
 import '../seller_profile_repository.dart';
+import '../major_activity_repository.dart';
 import '../seller_reputation_repository.dart';
 
 /// Coordinates all 4 Sprint 4 strategies for the Seller Profile screen:
@@ -33,12 +35,14 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
   final MarketplaceRemoteDataSource remote;
   final SellerProfileStore store;
   final SellerReputationRepository? reputationRepository;
+  final MajorActivityRepository? majorActivityRepository;
   final LruCache<String, SellerProfileData> _memoryCache;
 
   SellerProfileRepositoryImpl({
     required this.remote,
     required this.store,
     this.reputationRepository,
+    this.majorActivityRepository,
     LruCache<String, SellerProfileData>? memoryCache,
     DateTime Function()? clock,
   }) : _memoryCache = memoryCache ??
@@ -70,8 +74,9 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
       }
     }
 
-    // Fetch BQ 17 reputation concurrently; never block or fail Seller Profile if analytics is down.
+    // Fetch BQ 17 reputation & BQ 18 major activity concurrently; never fail Seller Profile if analytics is down.
     final reputationFuture = _fetchReputationSafely();
+    final majorActivityFuture = _fetchMajorActivitySafely();
 
     try {
       // Parallel network fetches: seller's ratings + listings (if not supplied or refreshing).
@@ -89,11 +94,13 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
         ratingsFuture,
         listingsFuture,
         reputationFuture,
+        majorActivityFuture,
       ]);
 
       final ratings = results[0]! as List<RatingEntity>;
       final sellerListings = results[1]! as List<MaterialEntity>;
       final reputation = results[2] as SellerReputationInsight?;
+      final majorActivity = results[3] as MajorActivityInsight?;
 
       // Off-main-thread aggregation via Isolate.run (MO6).
       final summary = await aggregateSellerProfileInIsolate(
@@ -111,17 +118,18 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
         seller: seller,
         summary: summary,
         reputation: reputation,
+        majorActivity: majorActivity,
         savedAt: null,
         fromMemoryCache: false,
       );
       _memoryCache.put(seller.id, profile);
       return profile;
     } on NetworkException {
-      return _readOfflineFallback(seller, reputationFuture);
+      return _readOfflineFallback(seller, reputationFuture, majorActivityFuture);
     } on ApiException catch (e) {
       // If the server returned 5xx, also check if we have a saved snapshot so the user isn't blocked.
       if (e.statusCode >= 500) {
-        final fallback = await _tryReadStoredProfile(seller, reputationFuture);
+        final fallback = await _tryReadStoredProfile(seller, reputationFuture, majorActivityFuture);
         if (fallback != null) return fallback;
       }
       throw DataException(e.message);
@@ -137,12 +145,22 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
       return null;
     }
   }
+  Future<MajorActivityInsight?> _fetchMajorActivitySafely() async {
+    final repo = majorActivityRepository;
+    if (repo == null) return null;
+    try {
+      return await repo.getMajorActivity();
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<SellerProfileData> _readOfflineFallback(
     UserSummary seller,
     Future<SellerReputationInsight?> reputationFuture,
+    Future<MajorActivityInsight?> majorActivityFuture,
   ) async {
-    final fallback = await _tryReadStoredProfile(seller, reputationFuture);
+    final fallback = await _tryReadStoredProfile(seller, reputationFuture, majorActivityFuture);
     if (fallback != null) return fallback;
     throw const NoConnectionException();
   }
@@ -150,6 +168,7 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
   Future<SellerProfileData?> _tryReadStoredProfile(
     UserSummary seller,
     Future<SellerReputationInsight?> reputationFuture,
+    Future<MajorActivityInsight?> majorActivityFuture,
   ) async {
     final stored = await store.read(seller.id);
     if (stored == null) return null;
@@ -160,6 +179,7 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
       final ratings = parseList(stored.body['ratings'] ?? const [], ratingFromJson);
       final listings = parseList(stored.body['listings'] ?? const [], materialFromJson);
       final reputation = await reputationFuture;
+      final majorActivity = await majorActivityFuture;
 
       final summary = await aggregateSellerProfileInIsolate(
         SellerProfileAggregationInput(
@@ -173,6 +193,7 @@ class SellerProfileRepositoryImpl implements SellerProfileRepository {
         seller: decodedSeller,
         summary: summary,
         reputation: reputation,
+        majorActivity: majorActivity,
         savedAt: stored.savedAt,
         fromMemoryCache: false,
       );

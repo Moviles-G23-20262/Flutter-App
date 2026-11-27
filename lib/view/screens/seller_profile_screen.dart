@@ -4,6 +4,7 @@ import '../../app/theme/app_theme.dart';
 import '../../model/entities/material_entity.dart';
 import '../../model/entities/rating_entity.dart';
 import '../../model/entities/seller_profile_entity.dart';
+import '../../model/entities/major_activity.dart';
 import '../../model/entities/seller_reputation.dart';
 import '../../view_model/seller_profile_view_model.dart';
 import '../widgets/async_views.dart';
@@ -165,6 +166,14 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
               reputation: profile.reputation!,
               averageRating: summary.averageRating,
               reviewCount: summary.reviewCount,
+            ),
+            const SizedBox(height: 14),
+          ],
+          if (profile.majorActivity != null && !profile.majorActivity!.isEmpty) ...[
+            _MajorActivityCard(
+              insight: profile.majorActivity!,
+              sellerMajor: profile.seller.major,
+              sellerFaculty: profile.seller.faculty,
             ),
             const SizedBox(height: 14),
           ],
@@ -745,6 +754,115 @@ class _OfflineEmptyState extends StatelessWidget {
               onPressed: onBack,
               child: const Text('Go back'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── BQ 18 Campus Activity by Major & Faculty Card ────────────────────────────
+
+class _MajorActivityCard extends StatelessWidget {
+  final MajorActivityInsight insight;
+  final String sellerMajor;
+  final String? sellerFaculty;
+
+  const _MajorActivityCard({
+    required this.insight,
+    required this.sellerMajor,
+    this.sellerFaculty,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final txPrimary = dark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final txSecondary = dark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final txMuted = dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
+    final accentHi = dark ? AppColors.darkAccentHi : AppColors.lightAccentHi;
+
+    final matched = insight.activityForMajor(sellerMajor) ?? insight.topMajor;
+    if (matched == null) return const SizedBox.shrink();
+    final rank = insight.rankOfMajor(matched.name);
+    final top = insight.topMajor;
+    final facultyStats = insight.activityForFaculty(sellerFaculty ?? matched.faculty);
+
+    final badgeText = rank != null ? '#$rank · ${matched.name}' : matched.name;
+
+    return Semantics(
+      label: 'Campus activity for ${matched.name}: ${matched.listings} listings, ${matched.buyerInquiries} inquiries, ${matched.completedExchanges} sold',
+      child: AppCard(
+        key: const Key('bq18-major-activity-card'),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.school_outlined, color: accentHi, size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Campus Activity by Major',
+                    style: AppTextStyles.body(txPrimary, fontSize: AppTextStyles.sizeSm, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Flexible(
+                  child: AppBadge(badgeText, highlighted: true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Across ${insight.majorsActive} active majors on CampusSwap, ${matched.name} has ${matched.listings} listing${matched.listings == 1 ? '' : 's'}, ${matched.buyerInquiries} buyer inquir${matched.buyerInquiries == 1 ? 'y' : 'ies'}, and ${matched.conversionRatePercent}% listing-to-sale conversion.',
+              style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatPill(
+                    label: 'Listings',
+                    value: '${matched.listings}',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatPill(
+                    label: 'Inquiries',
+                    value: '${matched.buyerInquiries}',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatPill(
+                    label: 'Sold',
+                    value: '${matched.completedExchanges}',
+                  ),
+                ),
+              ],
+            ),
+            if (facultyStats != null && facultyStats.name != 'Unspecified') ...[
+              const SizedBox(height: 8),
+              Text(
+                'Faculty (${facultyStats.name}): ${facultyStats.listings} listings · ${facultyStats.completedExchanges} sold (${facultyStats.conversionRatePercent}%)',
+                style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs),
+              ),
+            ] else if (top != null && top.name != matched.name) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Top campus major: ${top.name} (${top.completedExchanges} sold)',
+                style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs),
+              ),
+            ],
+            if (insight.savedAt != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Major activity saved ${timeAgo(insight.savedAt!)}',
+                style: AppTextStyles.mono(txMuted, fontSize: AppTextStyles.size2xs),
+              ),
+            ],
           ],
         ),
       ),

@@ -82,7 +82,9 @@ import '../model/use_cases/profile_use_cases.dart';
 import '../model/data_sources/local/seller_profile_store.dart';
 import '../model/entities/user_summary.dart';
 import '../model/repositories/impl/seller_profile_repository_impl.dart';
+import '../model/repositories/impl/major_activity_repository_impl.dart';
 import '../model/repositories/impl/seller_reputation_repository_impl.dart';
+import '../model/use_cases/major_activity_use_case.dart';
 import '../model/use_cases/seller_profile_use_cases.dart';
 import '../view_model/edit_profile_view_model.dart';
 import '../view_model/seller_profile_view_model.dart';
@@ -209,6 +211,7 @@ class AppDependencies {
   /// Sprint 4 Seller Profile + BQ17 campus reputation benchmark.
   final GetSellerProfileUseCase getSellerProfile;
   final GetSellerReputationUseCase getSellerReputation;
+  final GetMajorActivityUseCase getMajorActivity;
 
   /// The device's network state, for view-models that follow it themselves.
   final ConnectivityRepository connectivityRepository;
@@ -269,6 +272,7 @@ class AppDependencies {
     required this.getCategoryPerformance,
     required this.getSellerProfile,
     required this.getSellerReputation,
+    required this.getMajorActivity,
     required this.connectivityRepository,
     required this.updateProfile,
     required this.getUniandesPrograms,
@@ -432,6 +436,8 @@ class AppDependencies {
         CategoryPerformanceRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final sellerReputationRepository =
         SellerReputationRepositoryImpl(remote: analyticsRemote, cache: responseCache);
+    final majorActivityRepository =
+        MajorActivityRepositoryImpl(remote: analyticsRemote, cache: responseCache);
     final sellerProfileStore = SellerProfileStore(database);
     // Parsed once in an isolate, then answered from memory.
     final uniandesPrograms = UniandesProgramsRepositoryImpl();
@@ -455,6 +461,7 @@ class AppDependencies {
       remote: marketplaceRemote,
       store: sellerProfileStore,
       reputationRepository: sellerReputationRepository,
+      majorActivityRepository: majorActivityRepository,
     );
     final materials = MaterialRepositoryImpl(
       marketplaceRemote,
@@ -555,6 +562,7 @@ class AppDependencies {
       getCategoryPerformance: GetCategoryPerformanceUseCase(categoryPerformanceRepository),
       getSellerProfile: GetSellerProfileUseCase(sellerProfileRepository),
       getSellerReputation: GetSellerReputationUseCase(sellerReputationRepository),
+      getMajorActivity: GetMajorActivityUseCase(majorActivityRepository),
       connectivityRepository: connectivity,
       updateProfile: UpdateProfileUseCase(authRepository),
       getUniandesPrograms: GetUniandesProgramsUseCase(uniandesPrograms),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'material_entity.dart';
 import 'rating_entity.dart';
+import 'major_activity.dart';
 import 'seller_reputation.dart';
 import 'user_summary.dart';
 
@@ -72,6 +73,9 @@ class SellerProfileData {
   /// Optional campus-wide BQ 17 benchmark (`GET /analytics/seller-reputation/`).
   final SellerReputationInsight? reputation;
 
+  /// Optional campus-wide BQ 18 benchmark (GET /analytics/major-activity/).
+  final MajorActivityInsight? majorActivity;
+
   /// Non-null when the profile was served from the local SQLite `seller_profiles` table offline.
   final DateTime? savedAt;
 
@@ -82,6 +86,7 @@ class SellerProfileData {
     required this.seller,
     required this.summary,
     this.reputation,
+    this.majorActivity,
     this.savedAt,
     this.fromMemoryCache = false,
   });
@@ -92,6 +97,7 @@ class SellerProfileData {
     UserSummary? seller,
     SellerProfileSummary? summary,
     SellerReputationInsight? reputation,
+    MajorActivityInsight? majorActivity,
     DateTime? savedAt,
     bool clearSavedAt = false,
     bool? fromMemoryCache,
@@ -100,6 +106,7 @@ class SellerProfileData {
         seller: seller ?? this.seller,
         summary: summary ?? this.summary,
         reputation: reputation ?? this.reputation,
+        majorActivity: majorActivity ?? this.majorActivity,
         savedAt: clearSavedAt ? null : (savedAt ?? this.savedAt),
         fromMemoryCache: fromMemoryCache ?? this.fromMemoryCache,
       );
