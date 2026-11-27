@@ -37,8 +37,22 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   bool _savedOffline = false;
   bool _disposed = false;
 
+  /// Bumped by every [_rank], so a ranking that finishes after a newer one started is dropped.
+  int _rankGeneration = 0;
+  Future<void> _ranking = Future.value();
+
   /// Best match first; see [RankMeetingPointsUseCase].
   List<RankedZone> get zones => _ranked;
+
+  /// Completes once no ranking is running any more (they run in a background isolate, and a new
+  /// one can start while an older one is still being computed).
+  Future<void> get rankingDone async {
+    Future<void> current;
+    do {
+      current = _ranking;
+      await current;
+    } while (!identical(current, _ranking));
+  }
   MeetingSuggestions? get suggestions => _suggestions;
   /// Upcoming shared free slots only — times at or before now cannot be chosen.
   List<FreeSlot> get slots {
@@ -90,6 +104,7 @@ class MeetingPlannerViewModel extends ChangeNotifier {
           suggested != null && MeetingTimeRules.isValidStart(suggested.startsAt, now) ? suggested : null;
       _selectedSlot ??= validSuggested ?? slots.firstOrNull;
       _rank();
+      await rankingDone;
     } on DataException catch (e) {
       _error = e.message;
     }
@@ -148,24 +163,31 @@ class MeetingPlannerViewModel extends ChangeNotifier {
     _locating = true;
     _location = await useCases.currentLocation.execute();
     _locating = false;
-    _rank();
     _notify();
+    await _rank();
   }
 
   /// Past activity per zone and hour. It arrives whenever the analytics service answers.
   Future<void> _loadDensity() async {
     _density = await useCases.getDensity.execute();
-    _rank();
-    _notify();
+    await _rank();
   }
 
-  void _rank() {
-    _ranked = useCases.recommend
-        .execute(zones: _zones, from: _location, meetingAt: _selectedSlot?.startsAt, density: _density)
-        .ranked;
-    if (!_zonePickedByUser) {
-      _selectedZoneId = _ranked.where((r) => r.bestMatch).firstOrNull?.zone.id;
-    }
+  /// Re-scores the zones in a background isolate ([RecommendMeetingPointUseCase.executeInBackground])
+  /// and applies the result when it arrives. Several triggers can overlap (hour picked, GPS fix,
+  /// density answer); only the newest ranking is applied.
+  Future<void> _rank() {
+    final generation = ++_rankGeneration;
+    return _ranking = useCases.recommend
+        .executeInBackground(zones: _zones, from: _location, meetingAt: _selectedSlot?.startsAt, density: _density)
+        .then((recommendation) {
+      if (_disposed || generation != _rankGeneration) return;
+      _ranked = recommendation.ranked;
+      if (!_zonePickedByUser) {
+        _selectedZoneId = _ranked.where((r) => r.bestMatch).firstOrNull?.zone.id;
+      }
+      _notify();
+    });
   }
 
   void _notify() {

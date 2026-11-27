@@ -11,6 +11,7 @@ import '../../view_model/meeting_planner_view_model.dart';
 import '../widgets/async_views.dart';
 import '../widgets/formatters.dart';
 import '../widgets/meetup_widgets.dart';
+import '../widgets/cached_tile_provider.dart';
 
 // ─── Meeting Point Screen ─────────────────────────────────────────────────────
 
@@ -28,6 +29,9 @@ class MeetingPointScreen extends StatefulWidget {
 class _MeetingPointScreenState extends State<MeetingPointScreen> {
   late final MeetingPlannerViewModel _planner = widget.appState.createMeetingPlanner(widget.room);
   final _map = MapController();
+
+  /// Created once: a new provider on every build would make the map reload its tiles.
+  final _tiles = CachedTileProvider();
   bool _mapReady = false;
   String? _focusedZoneId;
 
@@ -296,6 +300,8 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
                 // OpenStreetMap: free, no key. Their usage policy asks every app to identify itself.
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.flutter_front_end',
+                // Tiles are cached in memory and on disk (cached_network_image), not downloaded each time.
+                tileProvider: _tiles,
                 tileBuilder: brightness == Brightness.dark ? darkModeTileBuilder : null,
               ),
               if (selected != null)

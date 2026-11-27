@@ -3,6 +3,7 @@ import '../../entities/meetup_entities.dart';
 import '../meetup_repositories.dart';
 import '../../data_sources/device_location_data_source.dart';
 import '../../data_sources/local/campus_zones_asset_data_source.dart';
+import '../../data_sources/local/expiring_lru_cache.dart';
 import '../../data_sources/local/response_cache.dart';
 import '../../data_sources/meetup_remote_data_source.dart';
 import '../../dto/marketplace_models.dart';
@@ -18,7 +19,15 @@ import 'marketplace_repositories_impl.dart' show guardRequest;
 ///   already ended.
 ///
 /// Without a [cache] it is network only (plus the bundled zones, when given).
+///
+/// In front of all that, the free hours of the last [suggestionsMemorySize] chats are kept in an
+/// in-memory LRU cache for [suggestionsMemoryTtl]: reopening the planner for the same chat shows
+/// them at once, without a request. The least recently used chat is dropped when a new one does
+/// not fit, and an entry older than the TTL is asked for again (schedules can change).
 class MeetupRepositoryImpl implements MeetupRepository {
+  static const int suggestionsMemorySize = 10;
+  static const Duration suggestionsMemoryTtl = Duration(minutes: 2);
+
   /// Campus zones are the same for everybody, so one copy serves every account.
   static const String meetingPointsOwner = 'global';
   static const String meetingPointsKey = 'meeting_points';
@@ -30,13 +39,23 @@ class MeetupRepositoryImpl implements MeetupRepository {
   final CampusZonesAssetDataSource? bundledZones;
   final DateTime Function() _now;
 
+  /// Free hours per chat (key: user and chat), most recently used last.
+  final ExpiringLruCache<String, MeetingSuggestions> _suggestionsMemory;
+
   MeetupRepositoryImpl(
     this.remote, {
     this.cache,
     this.owner,
     this.bundledZones,
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+  })  : _now = now ?? DateTime.now,
+        _suggestionsMemory = ExpiringLruCache(
+          maxSize: suggestionsMemorySize,
+          ttl: suggestionsMemoryTtl,
+          now: now ?? DateTime.now,
+        );
+
+  String _memoryKey(String chatRoomId) => '${owner?.userId ?? ''}:$chatRoomId';
 
   @override
   Future<List<MeetingPointEntity>> getMeetingPoints() => guardRequest(() async {
@@ -60,10 +79,26 @@ class MeetupRepositoryImpl implements MeetupRepository {
       });
 
   @override
-  Future<MeetingSuggestions> getSuggestions(String chatRoomId) {
+  Future<MeetingSuggestions> getSuggestions(String chatRoomId) async {
+    final memoryKey = _memoryKey(chatRoomId);
+    final remembered = _suggestionsMemory.get(memoryKey);
+    // Up to two minutes old: an hour that ended meanwhile is dropped (the planner also hides
+    // the ones that already started).
+    if (remembered != null) return FreeSlotExpiry.dropEnded(remembered, _now());
+
+    final fresh = await _loadSuggestions(chatRoomId);
+    if (fresh.fromServer) _suggestionsMemory.put(memoryKey, fresh.suggestions);
+    return fresh.suggestions;
+  }
+
+  /// Network first, then the saved copy. Only an answer straight from the server is worth
+  /// remembering in memory; an offline copy is read again next time, in case the network is back.
+  Future<({MeetingSuggestions suggestions, bool fromServer})> _loadSuggestions(String chatRoomId) {
     final cache = this.cache;
     final userId = owner?.userId;
-    if (cache == null || userId == null) return guardRequest(() => remote.getSuggestions(chatRoomId));
+    if (cache == null || userId == null) {
+      return guardRequest(() async => (suggestions: await remote.getSuggestions(chatRoomId), fromServer: true));
+    }
     return guardRequest(() async {
       final result = await cache.networkFirst(
         ownerId: userId,
@@ -72,7 +107,9 @@ class MeetupRepositoryImpl implements MeetupRepository {
         parse: (json) => meetingSuggestionsFromJson(json as Json),
       );
       // A fresh answer only has upcoming hours; a saved copy may be old.
-      return result.fromCache ? FreeSlotExpiry.dropEnded(result.data, _now()) : result.data;
+      return result.fromCache
+          ? (suggestions: FreeSlotExpiry.dropEnded(result.data, _now()), fromServer: false)
+          : (suggestions: result.data, fromServer: true);
     });
   }
 
@@ -86,13 +123,16 @@ class MeetupRepositoryImpl implements MeetupRepository {
     required String meetingPointId,
     required DateTime startsAt,
     required DateTime endsAt,
-  }) =>
-      guardRequest(() => remote.createProposal(meetingProposalToJson(
-            chatRoomId: chatRoomId,
-            meetingPointId: meetingPointId,
-            startsAt: startsAt,
-            endsAt: endsAt,
-          )));
+  }) {
+    // The chat's plans changed: the next planner opening asks the server again.
+    _suggestionsMemory.remove(_memoryKey(chatRoomId));
+    return guardRequest(() => remote.createProposal(meetingProposalToJson(
+          chatRoomId: chatRoomId,
+          meetingPointId: meetingPointId,
+          startsAt: startsAt,
+          endsAt: endsAt,
+        )));
+  }
 
   @override
   Future<MeetingProposalEntity> accept(String proposalId) =>
