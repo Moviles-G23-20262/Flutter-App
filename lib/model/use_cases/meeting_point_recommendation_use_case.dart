@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import '../entities/meeting_point_density.dart';
 import '../entities/meetup_entities.dart';
 import 'rank_meeting_points_use_case.dart';
@@ -42,5 +44,26 @@ class RecommendMeetingPointUseCase {
           reasons: scores[i].reasons,
         ),
     ]);
+  }
+
+  /// [execute] in a background isolate (`Isolate.run`), so re-scoring every zone (walking
+  /// distance, hour, BQ12 history) never competes with the map and the list for the UI thread.
+  /// The planner calls it on every hour change, GPS update and density answer.
+  ///
+  /// Everything it needs is plain data (zones, a point, a date, the density table, the const
+  /// ranker), so it is copied to the isolate, and the ranked zones are copied back.
+  Future<MeetingPointRecommendation> executeInBackground({
+    required List<MeetingPointEntity> zones,
+    GeoPoint? from,
+    DateTime? meetingAt,
+    DateTime? now,
+    MeetingPointDensity density = MeetingPointDensity.empty,
+  }) {
+    final ranker = this.ranker;
+    final at = meetingAt ?? now ?? DateTime.now();
+    return Isolate.run(
+      () => RecommendMeetingPointUseCase(ranker).execute(zones: zones, from: from, meetingAt: at, density: density),
+      debugName: 'rank-meeting-points',
+    );
   }
 }
