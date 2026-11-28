@@ -375,6 +375,12 @@ class _FakeDensity implements MeetingDensityRepository {
 
 /// The listings saved on the phone, which the test can change and watch.
 class _FakePendingListings implements PendingListingRepository {
+  @override
+  bool get canDeliver => false;
+
+  @override
+  Future<PendingListing?> deliver(PendingListing listing) async => listing;
+
   final _controller = StreamController<List<PendingListing>>.broadcast();
   final discarded = <String>[];
   final retried = <String>[];
@@ -671,7 +677,7 @@ void main() {
       final repository = MaterialRepositoryImpl(remote);
 
       remote.error = const NetworkException('offline');
-      await expectLater(repository.getMaterials(), throwsA(isA<DataException>().having((e) => e.message, 'message', contains("Can't reach"))));
+      await expectLater(repository.getMaterials(), throwsA(isA<DataException>().having((e) => e.message, 'message', contains('internet connection'))));
 
       remote.error = const ApiException(403, 'Only the seller can change this listing');
       await expectLater(repository.getMaterials(), throwsA(isA<DataException>().having((e) => e.message, 'message', 'Only the seller can change this listing')));

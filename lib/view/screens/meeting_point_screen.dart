@@ -72,7 +72,7 @@ class _MeetingPointScreenState extends State<MeetingPointScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(_planner.savedOffline
-          ? "You're offline. The proposal is saved and will be sent to $_otherFirstName when you're back online."
+          ? "Your proposal is saved. We’ll send it to $_otherFirstName when a connection is available."
           : 'Meeting proposed to $_otherFirstName.'),
     ));
     widget.appState.closeMeetingPlanner();

@@ -181,6 +181,7 @@ class _ChatViewState extends State<ChatView> {
     final messages   = chats.messagesOf(room.id);
     final agreed     = chats.agreedMeetingIn(room.id)?.meetingProposal;
     final order      = appState.account.latestOrderFor(room.materialId, room.buyerId);
+    final refusedProposal = appState.account.refusedMeetingProposalFor(room.id);
     final brightness = Theme.of(context).brightness;
     final surface    = brightness == Brightness.dark ? AppColors.darkSurface     : AppColors.lightSurface;
     final border     = brightness == Brightness.dark ? AppColors.darkBorder      : AppColors.lightBorder;
@@ -263,6 +264,16 @@ class _ChatViewState extends State<ChatView> {
         Divider(color: border, height: 1),
         if (!appState.connectivity.isOffline && appState.connectivity.isWaitingForWifi)
           OfflineBanner.waitingForWifi(onSendNow: appState.syncOverMobileData),
+        if (refusedProposal != null)
+          MaterialBanner(
+            content: Text(refusedProposal.lastError ?? 'The meeting proposal could not be sent.'),
+            actions: [
+              TextButton(
+                onPressed: () => appState.account.discardPending(refusedProposal.id),
+                child: const Text('Dismiss'),
+              ),
+            ],
+          ),
 
         // ── The listing being discussed ──
         if (room.material != null)
@@ -278,6 +289,7 @@ class _ChatViewState extends State<ChatView> {
           _OrderBanner(
             order: order,
             isBuyer: order.buyerId == me,
+            confirmationQueued: appState.account.isCompletionQueued(order.id),
             otherFirstName: otherFirst,
             onOpen: () => appState.openCompleteExchange(order),
           ),
@@ -540,12 +552,14 @@ class _ListingStrip extends StatelessWidget {
 class _OrderBanner extends StatelessWidget {
   final ExchangeEntity order;
   final bool isBuyer;
+  final bool confirmationQueued;
   final String otherFirstName;
   final VoidCallback onOpen;
 
   const _OrderBanner({
     required this.order,
     required this.isBuyer,
+    required this.confirmationQueued,
     required this.otherFirstName,
     required this.onOpen,
   });
@@ -559,10 +573,19 @@ class _OrderBanner extends StatelessWidget {
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
 
     final String text;
-    final String? action;
+    final String action;
     if (order.isPending) {
-      text = isBuyer ? 'You ordered this · pay in person' : '$otherFirstName ordered this item';
-      action = isBuyer ? 'Complete exchange' : null;
+      final myId = isBuyer ? order.buyerId : order.sellerId;
+      if (confirmationQueued) {
+        text = 'Confirmation saved on this phone';
+        action = 'View';
+      } else if (order.confirmedBy(myId)) {
+        text = 'Waiting for $otherFirstName to confirm';
+        action = 'View';
+      } else {
+        text = isBuyer ? 'You ordered this · pay in person' : '$otherFirstName ordered this item';
+        action = isBuyer ? 'Complete exchange' : 'Confirm exchange';
+      }
     } else {
       text = 'Exchange completed';
       action = 'Rate $otherFirstName';
@@ -582,7 +605,7 @@ class _OrderBanner extends StatelessWidget {
             child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
           ),
-          if (action != null) TextButton(onPressed: onOpen, child: Text(action)),
+          TextButton(onPressed: onOpen, child: Text(action)),
         ],
       ),
     );

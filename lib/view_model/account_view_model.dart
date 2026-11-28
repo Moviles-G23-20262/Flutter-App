@@ -40,6 +40,9 @@ class AccountViewModel extends ChangeNotifier {
   DateTime? _notificationsSavedAt;
   bool _loading = false;
   bool _loadedOnce = false;
+  bool _notificationsLoading = false;
+  String? _notificationsError;
+  int _loadRequest = 0;
   String? _error;
   int _generation = 0;
   List<PendingAction> _pendingActions = const [];
@@ -51,6 +54,8 @@ class AccountViewModel extends ChangeNotifier {
   /// Set while the notifications shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get notificationsSavedAt => _notificationsSavedAt;
   bool get isLoading => _loading;
+  bool get isNotificationsLoading => _notificationsLoading;
+  String? get notificationsError => _notificationsError;
   bool get isFirstLoad => !_loadedOnce;
   String? get error => _error;
   int get unreadNotifications => _notifications.where((n) => n.isUnread).length;
@@ -65,7 +70,13 @@ class AccountViewModel extends ChangeNotifier {
 
   /// A step of [exchangeId] the server refused, with its reason in [PendingAction.lastError].
   PendingAction? refusedStepFor(String exchangeId) => _pendingActions
-      .where((a) => a.groupId == exchangeId && a.status == PendingStatus.refused)
+      .where((a) => a.groupId == exchangeId && a.status == PendingStatus.refused &&
+          (a.kind == PendingActionKind.completeExchange || a.kind == PendingActionKind.rate))
+      .firstOrNull;
+
+  PendingAction? refusedMeetingProposalFor(String roomId) => _pendingActions.reversed
+      .where((a) => a.groupId == roomId && a.status == PendingStatus.refused &&
+          a.kind == PendingActionKind.proposeMeeting)
       .firstOrNull;
 
   /// Only steps still waiting count: a refused one can be done again.
@@ -130,40 +141,46 @@ class AccountViewModel extends ChangeNotifier {
       ).firstOrNull;
 
   Future<void> load() async {
-    final generation = _generation;
+    final request = ++_loadRequest;
     _loading = true;
+    _notificationsLoading = true;
+    _notificationsError = null;
     _error = null;
     notifyListeners();
     // Both start at once; notifications load on their own, so their saved copy still shows offline.
-    final notifications = _loadNotifications(generation);
+    final notifications = _loadNotifications(request);
     try {
       final exchanges = await getExchanges.execute();
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _exchanges = exchanges;
     } on DataException catch (e) {
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _error = e.message;
     } catch (_) {
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _error = 'Unexpected error. Please try again.';
     }
-    await notifications;
-    if (generation != _generation) return;
     _loading = false;
     _loadedOnce = true;
     notifyListeners();
+    await notifications;
   }
 
-  Future<void> _loadNotifications(int generation) async {
+  Future<void> _loadNotifications(int request) async {
     try {
       final result = await getNotifications.execute();
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _notifications = result.items;
       _notificationsSavedAt = result.savedAt;
     } on DataException catch (e) {
-      if (generation == _generation) _error ??= e.message;
+      if (request == _loadRequest) _notificationsError = e.message;
     } catch (_) {
-      if (generation == _generation) _error ??= 'Unexpected error. Please try again.';
+      if (request == _loadRequest) _notificationsError = 'Unexpected error. Please try again.';
+    } finally {
+      if (request == _loadRequest) {
+        _notificationsLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -207,27 +224,33 @@ class AccountViewModel extends ChangeNotifier {
   Future<void> openNotification(String id) async {
     final index = _notifications.indexWhere((n) => n.id == id);
     if (index < 0 || !_notifications[index].isUnread) return;
-    final before = _notifications;
+    final generation = _generation;
+    final before = _notifications[index];
+    final optimistic = before.markOpened(DateTime.now());
     _notifications = [
-      for (final n in before)
-        if (n.id == id) n.markOpened(DateTime.now()) else n,
+      for (final n in _notifications)
+        if (n.id == id) optimistic else n,
     ];
     notifyListeners();
     try {
       await markNotificationOpened.execute(id);
     } on DataException {
-      _notifications = before;
+      if (generation != _generation) return;
+      _notifications = [for (final n in _notifications) identical(n, optimistic) ? before : n];
       notifyListeners();
     }
   }
 
   void clear() {
     _generation++;
+    _loadRequest++;
     _pendingSubscription?.cancel();
     _pendingSubscription = null;
     _pendingActions = const [];
     _exchanges = const [];
     _notifications = const [];
+    _notificationsLoading = false;
+    _notificationsError = null;
     _notificationsSavedAt = null;
     _loading = false;
     _loadedOnce = false;
@@ -237,6 +260,8 @@ class AccountViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _generation++;
+    _loadRequest++;
     _pendingSubscription?.cancel();
     super.dispose();
   }

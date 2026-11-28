@@ -18,6 +18,9 @@ enum ExchangeSubmitOutcome {
   /// No connection: saved on the phone, and sent by the outbox when the connection is back.
   savedOffline,
 
+  /// Our side has confirmed. The rating is queued until the other side confirms.
+  waitingForOtherParty,
+
   /// Refused or invalid; [CompleteExchangeViewModel.errorMessage] says why. The form is kept.
   failed,
 }
@@ -105,14 +108,15 @@ class CompleteExchangeViewModel extends ChangeNotifier {
   /// Everything is saved and waiting for the connection: nothing left to fill in.
   bool get ratingQueued => _ratingQueued;
 
-  /// The buyer still has to check the item and confirm the exchange.
-  bool get needsCheck => isBuyer && _exchange.isPending && !_completionQueued;
+  bool get needsConfirmation =>
+      _exchange.isPending && !_completionQueued && !_exchange.confirmedBy(userId);
 
-  /// The seller waits until the buyer confirms.
-  bool get waitingForBuyer => !isBuyer && _exchange.isPending;
+  /// Only buyers check the item's condition before confirming.
+  bool get needsCheck => isBuyer && needsConfirmation;
 
   bool get allChecked => _checked.length == checklist.length;
-  bool get canSubmit => !_submitting && !_ratingQueued && _stars > 0 && (!needsCheck || allChecked);
+  bool get canSubmit =>
+      !_submitting && !_ratingQueued && !isCancelled && _stars > 0 && (!needsCheck || allChecked);
   String get otherFirstName => _exchange.otherParty(userId)?.fullName.split(' ').first ?? 'them';
 
   /// Restores the draft, if there is one. Call once when the screen opens.
@@ -174,20 +178,26 @@ class CompleteExchangeViewModel extends ChangeNotifier {
     );
     var offline = false;
     try {
-      if (needsCheck) {
+      if (needsConfirmation) {
+        final receivedCondition = isBuyer ? _received : null;
         try {
-          _exchange = await completeExchange.execute(_exchange, receivedCondition: _received);
+          _exchange = await completeExchange.execute(_exchange, receivedCondition: receivedCondition);
           onExchangeUpdated(_exchange);
         } on NoConnectionException {
           offline = true;
-          await queueCompletion.execute(ownerId: userId, exchange: _exchange, receivedCondition: _received);
+          await queueCompletion.execute(
+            ownerId: userId,
+            exchange: _exchange,
+            receivedCondition: receivedCondition,
+            rating: rating,
+          );
           _completionQueued = true;
         }
       }
-      if (offline) {
-        // The rating must follow the completion, so it waits in the outbox behind it.
+      final waitingForOtherParty = _exchange.isPending && _exchange.confirmedBy(userId);
+      if (waitingForOtherParty && !offline) {
         await queueRating.execute(ownerId: userId, rating: rating);
-      } else {
+      } else if (!offline) {
         try {
           await rateUser.execute(rating);
         } on NoConnectionException {
@@ -195,10 +205,11 @@ class CompleteExchangeViewModel extends ChangeNotifier {
           await queueRating.execute(ownerId: userId, rating: rating);
         }
       }
-      if (offline) _ratingQueued = true;
+      if (offline || waitingForOtherParty) _ratingQueued = true;
       _draftTimer?.cancel();
       await clearDraft.execute(userId: userId, exchangeId: _exchange.id);
-      return offline ? ExchangeSubmitOutcome.savedOffline : ExchangeSubmitOutcome.sent;
+      if (offline) return ExchangeSubmitOutcome.savedOffline;
+      return waitingForOtherParty ? ExchangeSubmitOutcome.waitingForOtherParty : ExchangeSubmitOutcome.sent;
     } on DataException catch (e) {
       // The exchange may have been completed even if the rating failed; the form follows suit.
       _errorMessage = e.message;

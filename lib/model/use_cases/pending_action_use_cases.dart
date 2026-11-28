@@ -4,6 +4,7 @@ import '../entities/meetup_entities.dart';
 import '../entities/pending_items.dart';
 import '../exceptions/data_exceptions.dart';
 import '../repositories/pending_action_repository.dart';
+import '../rules/campus_default_zones.dart';
 import 'marketplace_use_cases.dart';
 
 /// The buyer confirmed the exchange without a connection: saved and sent later.
@@ -15,12 +16,14 @@ class QueueExchangeCompletionUseCase {
     required String ownerId,
     required ExchangeEntity exchange,
     MaterialConditionEnum? receivedCondition,
+    NewRating? rating,
   }) {
     if (!exchange.isPending) throw const DataException('This exchange is already closed.');
     return repository.queueCompletion(
       ownerId: ownerId,
       exchangeId: exchange.id,
       receivedCondition: receivedCondition,
+      rating: rating == null ? null : RateUserUseCase.validated(rating),
     );
   }
 }
@@ -34,8 +37,7 @@ class QueueRatingUseCase {
       repository.queueRating(ownerId: ownerId, rating: RateUserUseCase.validated(rating));
 }
 
-/// A meeting proposal made without a connection. The sync service checks the time again before
-/// sending it, since it may have passed by then.
+/// Saves the proposal before sending so retries keep the same ID, even after a restart.
 class QueueMeetingProposalUseCase {
   final PendingActionRepository repository;
   QueueMeetingProposalUseCase(this.repository);
@@ -50,6 +52,9 @@ class QueueMeetingProposalUseCase {
     if (!slot.startsAt.isAfter(now ?? DateTime.now())) {
       throw const DataException('That time already passed. Pick another one.');
     }
+    if (CampusDefaultZones.isBundled(zone.id)) {
+      throw const DataException('Connect to the internet once to load the campus zones, then propose.');
+    }
     return repository.queueMeetingProposal(
       ownerId: ownerId,
       chatRoomId: chatRoomId,
@@ -57,6 +62,15 @@ class QueueMeetingProposalUseCase {
       startsAt: slot.startsAt,
       endsAt: slot.endsAt,
     );
+  }
+
+  /// Returns whether the proposal is still saved and waiting.
+  Future<bool> tryDelivery(PendingAction action) async {
+    final pending = await repository.deliver(action);
+    if (pending?.status == PendingStatus.refused) {
+      throw DataException(pending?.lastError ?? 'This proposal could not be sent. Please try again.');
+    }
+    return pending != null;
   }
 }
 

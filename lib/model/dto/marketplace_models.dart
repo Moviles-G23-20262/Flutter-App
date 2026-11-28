@@ -96,6 +96,8 @@ ExchangeEntity exchangeFromJson(Json json) => ExchangeEntity(
       status: ExchangeStatusEnum.values.byName(json['status'] as String),
       createdAt: _optionalDate(json['createdAt']),
       completedAt: _optionalDate(json['completedAt']),
+      buyerConfirmedAt: _optionalDate(json['buyerConfirmedAt']),
+      sellerConfirmedAt: _optionalDate(json['sellerConfirmedAt']),
       receivedCondition: json['receivedCondition'] == null
           ? null
           : MaterialConditionEnum.values.byName(json['receivedCondition'] as String),

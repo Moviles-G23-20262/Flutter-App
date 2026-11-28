@@ -420,7 +420,7 @@ void main() {
       await vm.load();
 
       expect(vm.report, isNull);
-      expect(vm.error, contains("Can't reach the server"));
+      expect(vm.error, contains('Check your internet connection'));
       vm.dispose();
     });
   });

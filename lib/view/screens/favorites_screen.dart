@@ -62,12 +62,12 @@ class FavoritesScreen extends StatelessWidget {
                 ),
                 Divider(color: border, height: 1),
                 if (market.wishlistSavedAt != null)
-                  SavedCopyBanner(savedAt: market.wishlistSavedAt!, onRetry: market.isLoading ? null : market.load),
+                  SavedCopyBanner(savedAt: market.wishlistSavedAt!, onRetry: market.isWishlistLoading ? null : market.load),
                 Expanded(
-                  child: market.isFirstLoad && market.isLoading
+                  child: market.isWishlistLoading && items.isEmpty && market.wishlistSavedAt == null
                       ? const LoadingView()
-                      : market.error != null && market.wishlist.isEmpty
-                          ? ErrorView(message: market.error!, onRetry: market.load)
+                      : market.wishlistError != null && market.wishlist.isEmpty
+                          ? ErrorView(message: market.wishlistError!, onRetry: market.load)
                           : items.isEmpty
                               ? const EmptyView(
                                   icon: Icons.favorite_border_rounded,

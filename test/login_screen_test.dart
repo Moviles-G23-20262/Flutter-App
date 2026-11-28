@@ -239,8 +239,8 @@ void main() {
       await type(tester, email: 'ana@uniandes.edu.co', password: 'secret-pass');
 
       const cases = {
-        'network': (AuthNetworkException(), "Can't reach the server. Check your connection and try again."),
-        'server': (AuthServerException(), 'Something went wrong on our side. Please try again later.'),
+        'network': (AuthNetworkException(), 'Check your internet connection and try again.'),
+        'server': (AuthServerException(), 'Campus Swap is temporarily unavailable. Please try again in a moment.'),
       };
       for (final entry in cases.entries) {
         auth.error = entry.value.$1;

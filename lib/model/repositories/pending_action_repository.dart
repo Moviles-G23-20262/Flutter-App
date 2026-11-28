@@ -8,6 +8,7 @@ abstract class PendingActionRepository {
     required String ownerId,
     required String exchangeId,
     MaterialConditionEnum? receivedCondition,
+    NewRating? rating,
   });
 
   Future<PendingAction> queueRating({required String ownerId, required NewRating rating});
@@ -26,6 +27,9 @@ abstract class PendingActionRepository {
     required double newPrice,
     String? listingTitle,
   });
+
+  /// Attempts delivery. Returns the stored step if it is still waiting or was refused.
+  Future<PendingAction?> deliver(PendingAction action);
 
   /// [ownerId]'s queued steps now, and again after every change (queued, sent, refused, discarded).
   Stream<List<PendingAction>> watch(String ownerId);

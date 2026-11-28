@@ -149,15 +149,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 if (account.notificationsSavedAt != null)
                   SavedCopyBanner(
                     savedAt: account.notificationsSavedAt!,
-                    onRetry: account.isLoading ? null : account.load,
+                    onRetry: account.isNotificationsLoading ? null : account.load,
                   ),
 
                 Expanded(
-                  child: account.isFirstLoad && account.isLoading
+                  child: account.isNotificationsLoading && items.isEmpty && account.notificationsSavedAt == null
                       ? const LoadingView()
-                      : account.error != null && items.isEmpty
+                      : account.notificationsError != null && items.isEmpty
                           ? ErrorView(
-                              message: account.error!,
+                              message: account.notificationsError!,
                               onRetry: account.load,
                             )
                           : items.isEmpty

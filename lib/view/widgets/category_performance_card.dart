@@ -211,7 +211,7 @@ class _SavedCopyNote extends StatelessWidget {
       liveRegion: true,
       label: refreshing
           ? 'Showing the copy saved ${age.toLowerCase()} while it refreshes'
-          : 'The server could not be reached. Showing the copy saved ${age.toLowerCase()}; it may be outdated',
+          : 'Showing the copy saved ${age.toLowerCase()}. Try again for the latest figures.',
       excludeSemantics: true,
       child: Row(
         key: const Key('category-performance-saved-copy'),

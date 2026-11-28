@@ -106,6 +106,7 @@ class SmartListingViewModel extends ChangeNotifier {
   bool _isPublishing = false;
   bool _published = false;
   bool _savedOffline = false;
+  String? _savedListingMessage;
 
   /// The client id of the listing being published. It stays the same for every attempt of this
   /// form (online, retried after an error, or saved offline), so the server can tell they are
@@ -207,6 +208,7 @@ class SmartListingViewModel extends ChangeNotifier {
 
   /// Published = true and the listing is waiting on the phone ([savedOfflineMessage]), not live yet.
   bool get savedOffline => _savedOffline;
+  String get savedListingMessage => _savedListingMessage ?? savedOfflineMessage;
   String? get publishError => _publishError;
 
   // ── Intents from the View ─────────────────────────────────────────────────
@@ -389,6 +391,7 @@ class SmartListingViewModel extends ChangeNotifier {
 
     String? error;
     var savedOffline = false;
+    var keptInOutbox = false;
     var compressedPaths = <String>[];
     try {
       // The photos are shrunk and saved on the phone first (in an isolate, so the screen keeps
@@ -411,7 +414,25 @@ class SmartListingViewModel extends ChangeNotifier {
         clientId: _listingClientId ??= newListingId(),
       );
 
-      if (await _isOnline()) {
+      final queue = queueListing;
+      final owner = userId;
+      if (queue != null && queue.canDeliver && owner != null && compressedPaths.length == images.length) {
+        final queued = await queue.execute(ownerId: owner, data: data, photoPaths: compressedPaths);
+        keptInOutbox = true;
+        savedOffline = true;
+        await discardDraft();
+        if (await _isOnline()) {
+          try {
+            final remaining = await queue.deliver(queued);
+            savedOffline = remaining != null;
+            _savedListingMessage = remaining?.isRefused == true
+                ? 'Your listing was saved. Open My Listings to see what needs attention.'
+                : 'Your listing is saved. We’ll publish it when a connection is available.';
+          } catch (_) {
+            _savedListingMessage = 'Your listing is saved. Check My Listings for its status.';
+          }
+        }
+      } else if (await _isOnline()) {
         try {
           await publisher!(data);
         } on NoConnectionException {
@@ -428,7 +449,7 @@ class SmartListingViewModel extends ChangeNotifier {
       error = 'Unexpected error. Please try again.';
     }
     // Published or refused: the compressed copies are not needed. Queued ones are kept.
-    if (!savedOffline) await deleteCompressedPhotos(compressedPaths);
+    if (!keptInOutbox && !savedOffline) await deleteCompressedPhotos(compressedPaths);
 
     if (_disposed) return false;
     _isPublishing = false;
@@ -436,7 +457,7 @@ class SmartListingViewModel extends ChangeNotifier {
     _published = error == null;
     _savedOffline = error == null && savedOffline;
     // Published, or saved in the offline queue: either way the draft has done its job.
-    if (_published) unawaited(discardDraft());
+    if (_published && !keptInOutbox) unawaited(discardDraft());
     notifyListeners();
     return _published;
   }

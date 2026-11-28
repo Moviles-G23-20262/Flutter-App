@@ -1,3 +1,6 @@
+const checkInternetMessage = 'Check your internet connection and try again.';
+const temporarilyUnavailableMessage = 'Campus Swap is temporarily unavailable. Please try again in a moment.';
+
 /// A request for marketplace data failed. [message] is safe to show to the user.
 class DataException implements Exception {
   final String message;
@@ -11,5 +14,7 @@ class DataException implements Exception {
 /// on the phone and sent later.
 class NoConnectionException extends DataException {
   const NoConnectionException()
-      : super("Can't reach the server. Check your connection and try again.");
+      : super(checkInternetMessage);
+
+  const NoConnectionException.serviceUnavailable() : super(temporarilyUnavailableMessage);
 }

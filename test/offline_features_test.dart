@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_front_end/app/network/api_client.dart';
@@ -8,6 +9,8 @@ import 'package:flutter_front_end/model/data_sources/local/draft_store.dart';
 import 'package:flutter_front_end/model/data_sources/local/outbox_store.dart';
 import 'package:flutter_front_end/model/data_sources/local/response_cache.dart';
 import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/meetup_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/remote_outbox_sender.dart';
 import 'package:flutter_front_end/model/data_sources/session_storage.dart';
 import 'package:flutter_front_end/model/dto/auth_session_model.dart';
 import 'package:flutter_front_end/model/entities/exchange_entity.dart';
@@ -50,6 +53,7 @@ AppDatabase _memoryDatabase() => AppDatabase.withFactory(databaseFactoryFfi);
 
 class _FakeAuthRemote implements AuthRemoteDataSource {
   Exception? meError;
+  Future<UserEntity>? meResponse;
   UserEntity me_ = _ana;
 
   @override
@@ -62,6 +66,8 @@ class _FakeAuthRemote implements AuthRemoteDataSource {
   @override
   Future<UserEntity> me() async {
     if (meError != null) throw meError!;
+    final response = meResponse;
+    if (response != null) return response;
     return me_;
   }
 
@@ -112,7 +118,10 @@ class _MemoryBiometric implements BiometricCredentialStorage {
 
 const _seller = UserSummary(id: 'luis-id', fullName: 'Luis Perez', major: 'ISIS', rating: 4);
 
-ExchangeEntity _exchange({ExchangeStatusEnum status = ExchangeStatusEnum.PENDING}) => ExchangeEntity(
+ExchangeEntity _exchange({
+  ExchangeStatusEnum status = ExchangeStatusEnum.PENDING,
+  DateTime? buyerConfirmedAt,
+}) => ExchangeEntity(
       id: 'ex-1',
       orderNumber: 1001,
       materialId: 'm-1',
@@ -120,18 +129,20 @@ ExchangeEntity _exchange({ExchangeStatusEnum status = ExchangeStatusEnum.PENDING
       sellerId: _seller.id,
       price: 20000,
       status: status,
+      buyerConfirmedAt: buyerConfirmedAt,
       seller: _seller,
     );
 
 class _FakeExchanges implements ExchangeRepository {
   Object? completeError;
   Object? rateError;
+  ExchangeEntity? confirmation;
   final List<NewRating> ratings = [];
 
   @override
   Future<ExchangeEntity> complete(String exchangeId, {MaterialConditionEnum? receivedCondition}) async {
     if (completeError != null) throw completeError!;
-    return _exchange(status: ExchangeStatusEnum.COMPLETED);
+    return confirmation ?? _exchange(status: ExchangeStatusEnum.COMPLETED);
   }
 
   @override
@@ -154,7 +165,7 @@ class _OfflineNetwork implements ConnectivityRepository {
 
 class _RecordingSender implements OutboxSender {
   final List<String> sent = [];
-  final Map<PendingActionKind, ApiException> refuse = {};
+  final Map<PendingActionKind, Object> refuse = {};
 
   @override
   Future<void> sendAction(PendingAction action) async {
@@ -261,6 +272,37 @@ void main() {
       );
       expect((await repository.verifySession())?.fullName, 'Ana María Gomez');
       expect(await repository.verifySession(), isNull, reason: 'nothing left to verify');
+    });
+
+    test('a 503 at launch opens the saved profile and preserves the session', () async {
+      await newRepository().login(email: _ana.email, password: 'pw');
+      remote.meError = const ApiException(503, 'temporarily unavailable');
+      apiClient.authToken = null;
+
+      expect((await newRepository().restoreSession())?.id, _ana.id);
+      expect(apiClient.authToken, 'jwt-ana');
+      expect(owner.userId, _ana.id);
+    });
+
+    test('a slow session check cannot put a signed-out owner back in the cache', () async {
+      final repository = newRepository();
+      await repository.login(email: _ana.email, password: 'pw');
+      remote.meError = const NetworkException('offline');
+      await repository.restoreSession();
+      remote.meError = null;
+      final response = Completer<UserEntity>();
+      remote.meResponse = response.future;
+      final verification = repository.verifySession();
+
+      await repository.forgetBiometrics();
+      await repository.logout();
+      response.complete(_ana);
+
+      expect(await verification, isNull);
+      expect(owner.userId, isNull);
+      session.token = 'jwt-ana';
+      remote.meError = const NetworkException('offline');
+      expect(await repository.restoreSession(), isNull);
     });
 
     test('a token the server rejects on reconnect ends the session and drops the saved profile', () async {
@@ -415,6 +457,17 @@ void main() {
       expect(await drafts.load(userId: _ana.id, exchangeId: 'ex-1'), isNull);
     });
 
+    test('a saved confirmation queues the rating while the other party has not confirmed', () async {
+      exchanges.confirmation = _exchange(buyerConfirmedAt: DateTime(2026, 11, 27));
+      final vm = newViewModel();
+      fillForm(vm);
+
+      expect(await vm.submit(), ExchangeSubmitOutcome.waitingForOtherParty);
+      expect(updated.single.isPending, isTrue);
+      expect(exchanges.ratings, isEmpty);
+      expect((await outbox.actions(_ana.id)).single.kind, PendingActionKind.rate);
+    });
+
     test('completed online but the rating had no connection: only the rating is queued', () async {
       exchanges.rateError = const NoConnectionException();
       final vm = newViewModel();
@@ -487,7 +540,26 @@ void main() {
       expect(left.last.status, PendingStatus.waiting);
     });
 
-    test('a meeting proposal whose time already passed is refused on the phone', () async {
+    test('a rating waiting for the other party never blocks another exchange', () async {
+      sender.refuse[PendingActionKind.rate] = const OutboxActionDeferred();
+      await pending.queueRating(ownerId: 'ana', rating: rating);
+      await pending.queueCompletion(ownerId: 'ana', exchangeId: 'ex-2');
+
+      sync.start('ana');
+      await sync.flush();
+
+      expect(sender.sent, ['completeExchange:ex-2']);
+      final waiting = (await outbox.actions('ana')).single;
+      expect(waiting.status, PendingStatus.waiting);
+      expect(waiting.attempts, 0);
+
+      sender.refuse.clear();
+      await sync.flush();
+      expect(sender.sent.last, 'rate:ex-1');
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('an expired meeting proposal is refused without blocking a new proposal in the same chat', () async {
       await pending.queueMeetingProposal(
         ownerId: 'ana',
         chatRoomId: 'r1',
@@ -497,7 +569,7 @@ void main() {
       );
       await pending.queueMeetingProposal(
         ownerId: 'ana',
-        chatRoomId: 'r2',
+        chatRoomId: 'r1',
         meetingPointId: 'zone-1',
         startsAt: now.add(const Duration(days: 1)),
         endsAt: now.add(const Duration(days: 1, hours: 1)),
@@ -506,7 +578,7 @@ void main() {
       sync.start('ana');
       await sync.flush();
 
-      expect(sender.sent, ['proposeMeeting:r2']);
+      expect(sender.sent, ['proposeMeeting:r1']);
       final late = (await outbox.actions('ana')).single;
       expect(late.status, PendingStatus.refused);
       expect(late.lastError, contains('already passed'));
@@ -527,6 +599,98 @@ void main() {
       expect(updates, contains(1));
       expect(updates.last, 0);
       await subscription.cancel();
+    });
+  });
+
+  group('Meeting proposal delivery over HTTP', () {
+    late AppDatabase db;
+    late OutboxStore outbox;
+    late PendingActionRepositoryImpl pending;
+    late OutboxSyncService sync;
+    late DateTime now;
+    late List<String> requests;
+    late List<String> postedIds;
+    Map<String, dynamic>? received;
+
+    setUp(() {
+      db = _memoryDatabase();
+      outbox = OutboxStore(db);
+      pending = PendingActionRepositoryImpl(outbox);
+      now = DateTime.utc(2026, 11, 27, 12);
+      requests = [];
+      postedIds = [];
+      received = null;
+      final api = ApiClient(
+        baseUrl: 'https://api.test',
+        client: MockClient((request) async {
+          requests.add(request.method);
+          if (request.method == 'GET') {
+            expect(request.url.queryParameters['chatRoomId'], 'r1');
+            return http.Response(jsonEncode([?received]), 200);
+          }
+          final payload = jsonDecode(request.body) as Map<String, dynamic>;
+          final id = payload['clientId'] as String;
+          postedIds.add(id);
+          expect((await outbox.actions('ana')).single.id, id);
+          received ??= {...payload, 'id': id, 'proposerId': 'ana', 'status': 'PENDING'};
+          if (postedIds.length == 1) throw http.ClientException('The response was lost');
+          return http.Response(jsonEncode(received), 201);
+        }),
+      );
+      sync = OutboxSyncService(
+        store: outbox,
+        sender: RemoteOutboxSender(_FakeMarketRemote(), MeetupRemoteDataSourceImpl(apiClient: api)),
+        connectivity: _OfflineNetwork(),
+        now: () => now,
+      );
+    });
+
+    tearDown(() async {
+      sync.dispose();
+      await db.close();
+    });
+
+    Future<PendingAction> queueProposal(DateTime startsAt) => pending.queueMeetingProposal(
+          ownerId: 'ana',
+          chatRoomId: 'r1',
+          meetingPointId: 'zone-1',
+          startsAt: startsAt,
+          endsAt: startsAt.add(const Duration(hours: 1)),
+        );
+
+    test('a retry reuses the ID that was saved before the first request', () async {
+      final action = await queueProposal(now.add(const Duration(hours: 1)));
+      sync.start('ana');
+      await sync.flush();
+      expect((await outbox.actions('ana')).single.status, PendingStatus.waiting);
+
+      await sync.flush();
+
+      expect(postedIds, [action.id, action.id]);
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('after expiry, a read confirms a proposal whose first response was lost', () async {
+      await queueProposal(now.add(const Duration(hours: 1)));
+      sync.start('ana');
+      await sync.flush();
+      now = now.add(const Duration(hours: 2));
+
+      await sync.flush();
+
+      expect(requests, ['POST', 'GET']);
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('a proposal the server never received is refused without posting it after expiry', () async {
+      await queueProposal(now.subtract(const Duration(hours: 2)));
+      sync.start('ana');
+      await sync.flush();
+
+      expect(requests, ['GET']);
+      final expired = (await outbox.actions('ana')).single;
+      expect(expired.status, PendingStatus.refused);
+      expect(expired.lastError, contains('already passed'));
     });
   });
 

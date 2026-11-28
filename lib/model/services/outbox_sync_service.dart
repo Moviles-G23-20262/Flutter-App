@@ -23,6 +23,16 @@ abstract class OutboxSender {
   Future<void> sendAction(PendingAction action);
 }
 
+/// Resolves a proposal that may have reached the server before its time passed.
+abstract interface class MeetingProposalLookup implements OutboxSender {
+  Future<bool> wasMeetingProposalDelivered(PendingAction action);
+}
+
+/// The action depends on a change by the other participant and is still valid.
+class OutboxActionDeferred implements Exception {
+  const OutboxActionDeferred();
+}
+
 /// How one delivery attempt ended.
 enum SyncOutcome {
   /// Confirmed by the server; removed from the outbox.
@@ -30,6 +40,7 @@ enum SyncOutcome {
 
   /// No network, a 5xx or an expired session: it stays queued and the flush stops.
   retryLater,
+  deferred,
 
   /// The server refused it (4xx): kept with the server's reason until the user discards it.
   refused,
@@ -70,6 +81,7 @@ class OutboxSyncService {
   }) : _now = now ?? DateTime.now;
 
   String? _ownerId;
+  int _session = 0;
   StreamSubscription<bool>? _connectivitySubscription;
   StreamSubscription<NetworkTransport>? _transportSubscription;
   StreamSubscription<void>? _storeChangesSubscription;
@@ -80,6 +92,7 @@ class OutboxSyncService {
   /// A trigger arrived during a flush (e.g. a new item was queued): flush once more after it.
   bool _flushAgain = false;
   bool _flushAgainOverMobileData = false;
+  bool _connectionChangedWhileFlushing = false;
 
   bool _waitingForWifi = false;
   final StreamController<bool> _waitingForWifiController = StreamController<bool>.broadcast();
@@ -109,7 +122,7 @@ class OutboxSyncService {
     _ownerId = ownerId;
     _connectivitySubscription ??= connectivity.watch().listen((online) {
       if (online) {
-        flush();
+        _flushAfterConnectionChange();
       } else {
         _setWaitingForWifi(false);
       }
@@ -119,11 +132,11 @@ class OutboxSyncService {
       _transportSubscription ??= netTransport.watchTransport().listen((kind) {
         if (kind == NetworkTransport.wifi) {
           _setWaitingForWifi(false);
-          flush();
+          _flushAfterConnectionChange();
         } else if (kind == NetworkTransport.none) {
           _setWaitingForWifi(false);
         } else {
-          flush();
+          _flushAfterConnectionChange();
         }
       }, onError: (_) {});
     }
@@ -136,6 +149,7 @@ class OutboxSyncService {
   /// Stops syncing (on logout). Queued rows stay: they belong to that user and are sent the next
   /// time they sign in on this phone.
   void stop() {
+    _session++;
     _ownerId = null;
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
@@ -148,17 +162,17 @@ class OutboxSyncService {
     _failedFlushes = 0;
     _flushAgain = false;
     _flushAgainOverMobileData = false;
+    _connectionChangedWhileFlushing = false;
     _setWaitingForWifi(false);
   }
 
   Future<void> _refreshWaitingState() async {
     final ownerId = _ownerId;
     if (ownerId == null || _running != null) return;
-    if (!await _hasDeliverableWaitingItems(ownerId)) {
-      _setWaitingForWifi(false);
-    } else if (await _isBlockedOnMobileData(ownerId)) {
-      _setWaitingForWifi(true);
-    }
+    final session = _session;
+    final waiting = await _hasDeliverableWaitingItems(ownerId) &&
+        await _isBlockedOnMobileData();
+    if (session == _session && _running == null) _setWaitingForWifi(waiting);
   }
 
   Future<bool> _hasDeliverableWaitingItems(String ownerId) async {
@@ -181,7 +195,7 @@ class OutboxSyncService {
     for (final a in actions) {
       if (heldGroups.contains(a.groupId)) continue;
       if (a.status == PendingStatus.refused) {
-        heldGroups.add(a.groupId);
+        if (a.kind != PendingActionKind.proposeMeeting) heldGroups.add(a.groupId);
       } else if (a.status == PendingStatus.waiting) {
         return true;
       }
@@ -189,13 +203,26 @@ class OutboxSyncService {
     return false;
   }
 
-  Future<bool> _isBlockedOnMobileData(String ownerId) async {
-    final netTransport = transport;
-    if (netTransport == null) return false;
-    final current = await netTransport.currentTransport();
+  Future<bool> _isBlockedOnMobileData() async {
+    final current = await transport?.currentTransport();
     if (current != NetworkTransport.mobile) return false;
     final allowed = await mobileDataPreference?.isAllowed() ?? false;
     return !allowed;
+  }
+
+  void _flushAfterConnectionChange() {
+    if (_running != null) _connectionChangedWhileFlushing = true;
+    flush();
+  }
+
+  Future<void> _checkBeforeSend(int session, {required bool overMobileData}) async {
+    final kind = await transport?.currentTransport();
+    final blocked = kind == NetworkTransport.mobile &&
+        !overMobileData &&
+        !(await mobileDataPreference?.isAllowed() ?? false);
+    if (session != _session || kind == NetworkTransport.none || blocked) {
+      throw const _SyncPaused();
+    }
   }
 
   /// Sends everything that is waiting. While a flush is running no second one starts: this one
@@ -213,58 +240,57 @@ class OutboxSyncService {
     }
     final ownerId = _ownerId;
     if (ownerId == null) return Future.value();
+    final session = _session;
 
     final completer = Completer<void>();
     _running = completer;
     _retryTimer?.cancel();
     _retryTimer = null;
-    _runFlush(ownerId, overMobileData: overMobileData).then((deliveredEverything) {
-      if (_ownerId != ownerId) return;
+    _runFlush(ownerId, session, overMobileData: overMobileData).then((deliveredEverything) {
+      if (session != _session) return;
       if (deliveredEverything) {
         _failedFlushes = 0;
       } else {
         _scheduleRetry();
       }
     }).catchError((Object _) {
-      if (_ownerId == ownerId) _scheduleRetry();
+      if (session == _session) _scheduleRetry();
     }).whenComplete(() {
       _running = null;
-      if (_flushAgain && _ownerId == ownerId) {
+      if (_flushAgain && _ownerId != null) {
         final nextOverMobile = _flushAgainOverMobileData;
         _flushAgain = false;
         _flushAgainOverMobileData = false;
+        _connectionChangedWhileFlushing = false;
         flush(overMobileData: nextOverMobile).whenComplete(completer.complete);
       } else {
         _flushAgain = false;
         _flushAgainOverMobileData = false;
+        _connectionChangedWhileFlushing = false;
         completer.complete();
       }
     });
     return completer.future;
   }
 
-  Future<bool> _runFlush(String ownerId, {required bool overMobileData}) async {
-    if (!await _hasDeliverableWaitingItems(ownerId)) {
+  Future<bool> _runFlush(String ownerId, int session, {required bool overMobileData}) async {
+    try {
+      await _checkBeforeSend(session, overMobileData: overMobileData);
       _setWaitingForWifi(false);
+      return await _deliverAll(ownerId, () => _checkBeforeSend(session, overMobileData: overMobileData));
+    } on _SyncPaused {
+      if (session == _session) {
+        final waiting = await _isBlockedOnMobileData() && await _hasDeliverableWaitingItems(ownerId);
+        if (session == _session) _setWaitingForWifi(waiting);
+      }
       return true;
     }
-    if (!overMobileData && await _isBlockedOnMobileData(ownerId)) {
-      _setWaitingForWifi(true);
-      return true;
-    }
-    _setWaitingForWifi(false);
-    final delivered = await _deliverAll(ownerId);
-    if (!delivered && !overMobileData && await _hasDeliverableWaitingItems(ownerId) && await _isBlockedOnMobileData(ownerId)) {
-      _setWaitingForWifi(true);
-      return true;
-    }
-    await _refreshWaitingState();
-    return delivered;
   }
 
   /// The server could not be reached, so flushing again right away would fail too: the backoff
   /// timer takes over, including for triggers that arrived during this flush.
   void _scheduleRetry() {
+    if (_flushAgainOverMobileData || _connectionChangedWhileFlushing) return;
     _flushAgain = false;
     _flushAgainOverMobileData = false;
     final delay = _retryDelay(_failedFlushes);
@@ -281,12 +307,12 @@ class OutboxSyncService {
   }
 
   /// `false` when something has to wait for a later flush.
-  Future<bool> _deliverAll(String ownerId) async {
+  Future<bool> _deliverAll(String ownerId, Future<void> Function() checkBeforeSend) async {
     for (final listing in await store.listings(ownerId)) {
       if (listing.status != PendingStatus.waiting) continue;
-      final outcome = await _attempt(PendingKind.listing, listing.id, () => _deliverListing(listing));
+      final outcome = await _attempt(PendingKind.listing, listing.id, () => _deliverListing(listing, checkBeforeSend));
       if (outcome == SyncOutcome.sent) await deleteCompressedPhotos(listing.photoPaths);
-      if (outcome == SyncOutcome.retryLater || _ownerId != ownerId) return false;
+      if (outcome == SyncOutcome.retryLater) return false;
     }
 
     final messages = await store.messages(ownerId);
@@ -298,45 +324,59 @@ class OutboxSyncService {
         continue;
       }
       if (message.status != PendingStatus.waiting) continue;
+      await checkBeforeSend();
       final outcome = await _attempt(PendingKind.message, message.id, () => sender.sendMessage(message));
-      if (outcome == SyncOutcome.retryLater || _ownerId != ownerId) return false;
+      if (outcome == SyncOutcome.retryLater) return false;
       if (outcome == SyncOutcome.refused) heldRooms.add(message.chatRoomId);
     }
 
     final actions = await store.actions(ownerId);
     final heldGroups = <String>{};
+    var hasDeferredAction = false;
     for (final action in actions) {
       if (heldGroups.contains(action.groupId)) continue;
       if (action.status == PendingStatus.refused) {
-        heldGroups.add(action.groupId);
+        if (action.kind != PendingActionKind.proposeMeeting) heldGroups.add(action.groupId);
         continue;
       }
       if (action.status != PendingStatus.waiting) continue;
+      await checkBeforeSend();
       final startsAt = action.meetingStartsAt;
-      if (startsAt != null && !startsAt.isAfter(_now())) {
-        // Saved offline and the time went by: the other person could not make it anyway.
-        await store.markRefused(PendingKind.action, action.id, 'That time already passed. Propose another one.');
+      final expired = startsAt != null && !startsAt.isAfter(_now());
+      final outcome = await _attempt(
+        PendingKind.action,
+        action.id,
+        () => expired ? _resolveExpiredProposal(action) : sender.sendAction(action),
+      );
+      if (outcome == SyncOutcome.retryLater) return false;
+      if (outcome == SyncOutcome.deferred) hasDeferredAction = true;
+      if (outcome != SyncOutcome.sent && action.kind != PendingActionKind.proposeMeeting) {
         heldGroups.add(action.groupId);
-        continue;
       }
-      final outcome = await _attempt(PendingKind.action, action.id, () => sender.sendAction(action));
-      if (outcome == SyncOutcome.retryLater || _ownerId != ownerId) return false;
-      if (outcome == SyncOutcome.refused) heldGroups.add(action.groupId);
     }
-    return true;
+    return !hasDeferredAction;
+  }
+
+  Future<void> _resolveExpiredProposal(PendingAction action) async {
+    // The app may have stopped during the request, before recording any attempt.
+    final lookup = sender;
+    if (lookup is MeetingProposalLookup && await lookup.wasMeetingProposalDelivered(action)) return;
+    throw const ApiException(400, 'That time already passed. Propose another one.');
   }
 
   /// Uploads the photos that are not on the server yet, one request each, in order. Every URL is
   /// saved as soon as it arrives, so a connection that drops half way costs only the photos
   /// still missing. Then the listing itself is created.
-  Future<void> _deliverListing(PendingListing listing) async {
+  Future<void> _deliverListing(PendingListing listing, Future<void> Function() checkBeforeSend) async {
     final urls = List<String>.of(listing.uploadedUrls);
     for (var i = urls.length; i < listing.photoPaths.length; i++) {
+      await checkBeforeSend();
       urls.add(await sender.uploadPhoto(listing.photoPaths[i]));
       await store.saveUploadedUrls(listing.id, urls);
     }
     // The listing's own id is its clientId: if an earlier attempt reached the server but its answer
     // was lost, the server returns that listing instead of creating a second one.
+    await checkBeforeSend();
     await sender.createListing({...listing.payload, 'clientId': listing.id, 'imageUrls': urls});
   }
 
@@ -345,6 +385,10 @@ class OutboxSyncService {
       await send();
       await store.markSent(kind, id);
       return SyncOutcome.sent;
+    } on _SyncPaused {
+      rethrow;
+    } on OutboxActionDeferred {
+      return SyncOutcome.deferred;
     } on NetworkException catch (e) {
       _log('${kind.name} $id: no answer, kept for a retry (${e.message})');
       await store.markRetry(kind, id, e.message);
@@ -382,4 +426,8 @@ class OutboxSyncService {
     stop();
     _waitingForWifiController.close();
   }
+}
+
+class _SyncPaused implements Exception {
+  const _SyncPaused();
 }

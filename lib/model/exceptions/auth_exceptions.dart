@@ -1,3 +1,5 @@
+import 'data_exceptions.dart';
+
 sealed class AuthException implements Exception {
   final String message;
   const AuthException(this.message);
@@ -26,7 +28,7 @@ final class InvalidCredentialsException extends AuthException {
 
 final class AuthNetworkException extends AuthException {
   const AuthNetworkException()
-      : super("Can't reach the server. Check your connection and try again.");
+      : super(checkInternetMessage);
 }
 
 /// The server refused a profile edit; [message] says why, in words for the user.
@@ -36,6 +38,6 @@ final class ProfileUpdateException extends AuthException {
 
 final class AuthServerException extends AuthException {
   const AuthServerException([
-    super.message = 'Something went wrong on our side. Please try again later.',
+    super.message = temporarilyUnavailableMessage,
   ]);
 }

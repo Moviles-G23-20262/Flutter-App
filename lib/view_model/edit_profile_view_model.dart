@@ -25,8 +25,7 @@ class EditProfileViewModel extends ChangeNotifier {
   static const String offlineReason =
       "You're offline. Your changes are kept on this phone; connect to the internet to save them.";
   static const String networkErrorMessage =
-      "Couldn't reach the server, so nothing was saved. Your changes are kept on this phone; "
-      'try again when the connection is back.';
+      'Your changes are saved on this phone. Check your internet connection and try again.';
   static const String invalidReason = 'Fix the highlighted fields to save.';
   static const String noChangesReason = 'Change something to save it.';
   static const String catalogErrorMessage = "Couldn't load the list of Uniandes programs.";

@@ -21,11 +21,12 @@ class PendingActionRepositoryImpl implements PendingActionRepository {
     required String ownerId,
     required String exchangeId,
     MaterialConditionEnum? receivedCondition,
+    NewRating? rating,
   }) =>
       _queue(ownerId, PendingActionKind.completeExchange, exchangeId, {
         'exchangeId': exchangeId,
         if (receivedCondition != null) 'receivedCondition': receivedCondition.name,
-      });
+      }, ratingPayload: rating == null ? null : newRatingToJson(rating));
 
   @override
   Future<PendingAction> queueRating({required String ownerId, required NewRating rating}) =>
@@ -68,11 +69,26 @@ class PendingActionRepositoryImpl implements PendingActionRepository {
     String ownerId,
     PendingActionKind kind,
     String groupId,
-    Map<String, dynamic> payload,
-  ) async {
-    final action = await store.enqueueAction(ownerId: ownerId, kind: kind, groupId: groupId, payload: payload);
+    Map<String, dynamic> payload, {
+    Map<String, dynamic>? ratingPayload,
+  }) async {
+    final action = ratingPayload == null
+        ? await store.enqueueAction(ownerId: ownerId, kind: kind, groupId: groupId, payload: payload)
+        : await store.enqueueCompletionAndRating(
+            ownerId: ownerId,
+            exchangeId: groupId,
+            completion: payload,
+            rating: ratingPayload,
+          );
     sync?.flush();
     return action;
+  }
+
+  @override
+  Future<PendingAction?> deliver(PendingAction action) async {
+    await sync?.flush();
+    final actions = await store.actions(action.ownerId);
+    return actions.where((item) => item.id == action.id).firstOrNull;
   }
 
   @override

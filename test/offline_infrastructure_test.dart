@@ -23,13 +23,25 @@ class _FakeConnectivity implements ConnectivityRepository {
   Stream<bool> watch() => changes.stream;
 }
 
+class _TestTransport implements NetworkTransportRepository {
+  NetworkTransport kind = NetworkTransport.wifi;
+
+  @override
+  Future<NetworkTransport> currentTransport() async => kind;
+
+  @override
+  Stream<NetworkTransport> watchTransport() => const Stream.empty();
+}
+
 /// Records what was sent; [failNext] decides how the next sends fail.
 class _FakeSender implements OutboxSender {
   final List<String> sent = [];
   final List<Object> failures = [];
   Completer<void>? gate;
+  Completer<void>? started;
 
   Future<void> _send(String label) async {
+    if (started?.isCompleted == false) started!.complete();
     if (gate != null) await gate!.future;
     if (failures.isNotEmpty) throw failures.removeAt(0);
     sent.add(label);
@@ -366,6 +378,44 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 150));
 
       expect(sender.sent, ['r1:written offline']);
+    });
+
+    test('switching accounts during a send starts the new account without sending more old rows', () async {
+      sender.gate = Completer<void>();
+      sender.started = Completer<void>();
+      await store.enqueueMessage(ownerId: 'ana', chatRoomId: 'r1', content: 'in flight');
+      await store.enqueueMessage(ownerId: 'ana', chatRoomId: 'r1', content: 'keep for ana');
+      await store.enqueueMessage(ownerId: 'luis', chatRoomId: 'r2', content: 'send for luis');
+      sync.start('ana');
+      await sender.started!.future;
+      sync.start('luis');
+      final finished = sync.flush();
+      sender.gate!.complete();
+      await finished;
+
+      expect(sender.sent, ['r1:in flight', 'r2:send for luis']);
+      expect((await store.messages('ana')).single.content, 'keep for ana');
+    });
+
+    test('a Wi-Fi to mobile handoff pauses the remaining sends until explicit permission', () async {
+      sync.dispose();
+      final transport = _TestTransport();
+      sync = OutboxSyncService(store: store, sender: sender, connectivity: connectivity, transport: transport);
+      sender.gate = Completer<void>();
+      sender.started = Completer<void>();
+      await store.enqueueMessage(ownerId: 'ana', chatRoomId: 'r1', content: 'over wifi');
+      await store.enqueueMessage(ownerId: 'ana', chatRoomId: 'r1', content: 'wait for wifi');
+      sync.start('ana');
+      final finished = sync.flush();
+      await sender.started!.future;
+      transport.kind = NetworkTransport.mobile;
+      sender.gate!.complete();
+      await finished;
+
+      expect(sender.sent, ['r1:over wifi']);
+      expect(sync.isWaitingForWifi, isTrue);
+      await sync.flush(overMobileData: true);
+      expect(sender.sent, ['r1:over wifi', 'r1:wait for wifi']);
     });
   });
 }

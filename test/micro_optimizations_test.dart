@@ -209,6 +209,12 @@ class _MemDensity implements MeetingDensityRepository {
 }
 
 class _MemPendingListings implements PendingListingRepository {
+  @override
+  bool get canDeliver => false;
+
+  @override
+  Future<PendingListing?> deliver(PendingListing listing) async => listing;
+
   final _ctrl = StreamController<List<PendingListing>>.broadcast();
 
   @override

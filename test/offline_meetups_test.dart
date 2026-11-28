@@ -2,6 +2,7 @@
 import 'package:flutter_front_end/app/network/api_client.dart';
 import 'package:flutter_front_end/model/data_sources/local/app_database.dart';
 import 'package:flutter_front_end/model/data_sources/local/campus_zones_asset_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/local/outbox_store.dart';
 import 'package:flutter_front_end/model/data_sources/local/response_cache.dart';
 import 'package:flutter_front_end/model/data_sources/meetup_remote_data_source.dart';
 import 'package:flutter_front_end/model/dto/marketplace_models.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_front_end/model/entities/meeting_point_density.dart';
 import 'package:flutter_front_end/model/entities/meetup_entities.dart';
 import 'package:flutter_front_end/model/exceptions/data_exceptions.dart';
 import 'package:flutter_front_end/model/repositories/impl/meetup_repositories_impl.dart';
+import 'package:flutter_front_end/model/repositories/impl/pending_action_repository_impl.dart';
 import 'package:flutter_front_end/model/repositories/meeting_density_repository.dart';
 import 'package:flutter_front_end/model/repositories/meetup_repositories.dart';
 import 'package:flutter_front_end/model/rules/campus_default_zones.dart';
@@ -17,6 +19,7 @@ import 'package:flutter_front_end/model/services/session_owner.dart';
 import 'package:flutter_front_end/model/use_cases/get_meeting_point_density_use_case.dart';
 import 'package:flutter_front_end/model/use_cases/meeting_point_recommendation_use_case.dart';
 import 'package:flutter_front_end/model/use_cases/meetup_use_cases.dart';
+import 'package:flutter_front_end/model/use_cases/pending_action_use_cases.dart';
 import 'package:flutter_front_end/model/use_cases/rank_meeting_points_use_case.dart';
 import 'package:flutter_front_end/view_model/meeting_planner_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,6 +73,9 @@ class _FakeMeetupRemote implements MeetupRemoteDataSource {
 
   @override
   Future<MeetingProposalEntity> createProposal(Map<String, dynamic> body) => throw UnimplementedError();
+
+  @override
+  Future<List<MeetingProposalEntity>> getProposals(String chatRoomId) => throw UnimplementedError();
 
   @override
   Future<MeetingProposalEntity> answerProposal(String proposalId, String action) => throw UnimplementedError();
@@ -270,7 +276,7 @@ void main() {
   });
 
   group('meeting planner offline', () {
-    MeetupUseCases useCases(MeetupRepository repo) => MeetupUseCases(
+    MeetupUseCases useCases(MeetupRepository repo, {QueueMeetingProposalUseCase? queue}) => MeetupUseCases(
           getMeetingPoints: GetMeetingPointsUseCase(repo),
           getSuggestions: GetMeetingSuggestionsUseCase(repo),
           propose: ProposeMeetingUseCase(repo),
@@ -279,7 +285,29 @@ void main() {
           rankZones: RankSafeZonesUseCase(),
           recommend: RecommendMeetingPointUseCase(const RankMeetingPointsUseCase()),
           getDensity: GetMeetingPointDensityUseCase(_NoDensity()),
+          queuePropose: queue,
         );
+
+    test('the signed-in planner saves the selection even when no send can start', () async {
+      final startsAt = _now.add(const Duration(hours: 1));
+      remote.suggestions = {
+        'slots': [_slot(startsAt, startsAt.add(const Duration(hours: 1)))],
+        'callerHasSchedule': true,
+        'otherHasSchedule': true,
+      };
+      final store = OutboxStore(db);
+      final planner = MeetingPlannerViewModel(
+        useCases: useCases(repository(), queue: QueueMeetingProposalUseCase(PendingActionRepositoryImpl(store))),
+        chatRoomId: 'r1',
+        userId: 'ana-id',
+        now: () => _now,
+      );
+      addTearDown(planner.dispose);
+      await planner.load();
+      expect(await planner.propose(), isNull);
+      expect(planner.savedOffline, isTrue);
+      expect((await store.actions('ana-id')).single.payload, containsPair('meetingPointId', 'server-1'));
+    });
 
     test('shows the bundled zones and the saved hours, but does not send a bundled zone', () async {
       final upcoming = DateTime.now().add(const Duration(days: 1));

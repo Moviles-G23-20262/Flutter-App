@@ -268,9 +268,11 @@ class MarketplaceRemoteDataSourceImpl
   @override
   Future<List<ExchangeEntity>> getExchanges() async =>
       parseList(
-        await apiClient.get('/exchanges'),
+        await getExchangesJson(),
         exchangeFromJson,
       );
+
+  Future<Object?> getExchangesJson() => apiClient.get('/exchanges');
 
   @override
   Future<ExchangeEntity> placeOrder(
