@@ -1,4 +1,4 @@
 {
   "API_BASE_URL": "https://back-end-sigma-seven.vercel.app/",
-  "ANALYTICS_BASE_URL": "http://localhost:8000"
+  "ANALYTICS_BASE_URL": "https://analytics-back-end.vercel.app/"
 }
