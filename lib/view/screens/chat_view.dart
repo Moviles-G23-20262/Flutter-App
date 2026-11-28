@@ -573,7 +573,7 @@ class _OrderBanner extends StatelessWidget {
     final txMuted    = brightness == Brightness.dark ? AppColors.darkTextMuted : AppColors.lightTextMuted;
 
     final String text;
-    final String? action;
+    final String action;
     if (order.isPending) {
       final myId = isBuyer ? order.buyerId : order.sellerId;
       if (confirmationQueued) {
@@ -605,7 +605,7 @@ class _OrderBanner extends StatelessWidget {
             child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs)),
           ),
-          if (action != null) TextButton(onPressed: onOpen, child: Text(action)),
+          TextButton(onPressed: onOpen, child: Text(action)),
         ],
       ),
     );

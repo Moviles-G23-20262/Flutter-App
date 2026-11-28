@@ -146,8 +146,8 @@ class AppViewModel extends ChangeNotifier {
     chats.setOffline(!online);
     if (!_isLoggedIn) return;
     marketplace.load();
-    if (!online) return;
     account.load();
+    if (!online) return;
     averageTicket?.load(force: true);
     _verifyOfflineSession();
   }
