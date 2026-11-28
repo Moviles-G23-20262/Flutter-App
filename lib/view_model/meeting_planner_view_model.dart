@@ -41,6 +41,16 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   int _rankGeneration = 0;
   Future<void> _ranking = Future.value();
 
+  /// MO8: what the last ranking was computed from. The ranking depends only on the zones, the
+  /// location, the density table and the hour of the meeting, so the same inputs skip the isolate.
+  ({List<MeetingPointEntity> zones, GeoPoint? location, MeetingPointDensity density, int hour})? _rankedFrom;
+  int _rankingsStarted = 0;
+  int _rankingsSkipped = 0;
+
+  /// MO8 measurements: background rankings started, and the ones avoided because nothing changed.
+  int get rankingsStarted => _rankingsStarted;
+  int get rankingsSkipped => _rankingsSkipped;
+
   /// Best match first; see [RankMeetingPointsUseCase].
   List<RankedZone> get zones => _ranked;
 
@@ -177,6 +187,24 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   /// and applies the result when it arrives. Several triggers can overlap (hour picked, GPS fix,
   /// density answer); only the newest ranking is applied.
   Future<void> _rank() {
+    final inputs = (
+      zones: _zones,
+      location: _location,
+      density: _density,
+      hour: (_selectedSlot?.startsAt ?? _now()).hour,
+    );
+    final last = _rankedFrom;
+    if (last != null &&
+        identical(last.zones, inputs.zones) &&
+        last.location == inputs.location &&
+        identical(last.density, inputs.density) &&
+        last.hour == inputs.hour) {
+      // Same hour tapped again, a GPS fix at the same spot, another slot in the same hour...
+      _rankingsSkipped++;
+      return _ranking;
+    }
+    _rankedFrom = inputs;
+    _rankingsStarted++;
     final generation = ++_rankGeneration;
     return _ranking = useCases.recommend
         .executeInBackground(zones: _zones, from: _location, meetingAt: _selectedSlot?.startsAt, density: _density)

@@ -11,6 +11,7 @@ import '../../model/entities/pending_items.dart';
 import '../widgets/average_ticket_card.dart';
 import '../widgets/cached_photo.dart';
 import '../widgets/category_performance_card.dart';
+import '../widgets/course_demand_card.dart';
 import '../../model/entities/time_to_sell.dart';
 import '../widgets/offline_banner.dart';
 
@@ -222,6 +223,10 @@ class _SellerHubScreenState extends State<SellerHubScreen> {
                 ],
                 if (appState.categoryPerformance != null) ...[
                   CategoryPerformanceCard(viewModel: appState.categoryPerformance!),
+                  const SizedBox(height: 20),
+                ],
+                if (appState.courseDemand != null) ...[
+                  CourseDemandCard(viewModel: appState.courseDemand!),
                   const SizedBox(height: 20),
                 ],
                 _ListingHealthEntryCard(

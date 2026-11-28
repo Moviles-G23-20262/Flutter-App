@@ -86,6 +86,8 @@ import '../model/repositories/impl/seller_reputation_repository_impl.dart';
 import '../model/use_cases/seller_profile_use_cases.dart';
 import '../view_model/edit_profile_view_model.dart';
 import '../view_model/seller_profile_view_model.dart';
+import '../model/repositories/impl/course_demand_repository_impl.dart';
+import '../model/use_cases/get_course_demand_use_case.dart';
 import 'network/api_client.dart';
 
 class AppDependencies {
@@ -206,6 +208,9 @@ class AppDependencies {
   /// BQ6: listings and completed exchanges per category, for the Seller Hub.
   final GetCategoryPerformanceUseCase getCategoryPerformance;
 
+  /// BQ 19: the courses students want more listings of (Seller Hub card).
+  final GetCourseDemandUseCase getCourseDemand;
+
   /// Sprint 4 Seller Profile + BQ17 campus reputation benchmark.
   final GetSellerProfileUseCase getSellerProfile;
   final GetSellerReputationUseCase getSellerReputation;
@@ -267,6 +272,7 @@ class AppDependencies {
     required this.getTimeToSell,
     required this.getAverageTicket,
     required this.getCategoryPerformance,
+    required this.getCourseDemand,
     required this.getSellerProfile,
     required this.getSellerReputation,
     required this.connectivityRepository,
@@ -553,6 +559,9 @@ class AppDependencies {
       getTimeToSell: GetTimeToSellUseCase(timeToSellRepository),
       getAverageTicket: GetAverageTicketUseCase(averageTicketRepository),
       getCategoryPerformance: GetCategoryPerformanceUseCase(categoryPerformanceRepository),
+      getCourseDemand: GetCourseDemandUseCase(
+        CourseDemandRepositoryImpl(remote: analyticsRemote, cache: responseCache),
+      ),
       getSellerProfile: GetSellerProfileUseCase(sellerProfileRepository),
       getSellerReputation: GetSellerReputationUseCase(sellerReputationRepository),
       connectivityRepository: connectivity,

@@ -101,9 +101,9 @@ class AccountViewModel extends ChangeNotifier {
 }
 
   /// Orders [userId] placed, newest first (cancelled ones left out).
-  List<ExchangeEntity> purchasesOf(String userId) => _sortedBy((e) => e.buyerId == userId);
+  List<ExchangeEntity> purchasesOf(String userId) => _sortedBy('purchases:$userId', (e) => e.buyerId == userId);
 
-  List<ExchangeEntity> salesOf(String userId) => _sortedBy((e) => e.sellerId == userId);
+  List<ExchangeEntity> salesOf(String userId) => _sortedBy('sales:$userId', (e) => e.sellerId == userId);
 
   /// Completed exchanges as buyer or seller.
   int swapCountOf(String userId) =>
@@ -125,6 +125,7 @@ class AccountViewModel extends ChangeNotifier {
 
   /// The latest order (pending or completed) for [materialId] with [buyerId].
   ExchangeEntity? latestOrderFor(String materialId, String buyerId) => _sortedBy(
+        'latest:$materialId:$buyerId',
         (e) => e.materialId == materialId && e.buyerId == buyerId,
       ).firstOrNull;
 
@@ -251,10 +252,27 @@ class AccountViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<ExchangeEntity> _sortedBy(bool Function(ExchangeEntity) test) {
-    final list = _exchanges.where((e) => e.status != ExchangeStatusEnum.CANCELLED && test(e)).toList();
-    DateTime when(ExchangeEntity e) => e.completedAt ?? e.createdAt ?? DateTime(0);
-    list.sort((a, b) => when(b).compareTo(when(a)));
-    return list;
+  /// MO9: Profile, the chat header (rebuilt on every 4 s poll) and the Seller Hub ask for these
+  /// lists on every build. Each one is filtered and sorted once per version of [_exchanges] (the
+  /// list is replaced, never changed in place, on every load, refresh or update) and then reused.
+  final Map<String, List<ExchangeEntity>> _sortedMemo = {};
+  List<ExchangeEntity>? _sortedMemoSource;
+  int _sortComputations = 0;
+
+  /// MO9 measurement: how many times an order list was actually filtered and sorted.
+  int get sortComputations => _sortComputations;
+
+  List<ExchangeEntity> _sortedBy(String memoKey, bool Function(ExchangeEntity) test) {
+    if (!identical(_sortedMemoSource, _exchanges)) {
+      _sortedMemo.clear();
+      _sortedMemoSource = _exchanges;
+    }
+    return _sortedMemo.putIfAbsent(memoKey, () {
+      _sortComputations++;
+      final list = _exchanges.where((e) => e.status != ExchangeStatusEnum.CANCELLED && test(e)).toList();
+      DateTime when(ExchangeEntity e) => e.completedAt ?? e.createdAt ?? DateTime(0);
+      list.sort((a, b) => when(b).compareTo(when(a)));
+      return List.unmodifiable(list);
+    });
   }
 }
