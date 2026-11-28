@@ -32,6 +32,9 @@ Future<T> guardRequest<T>(
   } on NetworkException {
     throw const NoConnectionException();
   } on ApiException catch (e) {
+    if (e.statusCode == 408 || e.statusCode == 429 || e.statusCode >= 500) {
+      throw const NoConnectionException.serviceUnavailable();
+    }
     switch (e.statusCode) {
       case 400:
       case 403:
@@ -257,14 +260,25 @@ class ChatRepositoryImpl implements ChatRepository {
 
 class ExchangeRepositoryImpl implements ExchangeRepository {
   final MarketplaceRemoteDataSource remote;
+  final ResponseCache? cache;
+  final SessionOwner? owner;
+  final Future<Object?> Function()? fetchExchangesJson;
 
-  ExchangeRepositoryImpl(this.remote);
+  ExchangeRepositoryImpl(this.remote, {this.cache, this.owner, this.fetchExchangesJson});
 
   @override
-  Future<List<ExchangeEntity>> getExchanges() =>
-      guardRequest(
-        remote.getExchanges,
-      );
+  Future<List<ExchangeEntity>> getExchanges() async {
+    final fetch = fetchExchangesJson;
+    if (fetch == null) return guardRequest(remote.getExchanges);
+    final result = await _cachedList(
+      cache: cache,
+      owner: owner,
+      key: 'exchanges',
+      fetch: fetch,
+      parse: exchangeFromJson,
+    );
+    return result.items;
+  }
 
   @override
   Future<ExchangeEntity> placeOrder(

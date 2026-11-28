@@ -7,6 +7,10 @@ class QueueListingUseCase {
   final PendingListingRepository repository;
   QueueListingUseCase(this.repository);
 
+  bool get canDeliver => repository.canDeliver;
+
+  Future<PendingListing?> deliver(PendingListing listing) => repository.deliver(listing);
+
   Future<PendingListing> execute({
     required String ownerId,
     required NewListingData data,

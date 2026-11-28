@@ -83,14 +83,14 @@ class _ConversationList extends StatelessWidget {
 
     return Column(
       children: [
-        if (isOffline)
-          if (savedAt != null)
-            SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
-          else if (chats.rooms.isEmpty)
+        if (savedAt != null)
+          SavedCopyBanner(savedAt: savedAt, onRetry: chats.loadRooms)
+        else if (isOffline)
+          if (chats.rooms.isEmpty)
             OfflineBanner.firstLaunchOffline(noun: 'conversations', onRetry: chats.loadRooms)
           else
-            OfflineBanner.forCache(formattedAge: null, noun: 'conversations', onRetry: chats.loadRooms)
-        else if (appState.connectivity.isWaitingForWifi)
+            OfflineBanner.forCache(formattedAge: null, noun: 'conversations', onRetry: chats.loadRooms),
+        if (!isOffline && appState.connectivity.isWaitingForWifi)
           OfflineBanner.waitingForWifi(onSendNow: appState.syncOverMobileData),
 
         // Header
@@ -111,29 +111,31 @@ class _ConversationList extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: elevated,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderSubtle),
+              if (!isOffline && savedAt == null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: elevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderSubtle),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        unread > 0 ? Icons.mark_chat_unread_outlined : Icons.check_circle_outline_rounded,
+                        color: unread > 0 ? accentHi : successColor,
+                        size: 15,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        unread > 0 ? '$unread unread message${unread != 1 ? 's' : ''}' : "You're all caught up",
+                        style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      unread > 0 ? Icons.mark_chat_unread_outlined : Icons.check_circle_outline_rounded,
-                      color: unread > 0 ? accentHi : successColor,
-                      size: 15,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      unread > 0 ? '$unread unread message${unread != 1 ? 's' : ''}' : "You're all caught up",
-                      style: AppTextStyles.body(txSecondary, fontSize: AppTextStyles.sizeXs),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ],
           ),
         ),

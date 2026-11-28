@@ -228,7 +228,7 @@ class _NewListingSmartScreenState extends State<NewListingSmartScreen> {
                     Flexible(
                       child: Text(
                           vm.savedOffline
-                              ? SmartListingViewModel.savedOfflineMessage
+                              ? vm.savedListingMessage
                               : '"${_titleCtrl.text}" is ready for campus buyers.',
                           style: AppTextStyles.body(success, fontSize: AppTextStyles.sizeXs)),
                     ),

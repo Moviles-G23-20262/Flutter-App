@@ -538,6 +538,14 @@ class _MemoryOutboxStore implements OutboxStore {
       _actions.where((a) => a.ownerId == ownerId).toList(growable: false);
 
   @override
+  Future<PendingAction> enqueueCompletionAndRating({
+    required String ownerId,
+    required String exchangeId,
+    required Map<String, dynamic> completion,
+    required Map<String, dynamic> rating,
+  }) => throw UnimplementedError();
+
+  @override
   Future<void> markSent(PendingKind kind, String id) => discard(kind, id);
 
   @override

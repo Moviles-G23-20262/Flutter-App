@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:sqflite/sqflite.dart';
+
 import '../../entities/pending_items.dart';
 import '../../rules/client_id.dart';
 import 'app_database.dart';
@@ -157,6 +159,27 @@ class OutboxStore {
     required PendingActionKind kind,
     required String groupId,
     required Map<String, dynamic> payload,
+  }) => _enqueueAction(ownerId: ownerId, kind: kind, groupId: groupId, payload: payload);
+
+  Future<PendingAction> enqueueCompletionAndRating({
+    required String ownerId,
+    required String exchangeId,
+    required Map<String, dynamic> completion,
+    required Map<String, dynamic> rating,
+  }) => _enqueueAction(
+        ownerId: ownerId,
+        kind: PendingActionKind.completeExchange,
+        groupId: exchangeId,
+        payload: completion,
+        ratingPayload: rating,
+      );
+
+  Future<PendingAction> _enqueueAction({
+    required String ownerId,
+    required PendingActionKind kind,
+    required String groupId,
+    required Map<String, dynamic> payload,
+    Map<String, dynamic>? ratingPayload,
   }) async {
     final action = PendingAction(
       id: newClientId(),
@@ -167,18 +190,35 @@ class OutboxStore {
       createdAt: _now(),
     );
     final db = await _db.database;
-    await db.insert('pending_actions', {
-      'id': action.id,
-      'owner_id': ownerId,
-      'kind': kind.name,
-      'group_id': groupId,
-      'payload': jsonEncode(payload),
-      'created_at': action.createdAt.millisecondsSinceEpoch,
-      'status': PendingStatus.waiting.name,
-    });
+    if (ratingPayload == null) {
+      await _insertAction(db, action);
+    } else {
+      await db.transaction((tx) async {
+        await _insertAction(tx, action);
+        await _insertAction(tx, PendingAction(
+          id: newClientId(),
+          ownerId: ownerId,
+          kind: PendingActionKind.rate,
+          groupId: groupId,
+          payload: ratingPayload,
+          createdAt: action.createdAt,
+        ));
+      });
+    }
     _changed();
     return action;
   }
+
+  Future<int> _insertAction(DatabaseExecutor db, PendingAction action) =>
+      db.insert('pending_actions', {
+        'id': action.id,
+        'owner_id': action.ownerId,
+        'kind': action.kind.name,
+        'group_id': action.groupId,
+        'payload': jsonEncode(action.payload),
+        'created_at': action.createdAt.millisecondsSinceEpoch,
+        'status': PendingStatus.waiting.name,
+      });
 
   /// [ownerId]'s queued exchange steps, oldest first.
   Future<List<PendingAction>> actions(String ownerId) async {

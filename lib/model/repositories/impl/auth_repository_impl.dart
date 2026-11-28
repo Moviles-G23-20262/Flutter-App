@@ -70,6 +70,9 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       return await _verified(await remote.me());
     } on ApiException catch (e) {
+      if (e.statusCode >= 500 || e.statusCode == 408 || e.statusCode == 429) {
+        return _restoreSavedProfile();
+      }
       // Only a rejected token ends the session; a 5xx says nothing about it.
       if (e.statusCode == 401) {
         // The same token was enrolled for Quick Unlock, and it is dead too.
@@ -80,14 +83,16 @@ class AuthRepositoryImpl implements AuthRepository {
       apiClient.authToken = null;
       return null;
     } on NetworkException {
-      // Offline at launch: open with the saved profile and keep the token, so requests work as
-      // soon as the connection is back. Without a saved profile, show the login screen.
-      final saved = await _savedProfile();
-      if (saved == null) apiClient.authToken = null;
-      _unverified = saved != null;
-      if (saved != null) sessionOwner?.signedIn(saved.id);
-      return saved;
+      return _restoreSavedProfile();
     }
+  }
+
+  Future<UserEntity?> _restoreSavedProfile() async {
+    final saved = await _savedProfile();
+    if (saved == null) apiClient.authToken = null;
+    _unverified = saved != null;
+    if (saved != null) sessionOwner?.signedIn(saved.id);
+    return saved;
   }
 
   @override

@@ -53,7 +53,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    final completing = _vm.needsCheck;
+    final completing = _vm.needsConfirmation;
     final other = _vm.otherFirstName;
     final outcome = await _vm.submit();
     if (!mounted) return;
@@ -64,7 +64,10 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
         _showMessage(completing ? 'Exchange completed. Thanks for rating $other!' : 'Thanks for rating $other!');
         widget.appState.closeCompleteExchange();
       case ExchangeSubmitOutcome.savedOffline:
-        _showMessage("You're offline. It's saved on your phone and will be sent when you're back online.");
+        _showMessage("Saved on your phone. We’ll send it when a connection is available.");
+        widget.appState.closeCompleteExchange();
+      case ExchangeSubmitOutcome.waitingForOtherParty:
+        _showMessage("Your confirmation is in. Your rating will be sent once $other confirms.");
         widget.appState.closeCompleteExchange();
       case ExchangeSubmitOutcome.failed:
         if (_vm.errorMessage.isNotEmpty) _showMessage(_vm.errorMessage);
@@ -89,7 +92,6 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
 
     final exchange = _vm.exchange;
     final otherFirst = _vm.otherFirstName;
-    final waitingForBuyer = _vm.waitingForBuyer;
     final cancelled = _vm.isCancelled;
     final saved = _vm.ratingQueued;
     final refused = widget.appState.account.refusedStepFor(exchange.id);
@@ -100,7 +102,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
     } else if (_vm.stars == 0) {
       buttonLabel = 'Rate $otherFirst to continue';
     } else {
-      buttonLabel = _vm.needsCheck ? 'Complete exchange' : 'Submit rating';
+      buttonLabel = _vm.needsConfirmation ? 'Confirm exchange' : 'Submit rating';
     }
 
     return Scaffold(
@@ -127,7 +129,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                   ),
                   const SizedBox(width: 14),
                   Text(
-                    _vm.needsCheck || waitingForBuyer || cancelled ? 'Complete exchange' : 'Rate $otherFirst',
+                    exchange.isPending || cancelled ? 'Complete exchange' : 'Rate $otherFirst',
                     style: AppTextStyles.heading(txPrimary, fontSize: AppTextStyles.sizeMd),
                   ),
                 ],
@@ -143,8 +145,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                   if (refused != null) ...[
                     _InfoCard(
                       icon: Icons.error_outline_rounded,
-                      text: 'What you saved offline was not accepted: ${refused.lastError ?? 'refused by the server'}. '
-                          'Check the details and send it again.',
+                      text: refused.lastError ?? 'We couldn’t send this update. Check the details and try again.',
                       actionLabel: 'Discard',
                       onAction: () => widget.appState.account.discardPending(refused.id),
                     ),
@@ -156,14 +157,10 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
                     _InfoCard(
                       icon: Icons.cloud_upload_outlined,
                       text: _vm.completionQueued
-                          ? "The exchange and your rating are saved on your phone. They will be sent when you're back online."
-                          : "Your rating is saved on your phone. It will be sent when you're back online.",
-                    )
-                  else if (waitingForBuyer)
-                    _InfoCard(
-                      icon: Icons.hourglass_top_rounded,
-                      text: '$otherFirst confirms the exchange after checking the item at your meetup. '
-                          'You can rate each other once it is completed.',
+                          ? "Your confirmation is saved on your phone. Your rating will be sent once both sides confirm."
+                          : exchange.isPending
+                              ? "Your rating is saved. It will be sent once $otherFirst confirms."
+                              : "Your rating is saved on your phone and will be sent when you're back online.",
                     )
                   else ...[
                     if (_vm.needsCheck) ...[
@@ -176,7 +173,7 @@ class _CompleteExchangeScreenState extends State<CompleteExchangeScreen> {
               ),
             ),
 
-            if (!cancelled && !waitingForBuyer && !saved)
+            if (!cancelled && !saved)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
                 child: SizedBox(

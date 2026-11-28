@@ -112,7 +112,10 @@ class _MemoryBiometric implements BiometricCredentialStorage {
 
 const _seller = UserSummary(id: 'luis-id', fullName: 'Luis Perez', major: 'ISIS', rating: 4);
 
-ExchangeEntity _exchange({ExchangeStatusEnum status = ExchangeStatusEnum.PENDING}) => ExchangeEntity(
+ExchangeEntity _exchange({
+  ExchangeStatusEnum status = ExchangeStatusEnum.PENDING,
+  DateTime? buyerConfirmedAt,
+}) => ExchangeEntity(
       id: 'ex-1',
       orderNumber: 1001,
       materialId: 'm-1',
@@ -120,18 +123,20 @@ ExchangeEntity _exchange({ExchangeStatusEnum status = ExchangeStatusEnum.PENDING
       sellerId: _seller.id,
       price: 20000,
       status: status,
+      buyerConfirmedAt: buyerConfirmedAt,
       seller: _seller,
     );
 
 class _FakeExchanges implements ExchangeRepository {
   Object? completeError;
   Object? rateError;
+  ExchangeEntity? confirmation;
   final List<NewRating> ratings = [];
 
   @override
   Future<ExchangeEntity> complete(String exchangeId, {MaterialConditionEnum? receivedCondition}) async {
     if (completeError != null) throw completeError!;
-    return _exchange(status: ExchangeStatusEnum.COMPLETED);
+    return confirmation ?? _exchange(status: ExchangeStatusEnum.COMPLETED);
   }
 
   @override
@@ -154,7 +159,7 @@ class _OfflineNetwork implements ConnectivityRepository {
 
 class _RecordingSender implements OutboxSender {
   final List<String> sent = [];
-  final Map<PendingActionKind, ApiException> refuse = {};
+  final Map<PendingActionKind, Object> refuse = {};
 
   @override
   Future<void> sendAction(PendingAction action) async {
@@ -261,6 +266,16 @@ void main() {
       );
       expect((await repository.verifySession())?.fullName, 'Ana María Gomez');
       expect(await repository.verifySession(), isNull, reason: 'nothing left to verify');
+    });
+
+    test('a 503 at launch opens the saved profile and preserves the session', () async {
+      await newRepository().login(email: _ana.email, password: 'pw');
+      remote.meError = const ApiException(503, 'temporarily unavailable');
+      apiClient.authToken = null;
+
+      expect((await newRepository().restoreSession())?.id, _ana.id);
+      expect(apiClient.authToken, 'jwt-ana');
+      expect(owner.userId, _ana.id);
     });
 
     test('a token the server rejects on reconnect ends the session and drops the saved profile', () async {
@@ -415,6 +430,17 @@ void main() {
       expect(await drafts.load(userId: _ana.id, exchangeId: 'ex-1'), isNull);
     });
 
+    test('a saved confirmation queues the rating while the other party has not confirmed', () async {
+      exchanges.confirmation = _exchange(buyerConfirmedAt: DateTime(2026, 11, 27));
+      final vm = newViewModel();
+      fillForm(vm);
+
+      expect(await vm.submit(), ExchangeSubmitOutcome.waitingForOtherParty);
+      expect(updated.single.isPending, isTrue);
+      expect(exchanges.ratings, isEmpty);
+      expect((await outbox.actions(_ana.id)).single.kind, PendingActionKind.rate);
+    });
+
     test('completed online but the rating had no connection: only the rating is queued', () async {
       exchanges.rateError = const NoConnectionException();
       final vm = newViewModel();
@@ -487,7 +513,26 @@ void main() {
       expect(left.last.status, PendingStatus.waiting);
     });
 
-    test('a meeting proposal whose time already passed is refused on the phone', () async {
+    test('a rating waiting for the other party never blocks another exchange', () async {
+      sender.refuse[PendingActionKind.rate] = const OutboxActionDeferred();
+      await pending.queueRating(ownerId: 'ana', rating: rating);
+      await pending.queueCompletion(ownerId: 'ana', exchangeId: 'ex-2');
+
+      sync.start('ana');
+      await sync.flush();
+
+      expect(sender.sent, ['completeExchange:ex-2']);
+      final waiting = (await outbox.actions('ana')).single;
+      expect(waiting.status, PendingStatus.waiting);
+      expect(waiting.attempts, 0);
+
+      sender.refuse.clear();
+      await sync.flush();
+      expect(sender.sent.last, 'rate:ex-1');
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('an expired meeting proposal is refused without blocking a new proposal in the same chat', () async {
       await pending.queueMeetingProposal(
         ownerId: 'ana',
         chatRoomId: 'r1',
@@ -497,7 +542,7 @@ void main() {
       );
       await pending.queueMeetingProposal(
         ownerId: 'ana',
-        chatRoomId: 'r2',
+        chatRoomId: 'r1',
         meetingPointId: 'zone-1',
         startsAt: now.add(const Duration(days: 1)),
         endsAt: now.add(const Duration(days: 1, hours: 1)),
@@ -506,7 +551,7 @@ void main() {
       sync.start('ana');
       await sync.flush();
 
-      expect(sender.sent, ['proposeMeeting:r2']);
+      expect(sender.sent, ['proposeMeeting:r1']);
       final late = (await outbox.actions('ana')).single;
       expect(late.status, PendingStatus.refused);
       expect(late.lastError, contains('already passed'));

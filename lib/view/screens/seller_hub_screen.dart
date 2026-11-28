@@ -714,12 +714,11 @@ class _PendingListingRow extends StatelessWidget {
             Text(listing.lastError!, style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
           ] else if (!refused) ...[
             const SizedBox(height: 6),
-            Text("We'll publish it as soon as you reconnect.",
+            Text("We'll publish it when a connection is available.",
                 style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
-            // The reason of the last failed attempt (server down, timeout…): never a silent wait.
             if (listing.lastError != null) ...[
               const SizedBox(height: 2),
-              Text('Last attempt failed: ${listing.lastError}',
+              Text('We’ll try again automatically. You can also tap Retry now.',
                   key: Key('pending-last-error-${listing.id}'),
                   style: AppTextStyles.body(txMuted, fontSize: AppTextStyles.size2xs)),
             ],

@@ -140,18 +140,16 @@ class AppViewModel extends ChangeNotifier {
   bool _wasOnline = true;
 
   void _onConnectivityChanged() {
-  // Sabrina OFFLINE - In AppViewModel._onConnectivityChanged, reconnecting automatically refreshes marketplace.load()
+    final online = connectivity.isOnline;
+    if (online == _wasOnline) return;
+    _wasOnline = online;
+    chats.setOffline(!online);
+    if (!_isLoggedIn) return;
     marketplace.load();
-    final reconnected = connectivity.isOnline && !_wasOnline;
-    _wasOnline = connectivity.isOnline;
-    // BQ15 refreshes by itself when the network comes back (it may be showing a saved copy or an error).
-    if (reconnected) averageTicket?.load(force: true);
-    if (connectivity.isOnline) {
-      _verifyOfflineSession();
-      chats.setOffline(false);
-    } else {
-      chats.setOffline(true);
-    }
+    if (!online) return;
+    account.load();
+    averageTicket?.load(force: true);
+    _verifyOfflineSession();
   }
 
   /// A session restored offline shows the saved profile. Once the server answers, the profile is

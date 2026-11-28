@@ -56,12 +56,15 @@ class MarketplaceViewModel extends ChangeNotifier {
   DateTime? _materialsSavedAt;
   bool _loading = false;
   bool _loadedOnce = false;
+  bool _wishlistLoading = false;
+  String? _wishlistError;
   String? _error;
   TimeToSellInsight? _timeToSell;
   final Set<String> _togglingFavorites = {};
 
   /// Bumped on [clear] so answers that arrive after a sign-out are dropped.
   int _generation = 0;
+  int _loadRequest = 0;
 
   List<MaterialEntity> get materials => _materials;
   List<MaterialEntity> get availableMaterials =>
@@ -75,6 +78,8 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   /// Set while the favorites shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get wishlistSavedAt => _wishlistSavedAt;
+  bool get isWishlistLoading => _wishlistLoading;
+  String? get wishlistError => _wishlistError;
 
   /// Set while the listings shown are the copy saved on the phone (offline): when it was saved.
   DateTime? get materialsSavedAt => _materialsSavedAt;
@@ -139,58 +144,65 @@ class MarketplaceViewModel extends ChangeNotifier {
       (_wishlistIdsCache ??= {for (final w in _wishlist) w.materialId}).contains(materialId);
 
   Future<void> load() async {
-    final generation = _generation;
+    final request = ++_loadRequest;
     _loading = true;
+    _wishlistLoading = true;
+    _wishlistError = null;
     _error = null;
     _timeToSell = null;
     notifyListeners();
 
     // Both start at once. Favorites load on their own, so the saved copy still shows when the
     // listings cannot be loaded offline.
-    final favorites = _loadWishlist(generation);
+    final favorites = _loadWishlist(request);
     // Sabrina OFFLINE - MarketplaceViewModel.load() fetches materials, wishlist, and BQ11 in parallel, saves _materialsSavedAt so the UI knows the cache age
-    final timeToSellJob = _loadTimeToSell(generation);
+    final timeToSell = _loadTimeToSell(request);
     try {
       final result = await getMaterials.executeCached();
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _materials = result.items;
       _availableMaterialsCache = null;
       _materialsSavedAt = result.savedAt;
     } on DataException catch (e) {
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _error = e.message;
     } catch (_) {
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _error = 'Unexpected error. Please try again.';
     }
-    await favorites;
-    await timeToSellJob;
-    if (generation != _generation) return;
     _loading = false;
     _loadedOnce = true;
     notifyListeners();
+    await favorites;
+    await timeToSell;
   }
 
-  Future<void> _loadWishlist(int generation) async {
+  Future<void> _loadWishlist(int request) async {
     try {
       final result = await getWishlist.execute();
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _setWishlist(result.items);
       _wishlistSavedAt = result.savedAt;
     } on DataException catch (e) {
-      if (generation == _generation) _error ??= e.message;
+      if (request == _loadRequest) _wishlistError = e.message;
     } catch (_) {
-      if (generation == _generation) _error ??= 'Unexpected error. Please try again.';
+      if (request == _loadRequest) _wishlistError = 'Unexpected error. Please try again.';
+    } finally {
+      if (request == _loadRequest) {
+        _wishlistLoading = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> _loadTimeToSell(int generation) async {
+  Future<void> _loadTimeToSell(int request) async {
     final useCase = getTimeToSell;
     if (useCase == null) return;
     try {
       final result = await useCase.execute();
-      if (generation != _generation) return;
+      if (request != _loadRequest) return;
       _timeToSell = result;
+      notifyListeners();
     } catch (_) {}
   }
 
@@ -399,6 +411,7 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   void clear() {
     _generation++;
+    _loadRequest++;
     _pendingSubscription?.cancel();
     _pendingSubscription = null;
     _pendingListings = const [];
@@ -407,6 +420,8 @@ class MarketplaceViewModel extends ChangeNotifier {
     _availableMaterialsCache = null;
     _setWishlist(const []);
     _wishlistSavedAt = null;
+    _wishlistLoading = false;
+    _wishlistError = null;
     _materialsSavedAt = null;
     _loading = false;
     _loadedOnce = false;
@@ -418,6 +433,8 @@ class MarketplaceViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _generation++;
+    _loadRequest++;
     _pendingSubscription?.cancel();
     _publishedNotices.close();
     super.dispose();

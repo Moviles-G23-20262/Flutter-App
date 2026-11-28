@@ -52,8 +52,10 @@ class ExchangeEntity {
   /// When the order was placed.
   final DateTime? createdAt;
 
-  /// When the buyer confirmed the exchange. `null` while pending or if cancelled.
+  /// When both parties had confirmed the exchange.
   final DateTime? completedAt;
+  final DateTime? buyerConfirmedAt;
+  final DateTime? sellerConfirmedAt;
 
   /// The condition the buyer says they received.
   final MaterialConditionEnum? receivedCondition;
@@ -85,6 +87,8 @@ class ExchangeEntity {
     required this.status,
     this.createdAt,
     this.completedAt,
+    this.buyerConfirmedAt,
+    this.sellerConfirmedAt,
     this.receivedCondition,
     this.meetingPointId,
     this.meetingPoint,
@@ -105,6 +109,9 @@ class ExchangeEntity {
   bool get isPending => status == ExchangeStatusEnum.PENDING;
 
   bool get isCompleted => status == ExchangeStatusEnum.COMPLETED;
+
+  bool confirmedBy(String userId) =>
+      userId == buyerId ? buyerConfirmedAt != null : userId == sellerId && sellerConfirmedAt != null;
 
   /// Returns `true` when a geo-coordinate meeting point has been specified.
   bool get hasMeetingLocation => lat != null && lng != null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_front_end/model/dto/auth_session_model.dart';
@@ -412,6 +413,23 @@ void main() {
   });
 
   group('ApiClient', () {
+    test('a late 401 from a previous session does not sign out the new session', () async {
+      final response = Completer<http.Response>();
+      var unauthorized = 0;
+      final client = ApiClient(
+        baseUrl: 'https://api.test',
+        client: MockClient((_) => response.future),
+      )
+        ..authToken = 'old-token'
+        ..onUnauthorized = () => unauthorized++;
+      final pending = client.get('/materials');
+      client.authToken = 'new-token';
+      response.complete(http.Response('', 401));
+
+      await expectLater(pending, throwsA(isA<ApiException>()));
+      expect(unauthorized, 0);
+    });
+
     test('trims the trailing slash of the base URL and sends the bearer token', () async {
       late http.Request seen;
       final client = ApiClient(

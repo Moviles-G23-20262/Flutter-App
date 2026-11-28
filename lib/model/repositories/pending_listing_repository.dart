@@ -3,12 +3,17 @@ import '../entities/pending_items.dart';
 
 /// Listings created without a connection: saved on the phone and published by the sync service.
 abstract class PendingListingRepository {
+  bool get canDeliver;
+
   /// Saves [data] (its text and choices) with the already compressed photos at [photoPaths].
   Future<PendingListing> queue({
     required String ownerId,
     required NewListingData data,
     required List<String> photoPaths,
   });
+
+  /// Attempts delivery and returns the item if it still needs attention.
+  Future<PendingListing?> deliver(PendingListing listing);
 
   /// [ownerId]'s queued listings now (oldest first), and again after every change: queued,
   /// published, refused or discarded.

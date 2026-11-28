@@ -8,6 +8,7 @@ abstract class PendingActionRepository {
     required String ownerId,
     required String exchangeId,
     MaterialConditionEnum? receivedCondition,
+    NewRating? rating,
   });
 
   Future<PendingAction> queueRating({required String ownerId, required NewRating rating});

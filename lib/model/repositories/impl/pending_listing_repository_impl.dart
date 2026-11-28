@@ -17,6 +17,9 @@ class PendingListingRepositoryImpl implements PendingListingRepository {
   PendingListingRepositoryImpl(this.store, {this.sync});
 
   @override
+  bool get canDeliver => sync != null;
+
+  @override
   Future<PendingListing> queue({
     required String ownerId,
     required NewListingData data,
@@ -30,6 +33,13 @@ class PendingListingRepositoryImpl implements PendingListingRepository {
     );
     sync?.flush();
     return listing;
+  }
+
+  @override
+  Future<PendingListing?> deliver(PendingListing listing) async {
+    await sync?.flush();
+    final remaining = await store.listings(listing.ownerId);
+    return remaining.where((item) => item.id == listing.id).firstOrNull;
   }
 
   @override

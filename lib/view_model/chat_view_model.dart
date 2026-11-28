@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import '../model/entities/cached_list.dart';
 import '../model/entities/chat_agreement.dart';
 import '../model/entities/chat_room_entity.dart';
 import '../model/entities/conversation_insight.dart';
@@ -74,6 +75,13 @@ class ChatViewModel extends ChangeNotifier {
       stopPolling();
     } else {
       startPolling();
+      if (!_inBackground && _userId != null) {
+        if (_activeRoomId == null) {
+          loadRooms();
+        } else {
+          refreshMessages();
+        }
+      }
     }
     notifyListeners();
   }
@@ -94,6 +102,9 @@ class ChatViewModel extends ChangeNotifier {
   String? _messagesError;
   Timer? _timer;
   int _generation = 0;
+  int _roomGeneration = 0;
+  int _messageRequest = 0;
+  int _appliedMessageRequest = 0;
   ConversationInsight? _insight;
   bool _loadingInsight = false;
   final Map<String, ChatAgreement> _agreements = {};
@@ -154,14 +165,18 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   /// Conversations, most recently active first.
-  List<ChatRoomEntity> get rooms => _rooms;
+  List<ChatRoomEntity> get rooms => _isOffline || _roomsSavedAt != null
+      ? [for (final room in _rooms) if (room.unreadCount == 0) room else _withUnread(room, 0)]
+      : _rooms;
   bool get isLoadingRooms => _loadingRooms;
   bool get isFirstRoomsLoad => !_loadedRooms;
   String? get roomsError => _roomsError;
   String? get messagesError => _messagesError;
   bool get isLoadingMessages => _loadingMessages;
   String? get activeRoomId => _activeRoomId;
-  int get unreadTotal => _rooms.fold(0, (sum, room) => sum + room.unreadCount);
+  int get unreadTotal => _isOffline || _roomsSavedAt != null
+      ? 0
+      : _rooms.fold(0, (sum, room) => sum + room.unreadCount);
 
   ChatRoomEntity? get activeRoom {
     final id = _activeRoomId;
@@ -208,6 +223,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void openRoom(String roomId) {
+    _roomGeneration++;
     _activeRoomId = roomId;
     _messagesError = null;
     notifyListeners();
@@ -216,7 +232,9 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void closeRoom() {
+    _roomGeneration++;
     _activeRoomId = null;
+    _loadingMessages = false;
     notifyListeners();
     _restartTimer();
     loadRooms();
@@ -237,6 +255,7 @@ class ChatViewModel extends ChangeNotifier {
     text = trimmed;
 
     final senderId = _userId ?? '';
+    final generation = _generation;
     final queue = queueMessage;
 
     // Offline-first: saved in the outbox and shown at once with the clock icon; the sync service 
@@ -244,6 +263,7 @@ class ChatViewModel extends ChangeNotifier {
     // Offline first - Sabrina
     if (queue != null && senderId.isNotEmpty) {
       final queued = await queue.execute(ownerId: senderId, chatRoomId: roomId, content: text);
+      if (generation != _generation) return null;
       _messages[roomId] = [
         ...messagesOf(roomId),
         MessageEntity(
@@ -258,10 +278,8 @@ class ChatViewModel extends ChangeNotifier {
       ];
       notifyListeners();
       queue.send().then((_) {
-        refreshMessages();
-      }).catchError((_) {
-        notifyListeners();
-      });
+        if (generation == _generation) refreshMessages();
+      }).catchError((_) {});
       return null;
     }
 
@@ -283,6 +301,7 @@ class ChatViewModel extends ChangeNotifier {
 
     try {
       final serverMsg = await sendMessage.execute(roomId, text, id: clientId, clientCreatedAt: clientCreated);
+      if (generation != _generation) return null;
       _messages[roomId] = [
         ...messagesOf(roomId).where((m) => m.id != clientId),
         serverMsg,
@@ -366,52 +385,65 @@ class ChatViewModel extends ChangeNotifier {
     final roomId = _activeRoomId;
     if (roomId == null) return;
     final generation = _generation;
+    final roomGeneration = _roomGeneration;
+    final request = ++_messageRequest;
+    bool isCurrent() => generation == _generation && roomGeneration == _roomGeneration &&
+        request >= _appliedMessageRequest;
     if (showSpinner) {
       _loadingMessages = true;
       notifyListeners();
     }
+    CachedList<MessageEntity>? result;
+    String? error;
     try {
-      final result = await getMessages.executeCached(roomId);
-      if (generation != _generation || _activeRoomId != roomId) return;
-      _messagesSavedAt[roomId] = result.savedAt;
-
-      // Pending messages from outbox
-      List<MessageEntity> pendingEntities = [];
-      final readPending = getPendingMessages;
-      if (readPending != null && _userId != null) {
-        final pending = await readPending.execute(_userId!, roomId);
-        pendingEntities = pending.map((p) => MessageEntity(
-          id: p.id,
-          chatRoomId: p.chatRoomId,
-          senderId: p.ownerId,
-          content: p.content,
-          isRead: false,
-          createdAt: p.createdAt,
-          isPending: p.status == PendingStatus.waiting,
-          isFailed: p.status == PendingStatus.refused,
-          failureReason: p.lastError,
-        )).toList();
-      }
-
-      // Combine server/cached messages with pending ones
-      final serverIds = result.items.map((m) => m.id).toSet();
-      final filteredPending = pendingEntities.where((p) => !serverIds.contains(p.id)).toList();
-
-      _messages[roomId] = [...result.items, ...filteredPending];
-      _messagesError = null;
-      _loadAgreementIfNeeded(roomId);
-
-      // Only acknowledge if not viewing a saved/offline copy
-      if (result.savedAt == null) {
-        await _acknowledge(roomId, result.items);
-      }
+      result = await getMessages.executeCached(roomId);
     } on DataException catch (e) {
-      if (generation != _generation) return;
-      if (!_messages.containsKey(roomId)) _messagesError = e.message;
+      error = e.message;
+    } catch (_) {
+      error = 'Unexpected error. Please try again.';
     }
-    if (generation != _generation) return;
+    if (!isCurrent()) return;
+
+    final pending = await _pendingMessages(roomId);
+    if (!isCurrent()) return;
+    _appliedMessageRequest = request;
+    if (result != null) _messagesSavedAt[roomId] = result.savedAt;
+    final received = result?.items ??
+        messagesOf(roomId).where((message) => !message.isPending && !message.isFailed);
+    final receivedIds = received.map((message) => message.id).toSet();
+    _messages[roomId] = [...received, ...pending.where((message) => !receivedIds.contains(message.id))];
+    _messagesError = error;
     _loadingMessages = false;
     notifyListeners();
+    _loadAgreementIfNeeded(roomId);
+    if (result != null && result.savedAt == null && !_isOffline) {
+      await _acknowledge(roomId, result.items);
+    }
+  }
+
+  Future<List<MessageEntity>> _pendingMessages(String roomId) async {
+    final read = getPendingMessages;
+    final userId = _userId;
+    if (read == null || userId == null) return const [];
+    try {
+      final pending = await read.execute(userId, roomId);
+      return [
+        for (final message in pending)
+          MessageEntity(
+            id: message.id,
+            chatRoomId: message.chatRoomId,
+            senderId: message.ownerId,
+            content: message.content,
+            isRead: false,
+            createdAt: message.createdAt,
+            isPending: message.status == PendingStatus.waiting,
+            isFailed: message.status == PendingStatus.refused,
+            failureReason: message.lastError,
+          ),
+      ];
+    } catch (_) {
+      return messagesOf(roomId).where((message) => message.isPending || message.isFailed).toList();
+    }
   }
 
   Future<void> _acknowledge(String roomId, List<MessageEntity> messages) async {
@@ -525,6 +557,7 @@ class ChatViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    _generation++;
     _timer?.cancel();
     super.dispose();
   }

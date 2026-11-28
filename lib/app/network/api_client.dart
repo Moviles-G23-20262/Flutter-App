@@ -36,7 +36,16 @@ class ApiClient {
   final http.Client client;
 
   /// JWT sent as `Authorization: Bearer …` on every request while set.
-  String? authToken;
+  String? _authToken;
+  int _authRevision = 0;
+
+  String? get authToken => _authToken;
+
+  set authToken(String? token) {
+    if (token == _authToken) return;
+    _authToken = token;
+    _authRevision++;
+  }
 
   /// Called when the server rejects the token we sent (expired or revoked), so the app can sign out.
   void Function()? onUnauthorized;
@@ -97,6 +106,7 @@ class ApiClient {
   }
 
   Future<dynamic> _send(Future<http.Response> Function() request, {Duration timeout = _timeout}) async {
+    final authRevision = _authRevision;
     final http.Response response;
     try {
       response = await request().timeout(timeout);
@@ -104,6 +114,9 @@ class ApiClient {
       throw const NetworkException('The server took too long to respond.');
     } on http.ClientException catch (e) {
       throw NetworkException(e.message);
+    }
+    if (response.statusCode == 401 && _authToken != null && authRevision == _authRevision) {
+      onUnauthorized?.call();
     }
     return _processResponse(response);
   }
@@ -117,7 +130,6 @@ class ApiClient {
       }
       return null;
     }
-    if (response.statusCode == 401 && authToken != null) onUnauthorized?.call();
     throw ApiException(response.statusCode, _errorMessage(response));
   }
 

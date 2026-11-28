@@ -15,12 +15,14 @@ class QueueExchangeCompletionUseCase {
     required String ownerId,
     required ExchangeEntity exchange,
     MaterialConditionEnum? receivedCondition,
+    NewRating? rating,
   }) {
     if (!exchange.isPending) throw const DataException('This exchange is already closed.');
     return repository.queueCompletion(
       ownerId: ownerId,
       exchangeId: exchange.id,
       receivedCondition: receivedCondition,
+      rating: rating == null ? null : RateUserUseCase.validated(rating),
     );
   }
 }

@@ -473,7 +473,12 @@ class AppDependencies {
       cache: responseCache,
       owner: sessionOwner,
     );
-    final exchanges = ExchangeRepositoryImpl(marketplaceRemote);
+    final exchanges = ExchangeRepositoryImpl(
+      marketplaceRemote,
+      cache: responseCache,
+      owner: sessionOwner,
+      fetchExchangesJson: marketplaceRemote.getExchangesJson,
+    );
     final notifications = NotificationRepositoryImpl(marketplaceRemote, cache: responseCache, owner: sessionOwner);
 
     final meetupRemote = MeetupRemoteDataSourceImpl(apiClient: apiClient);
