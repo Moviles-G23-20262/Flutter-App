@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:isolate';
 
 import 'package:sqflite/sqflite.dart';
@@ -39,9 +40,23 @@ class ResponseCache {
   static const int isolateThreshold = 64 * 1024;
   static const int isolateListLength = 100;
 
+  /// MO7: an answer identical to the one already on disk is not written again, unless the stored
+  /// time is older than this (so the "saved 2h ago" age shown offline stays roughly right).
+  static const Duration refreshSavedAtEvery = Duration(minutes: 5);
+
   final AppDatabase _db;
   final LruCache<String, CachedJson> _memory;
   final DateTime Function() _now;
+
+  /// MO7: what was last written to disk per user and key: a fingerprint of the JSON and when.
+  final Map<String, ({int length, int hash, DateTime writtenAt})> _lastWritten = {};
+
+  int _diskWrites = 0;
+  int _skippedWrites = 0;
+
+  /// MO7 measurements: SQLite writes done, and the ones avoided because nothing changed.
+  int get diskWrites => _diskWrites;
+  int get skippedWrites => _skippedWrites;
 
   ResponseCache(this._db, {int memoryCapacity = 32, DateTime Function()? now})
       : _memory = LruCache(memoryCapacity),
@@ -51,16 +66,40 @@ class ResponseCache {
 
   /// Two-Level Response Cache - ResponseCache — L1 RAM LRU + L2 SQLite + Isolate.run - Sabrina 
   /// networkFirst tries the server first, overwrites the cache on success, and falls back ONLY on NetworkException
+  ///
+  /// MO7: screens that poll (the open chat every 4 s, the inbox every 12 s) save the same answer
+  /// again and again. When the encoded JSON matches what was last written for this key, and that
+  /// write is recent, the SQLite write is skipped; the memory copy is still refreshed.
   Future<void> save(String ownerId, String key, Object? data) async {
+    final memoryKey = _memoryKey(ownerId, key);
     final entry = CachedJson(data, _now());
-    _memory.put(_memoryKey(ownerId, key), entry);
+    _memory.put(memoryKey, entry);
     final body = await _encode(data);
-    final db = await _db.database;
-    await db.insert(
-      'cached_responses',
-      {'owner_id': ownerId, 'cache_key': key, 'body': body, 'saved_at': entry.savedAt.millisecondsSinceEpoch},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+
+    final last = _lastWritten[memoryKey];
+    final fingerprint = (length: body.length, hash: body.hashCode);
+    if (last != null &&
+        last.length == fingerprint.length &&
+        last.hash == fingerprint.hash &&
+        entry.savedAt.difference(last.writtenAt) < refreshSavedAtEvery) {
+      _skippedWrites++;
+      return;
+    }
+
+    // Visible in DevTools' Timeline as "ResponseCache.write" (async, so a task, not a sync span).
+    final task = developer.TimelineTask()..start('ResponseCache.write');
+    try {
+      final db = await _db.database;
+      await db.insert(
+        'cached_responses',
+        {'owner_id': ownerId, 'cache_key': key, 'body': body, 'saved_at': entry.savedAt.millisecondsSinceEpoch},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      _diskWrites++;
+      _lastWritten[memoryKey] = (length: fingerprint.length, hash: fingerprint.hash, writtenAt: entry.savedAt);
+    } finally {
+      task.finish();
+    }
   }
 
   Future<CachedJson?> read(String ownerId, String key) async {
@@ -86,6 +125,7 @@ class ResponseCache {
 
   Future<void> remove(String ownerId, String key) async {
     _memory.remove(_memoryKey(ownerId, key));
+    _lastWritten.remove(_memoryKey(ownerId, key));
     final db = await _db.database;
     await db.delete('cached_responses', where: 'owner_id = ? AND cache_key = ?', whereArgs: [ownerId, key]);
   }

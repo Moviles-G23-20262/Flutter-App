@@ -32,6 +32,9 @@ import 'view/screens/complete_exchange_screen.dart';
 import 'view/screens/confirmation_screen.dart';
 import 'view/screens/meeting_point_screen.dart';
 import 'view/screens/schedule_screen.dart';
+import 'view/screens/my_meetups_screen.dart';
+import 'view_model/my_meetups_view_model.dart';
+import 'view_model/course_demand_view_model.dart';
 import 'view/screens/favorites_screen.dart';
 import 'view/screens/notifications_screen.dart';
 import 'view/screens/edit_profile_screen.dart';
@@ -108,6 +111,10 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
     averageTicket: AverageTicketViewModel(getAverageTicket: _deps.getAverageTicket),
     categoryPerformance: CategoryPerformanceViewModel(
       getCategoryPerformance: _deps.getCategoryPerformance,
+      connectivity: _deps.connectivityRepository,
+    ),
+    courseDemand: CourseDemandViewModel(
+      getCourseDemand: _deps.getCourseDemand,
       connectivity: _deps.connectivityRepository,
     ),
     recentSearches: RecentSearchesViewModel(
@@ -310,6 +317,20 @@ class _CampusSwapAppState extends State<CampusSwapApp> with WidgetsBindingObserv
         return MeetingPointScreen(appState: _appState, room: room);
       case AppScreen.schedule:
         return ScheduleScreen(appState: _appState);
+      case AppScreen.myMeetups:
+        final me = _appState.currentUser;
+        if (me == null) return AppShell(appState: _appState);
+        final account = _appState.account;
+        return MyMeetupsScreen(
+          appState: _appState,
+          createViewModel: () => MyMeetupsViewModel(
+            userId: me.id,
+            exchanges: () => account.exchanges,
+            changes: account,
+            refresh: account.refreshExchanges,
+            isLoading: () => account.isLoading,
+          ),
+        );
       case AppScreen.editProfile:
         final me = _appState.currentUser;
         if (me == null) return AppShell(appState: _appState);

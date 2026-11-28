@@ -259,6 +259,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         brightness: brightness,
                       ),
                       _SettingsRow(
+                        icon: Icons.event_available_outlined,
+                        title: 'My meetups',
+                        detail: 'Your upcoming exchanges: where, when and with whom',
+                        onTap: () => widget.appState.navigateTo(AppScreen.myMeetups),
+                        brightness: brightness,
+                      ),
+                      _SettingsRow(
                         icon: Icons.calendar_month_outlined,
                         title: 'Class Schedule',
                         detail: widget.appState.schedule.blocks.isEmpty

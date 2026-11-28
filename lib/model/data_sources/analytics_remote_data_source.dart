@@ -56,6 +56,9 @@ class AnalyticsRemoteDataSource {
     return CategoryPerformanceModel.listFromJson(json);
   }
 
+  /// BQ 19: per course, listings on sale against interested students (raw JSON, for the saved copy).
+  Future<Object?> getCourseDemandJson() => apiClient.get('/analytics/course-demand/?limit=20');
+
   /// BQ11: average time (in days) it takes for a newly listed academic item to be marked as sold.
   Future<TimeToSellModel> getTimeToSell() async {
     final json = await apiClient.get('/analytics/time-to-sell/');

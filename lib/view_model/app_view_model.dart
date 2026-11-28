@@ -17,6 +17,7 @@ import 'meeting_planner_view_model.dart';
 import 'schedule_view_model.dart';
 import 'power_view_model.dart';
 import 'connectivity_view_model.dart';
+import 'course_demand_view_model.dart';
 import '../model/use_cases/track_event_use_case.dart';
 import '../model/use_cases/outbox_use_cases.dart';
 import '../model/use_cases/restore_session_use_case.dart';
@@ -56,6 +57,9 @@ enum AppScreen {
 
   /// Public seller profile: ratings breakdown, top tags, BQ 17 benchmark & active listings.
   sellerProfile,
+
+  /// The user's open exchanges as an agenda: upcoming meetings, ones to confirm, ones to agree.
+  myMeetups,
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────
@@ -79,6 +83,9 @@ class AppViewModel extends ChangeNotifier {
   /// BQ6, listings and completed exchanges per category, in the Seller Hub; without it the card
   /// is not shown.
   final CategoryPerformanceViewModel? categoryPerformance;
+
+  /// BQ 19 card in the Seller Hub: the most wanted courses.
+  final CourseDemandViewModel? courseDemand;
 
   /// The recent searches under the search box (kept on the phone); without it none are shown.
   final RecentSearchesViewModel? recentSearches;
@@ -113,6 +120,7 @@ class AppViewModel extends ChangeNotifier {
     required this.meetups,
     this.averageTicket,
     this.categoryPerformance,
+    this.courseDemand,
     this.recentSearches,
     required this.theme,
     required this.power,
@@ -252,6 +260,21 @@ class AppViewModel extends ChangeNotifier {
     }
   }
 
+  /// Opens the conversation of [exchange] from either side. The seller's chat with this buyer is
+  /// found among the loaded conversations; a buyer without one gets it created ([arrangeMeetup]).
+  /// Returns an error message, or `null` when the chat opened.
+  Future<String?> openMeetupChat(ExchangeEntity exchange) async {
+    final room = chats.rooms
+        .where((r) => r.materialId == exchange.materialId && r.buyerId == exchange.buyerId)
+        .firstOrNull;
+    if (room != null) {
+      openChat(room.id);
+      return null;
+    }
+    if (exchange.buyerId == _currentUser?.id) return arrangeMeetup(exchange);
+    return 'Open this conversation from Messages.';
+  }
+
   void openCompleteExchange(ExchangeEntity exchange) {
     _selectedExchange = exchange;
     // From the "Order Placed" screen there is nothing to go back to.
@@ -298,6 +321,7 @@ class AppViewModel extends ChangeNotifier {
   Future<void> loadSellerHubMetrics() => Future.wait<void>([
         if (averageTicket != null) averageTicket!.load(force: true),
         if (categoryPerformance != null) categoryPerformance!.load(force: true),
+        if (courseDemand != null) courseDemand!.load(force: true),
       ]);
 
   // ── Profile ───────────────────────────────────────────────────────────────
@@ -401,6 +425,7 @@ class AppViewModel extends ChangeNotifier {
     schedule.dispose();
     averageTicket?.dispose();
     categoryPerformance?.dispose();
+    courseDemand?.dispose();
     recentSearches?.dispose();
     theme.removeListener(notifyListeners);
     theme.dispose();
