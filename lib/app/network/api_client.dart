@@ -41,6 +41,9 @@ class ApiClient {
 
   String? get authToken => _authToken;
 
+  /// Changes whenever the active token changes, including sign-out and sign-in.
+  int get authRevision => _authRevision;
+
   set authToken(String? token) {
     if (token == _authToken) return;
     _authToken = token;

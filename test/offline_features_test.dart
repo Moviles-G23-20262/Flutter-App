@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_front_end/app/network/api_client.dart';
@@ -8,6 +9,8 @@ import 'package:flutter_front_end/model/data_sources/local/draft_store.dart';
 import 'package:flutter_front_end/model/data_sources/local/outbox_store.dart';
 import 'package:flutter_front_end/model/data_sources/local/response_cache.dart';
 import 'package:flutter_front_end/model/data_sources/marketplace_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/meetup_remote_data_source.dart';
+import 'package:flutter_front_end/model/data_sources/remote_outbox_sender.dart';
 import 'package:flutter_front_end/model/data_sources/session_storage.dart';
 import 'package:flutter_front_end/model/dto/auth_session_model.dart';
 import 'package:flutter_front_end/model/entities/exchange_entity.dart';
@@ -50,6 +53,7 @@ AppDatabase _memoryDatabase() => AppDatabase.withFactory(databaseFactoryFfi);
 
 class _FakeAuthRemote implements AuthRemoteDataSource {
   Exception? meError;
+  Future<UserEntity>? meResponse;
   UserEntity me_ = _ana;
 
   @override
@@ -62,6 +66,8 @@ class _FakeAuthRemote implements AuthRemoteDataSource {
   @override
   Future<UserEntity> me() async {
     if (meError != null) throw meError!;
+    final response = meResponse;
+    if (response != null) return response;
     return me_;
   }
 
@@ -276,6 +282,27 @@ void main() {
       expect((await newRepository().restoreSession())?.id, _ana.id);
       expect(apiClient.authToken, 'jwt-ana');
       expect(owner.userId, _ana.id);
+    });
+
+    test('a slow session check cannot put a signed-out owner back in the cache', () async {
+      final repository = newRepository();
+      await repository.login(email: _ana.email, password: 'pw');
+      remote.meError = const NetworkException('offline');
+      await repository.restoreSession();
+      remote.meError = null;
+      final response = Completer<UserEntity>();
+      remote.meResponse = response.future;
+      final verification = repository.verifySession();
+
+      await repository.forgetBiometrics();
+      await repository.logout();
+      response.complete(_ana);
+
+      expect(await verification, isNull);
+      expect(owner.userId, isNull);
+      session.token = 'jwt-ana';
+      remote.meError = const NetworkException('offline');
+      expect(await repository.restoreSession(), isNull);
     });
 
     test('a token the server rejects on reconnect ends the session and drops the saved profile', () async {
@@ -572,6 +599,98 @@ void main() {
       expect(updates, contains(1));
       expect(updates.last, 0);
       await subscription.cancel();
+    });
+  });
+
+  group('Meeting proposal delivery over HTTP', () {
+    late AppDatabase db;
+    late OutboxStore outbox;
+    late PendingActionRepositoryImpl pending;
+    late OutboxSyncService sync;
+    late DateTime now;
+    late List<String> requests;
+    late List<String> postedIds;
+    Map<String, dynamic>? received;
+
+    setUp(() {
+      db = _memoryDatabase();
+      outbox = OutboxStore(db);
+      pending = PendingActionRepositoryImpl(outbox);
+      now = DateTime.utc(2026, 11, 27, 12);
+      requests = [];
+      postedIds = [];
+      received = null;
+      final api = ApiClient(
+        baseUrl: 'https://api.test',
+        client: MockClient((request) async {
+          requests.add(request.method);
+          if (request.method == 'GET') {
+            expect(request.url.queryParameters['chatRoomId'], 'r1');
+            return http.Response(jsonEncode([?received]), 200);
+          }
+          final payload = jsonDecode(request.body) as Map<String, dynamic>;
+          final id = payload['clientId'] as String;
+          postedIds.add(id);
+          expect((await outbox.actions('ana')).single.id, id);
+          received ??= {...payload, 'id': id, 'proposerId': 'ana', 'status': 'PENDING'};
+          if (postedIds.length == 1) throw http.ClientException('The response was lost');
+          return http.Response(jsonEncode(received), 201);
+        }),
+      );
+      sync = OutboxSyncService(
+        store: outbox,
+        sender: RemoteOutboxSender(_FakeMarketRemote(), MeetupRemoteDataSourceImpl(apiClient: api)),
+        connectivity: _OfflineNetwork(),
+        now: () => now,
+      );
+    });
+
+    tearDown(() async {
+      sync.dispose();
+      await db.close();
+    });
+
+    Future<PendingAction> queueProposal(DateTime startsAt) => pending.queueMeetingProposal(
+          ownerId: 'ana',
+          chatRoomId: 'r1',
+          meetingPointId: 'zone-1',
+          startsAt: startsAt,
+          endsAt: startsAt.add(const Duration(hours: 1)),
+        );
+
+    test('a retry reuses the ID that was saved before the first request', () async {
+      final action = await queueProposal(now.add(const Duration(hours: 1)));
+      sync.start('ana');
+      await sync.flush();
+      expect((await outbox.actions('ana')).single.status, PendingStatus.waiting);
+
+      await sync.flush();
+
+      expect(postedIds, [action.id, action.id]);
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('after expiry, a read confirms a proposal whose first response was lost', () async {
+      await queueProposal(now.add(const Duration(hours: 1)));
+      sync.start('ana');
+      await sync.flush();
+      now = now.add(const Duration(hours: 2));
+
+      await sync.flush();
+
+      expect(requests, ['POST', 'GET']);
+      expect(await outbox.actions('ana'), isEmpty);
+    });
+
+    test('a proposal the server never received is refused without posting it after expiry', () async {
+      await queueProposal(now.subtract(const Duration(hours: 2)));
+      sync.start('ana');
+      await sync.flush();
+
+      expect(requests, ['GET']);
+      final expired = (await outbox.actions('ana')).single;
+      expect(expired.status, PendingStatus.refused);
+      expect(expired.lastError, contains('already passed'));
     });
   });
 

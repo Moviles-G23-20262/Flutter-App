@@ -28,6 +28,9 @@ abstract class PendingActionRepository {
     String? listingTitle,
   });
 
+  /// Attempts delivery. Returns the stored step if it is still waiting or was refused.
+  Future<PendingAction?> deliver(PendingAction action);
+
   /// [ownerId]'s queued steps now, and again after every change (queued, sent, refused, discarded).
   Stream<List<PendingAction>> watch(String ownerId);
 

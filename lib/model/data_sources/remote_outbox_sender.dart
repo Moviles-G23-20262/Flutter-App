@@ -10,7 +10,7 @@ import 'meetup_remote_data_source.dart';
 
 /// Delivers queued items through the marketplace API. Errors are left as they come
 /// ([NetworkException] / [ApiException]) so the sync service can classify them.
-class RemoteOutboxSender implements OutboxSender {
+class RemoteOutboxSender implements MeetingProposalLookup {
   final MarketplaceRemoteDataSource remote;
   final MeetupRemoteDataSource meetups;
 
@@ -63,11 +63,17 @@ class RemoteOutboxSender implements OutboxSender {
           throw const ApiException(400, 'This exchange is no longer available to rate');
         }
       case PendingActionKind.proposeMeeting:
-        await meetups.createProposal(body);
+        await meetups.createProposal({...body, 'clientId': action.id});
       case PendingActionKind.updateListingPrice:
         final rawPrice = body['price'];
         final price = rawPrice is num ? rawPrice.toDouble() : double.parse(rawPrice.toString());
         await remote.updateMaterialPrice(body['materialId'] as String, price);
     }
+  }
+
+  @override
+  Future<bool> wasMeetingProposalDelivered(PendingAction action) async {
+    final proposals = await meetups.getProposals(action.groupId);
+    return proposals.any((proposal) => proposal.id == action.id && proposal.proposerId == action.ownerId);
   }
 }

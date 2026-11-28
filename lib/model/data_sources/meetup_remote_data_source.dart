@@ -14,6 +14,7 @@ abstract class MeetupRemoteDataSource {
   /// The raw answer of [getSuggestions], for the copy saved on the phone.
   Future<Object?> getSuggestionsJson(String chatRoomId);
   Future<MeetingProposalEntity> createProposal(Map<String, dynamic> body);
+  Future<List<MeetingProposalEntity>> getProposals(String chatRoomId);
 
   /// [action] is `accept`, `decline` or `cancel`.
   Future<MeetingProposalEntity> answerProposal(String proposalId, String action);
@@ -46,6 +47,13 @@ class MeetupRemoteDataSourceImpl implements MeetupRemoteDataSource {
   @override
   Future<MeetingProposalEntity> createProposal(Map<String, dynamic> body) async =>
       meetingProposalFromJson(await apiClient.post('/meeting-proposals', body: body) as Json);
+
+  @override
+  Future<List<MeetingProposalEntity>> getProposals(String chatRoomId) async =>
+      parseList(
+        await apiClient.get('/meeting-proposals?chatRoomId=${Uri.encodeQueryComponent(chatRoomId)}'),
+        meetingProposalFromJson,
+      );
 
   @override
   Future<MeetingProposalEntity> answerProposal(String proposalId, String action) async =>

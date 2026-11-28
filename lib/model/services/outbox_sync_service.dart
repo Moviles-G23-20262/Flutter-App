@@ -23,6 +23,11 @@ abstract class OutboxSender {
   Future<void> sendAction(PendingAction action);
 }
 
+/// Resolves a proposal that may have reached the server before its time passed.
+abstract interface class MeetingProposalLookup implements OutboxSender {
+  Future<bool> wasMeetingProposalDelivered(PendingAction action);
+}
+
 /// The action depends on a change by the other participant and is still valid.
 class OutboxActionDeferred implements Exception {
   const OutboxActionDeferred();
@@ -337,12 +342,12 @@ class OutboxSyncService {
       if (action.status != PendingStatus.waiting) continue;
       await checkBeforeSend();
       final startsAt = action.meetingStartsAt;
-      if (startsAt != null && !startsAt.isAfter(_now())) {
-        // Saved offline and the time went by: the other person could not make it anyway.
-        await store.markRefused(PendingKind.action, action.id, 'That time already passed. Propose another one.');
-        continue;
-      }
-      final outcome = await _attempt(PendingKind.action, action.id, () => sender.sendAction(action));
+      final expired = startsAt != null && !startsAt.isAfter(_now());
+      final outcome = await _attempt(
+        PendingKind.action,
+        action.id,
+        () => expired ? _resolveExpiredProposal(action) : sender.sendAction(action),
+      );
       if (outcome == SyncOutcome.retryLater) return false;
       if (outcome == SyncOutcome.deferred) hasDeferredAction = true;
       if (outcome != SyncOutcome.sent && action.kind != PendingActionKind.proposeMeeting) {
@@ -350,6 +355,13 @@ class OutboxSyncService {
       }
     }
     return !hasDeferredAction;
+  }
+
+  Future<void> _resolveExpiredProposal(PendingAction action) async {
+    // The app may have stopped during the request, before recording any attempt.
+    final lookup = sender;
+    if (lookup is MeetingProposalLookup && await lookup.wasMeetingProposalDelivered(action)) return;
+    throw const ApiException(400, 'That time already passed. Propose another one.');
   }
 
   /// Uploads the photos that are not on the server yet, one request each, in order. Every URL is

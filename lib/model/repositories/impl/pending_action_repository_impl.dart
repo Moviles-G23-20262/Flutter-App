@@ -85,6 +85,13 @@ class PendingActionRepositoryImpl implements PendingActionRepository {
   }
 
   @override
+  Future<PendingAction?> deliver(PendingAction action) async {
+    await sync?.flush();
+    final actions = await store.actions(action.ownerId);
+    return actions.where((item) => item.id == action.id).firstOrNull;
+  }
+
+  @override
   Stream<List<PendingAction>> watch(String ownerId) {
     late final StreamController<List<PendingAction>> controller;
     StreamSubscription<void>? changes;

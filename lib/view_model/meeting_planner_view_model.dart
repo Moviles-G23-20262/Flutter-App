@@ -81,7 +81,7 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   String? get error => _error;
   bool get isSending => _sending;
 
-  /// The last [propose] had no connection, so the proposal waits on the phone to be sent.
+  /// The last [propose] is saved on the phone and waiting to be sent.
   bool get savedOffline => _savedOffline;
   FreeSlot? get selectedSlot => _selectedSlot;
 
@@ -140,6 +140,7 @@ class MeetingPlannerViewModel extends ChangeNotifier {
   /// Sends the picked zone and hour to the chat. Returns an error message, or `null` on success.
   /// Without a connection the proposal is saved and sent later ([savedOffline]).
   Future<String?> propose() async {
+    if (_sending) return 'Your proposal is already being sent.';
     final zone = selectedZone;
     final slot = _selectedSlot;
     if (zone == null || slot == null) return 'Pick a place and a time first.';
@@ -151,14 +152,19 @@ class MeetingPlannerViewModel extends ChangeNotifier {
     _savedOffline = false;
     _notify();
     try {
-      try {
+      final queue = useCases.queuePropose;
+      final owner = userId;
+      if (queue == null || owner == null) {
         await useCases.propose.execute(chatRoomId: chatRoomId, zone: zone.zone, slot: slot, now: now);
-      } on NoConnectionException {
-        final queue = useCases.queuePropose;
-        final owner = userId;
-        if (queue == null || owner == null) rethrow;
-        await queue.execute(ownerId: owner, chatRoomId: chatRoomId, zone: zone.zone, slot: slot);
-        _savedOffline = true;
+      } else {
+        final proposal = await queue.execute(
+          ownerId: owner,
+          chatRoomId: chatRoomId,
+          zone: zone.zone,
+          slot: slot,
+          now: now,
+        );
+        _savedOffline = await queue.tryDelivery(proposal);
       }
       return null;
     } on DataException catch (e) {

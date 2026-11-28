@@ -98,10 +98,14 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<UserEntity?> verifySession() async {
     if (!_unverified || apiClient.authToken == null) return null;
+    final revision = apiClient.authRevision;
     try {
-      return await _verified(await remote.me());
+      final user = await remote.me();
+      if (apiClient.authRevision != revision) return null;
+      return await _verified(user);
     } on ApiException catch (e) {
-      if (e.statusCode == 401) {
+      final signedOutByResponse = apiClient.authRevision == revision + 1 && apiClient.authToken == null;
+      if (e.statusCode == 401 && (apiClient.authRevision == revision || signedOutByResponse)) {
         // The client's onUnauthorized already signs the app out; drop what was kept for it.
         _unverified = false;
         sessionOwner?.signedOut();
